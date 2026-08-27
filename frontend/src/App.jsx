@@ -1,0 +1,99 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Explore from './pages/Explore';
+import Freelancers from './pages/Freelancers';
+import GigDetail from './pages/GigDetail';
+import Checkout from './pages/Checkout';
+
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import FreelancerJoin from './pages/auth/FreelancerJoin/FreelancerJoin';
+import ClientJoin from './pages/auth/ClientJoin/ClientJoin';
+import FreelancerProfile from './pages/profile/FreelancerProfile';
+
+import DashboardLayout from './components/DashboardLayout';
+import Overview from './pages/dashboard/Overview';
+import CreateGig from './pages/dashboard/CreateGig';
+import Orders from './pages/dashboard/Orders';
+import Chat from './pages/dashboard/Chat';
+import Wallet from './pages/dashboard/Wallet';
+import Profile from './pages/dashboard/Profile';
+import MyProposals from './pages/dashboard/MyProposals';
+import ReceivedProposals from './pages/dashboard/ReceivedProposals';
+import ActiveProjects from './pages/dashboard/ActiveProjects';
+import Portfolio from './pages/dashboard/Portfolio';
+import FreelancerChat from './pages/dashboard/FreelancerChat';
+import Reviews from './pages/dashboard/Reviews';
+import Settings from './pages/dashboard/Settings';
+import ProtectedRoute from './components/ProtectedRoute';
+import HiredFreelancers from './pages/dashboard/HiredFreelancers';
+import ClientOverview from './pages/dashboard/ClientOverview';
+import ClientSpending from './pages/dashboard/ClientSpending';
+import ClientReviews from './pages/dashboard/ClientReviews';
+import Notifications from './pages/dashboard/Notifications';
+
+
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import StyleTest from './pages/StyleTest';
+import './App.css';
+
+function App() {
+  return (
+    <Router>
+      <div className="app-container">
+        <Navbar />
+        
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/register" element={<Register />} />
+            <Route path="/auth/freelancer-join" element={<FreelancerJoin />} />
+            <Route path="/auth/client-join" element={<ClientJoin />} />
+            <Route path="/explore" element={<Explore />} />
+            <Route path="/freelancers" element={<Freelancers />} />
+            <Route path="/freelancer/:id" element={<FreelancerProfile />} />
+            <Route path="/gig/:id" element={<GigDetail />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/style-test" element={<StyleTest />} />
+            
+            <Route path="/client/dashboard" element={<ProtectedRoute allowedRole="client"><DashboardLayout /></ProtectedRoute>}>
+              <Route index element={<ClientOverview />} />
+              <Route path="chat" element={<Chat />} />
+              <Route path="my-projects" element={<Orders />} />
+              <Route path="proposals" element={<ReceivedProposals />} />
+              <Route path="wallet" element={<ClientSpending />} />
+              <Route path="create-project" element={<CreateGig />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="hired" element={<HiredFreelancers />} />
+              <Route path="reviews" element={<ClientReviews />} />
+              <Route path="notifications" element={<Notifications />} />
+            </Route>
+            
+            <Route path="/freelancer/dashboard" element={<ProtectedRoute allowedRole="freelancer"><DashboardLayout /></ProtectedRoute>}>
+              <Route index element={<Overview />} />
+              <Route path="chat" element={<FreelancerChat />} />
+              <Route path="my-proposals" element={<MyProposals />} />
+              <Route path="active-projects" element={<ActiveProjects />} />
+              <Route path="portfolio" element={<Portfolio />} />
+              <Route path="wallet" element={<Wallet />} />
+              <Route path="create-gig" element={<CreateGig />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="reviews" element={<Reviews />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="notifications" element={<Notifications />} />
+            </Route>
+
+
+          </Routes>
+        </main>
+
+        <Footer />
+      </div>
+    </Router>
+  );
+}
+
+export default App;
