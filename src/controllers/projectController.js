@@ -2,10 +2,21 @@ const { Project } = require('../models');
 
 const getAllProjects = async (req, res) => {
   try {
-    const projects = await Project.find().populate('client_id', 'name email');
+    const projects = await Project.find().populate('client_id', 'name email location');
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getProjectById = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id).populate('client_id', 'name email location');
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    res.json(project);
+  } catch (error) {
+    console.error('Error fetching project:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -80,6 +91,7 @@ const submitProposal = async (req, res) => {
 
 module.exports = {
   getAllProjects,
+  getProjectById,
   createProject,
   submitProposal
 };

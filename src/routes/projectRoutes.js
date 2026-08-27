@@ -7,6 +7,9 @@ const authorizeRoles = require('../middleware/rbacMiddleware');
 // Get all projects
 router.get('/', projectController.getAllProjects);
 
+// Get single project by ID
+router.get('/:id', projectController.getProjectById);
+
 // Create a project (Temporarily public for demo)
 router.post('/', projectController.createProject);
 

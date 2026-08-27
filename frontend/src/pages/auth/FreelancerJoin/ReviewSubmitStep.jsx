@@ -19,7 +19,11 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
           password: formData.password,
           role: 'freelancer',
           bio: formData.bio,
-          skills: formData.skills ? formData.skills.join(', ') : ''
+          skills: formData.skills ? formData.skills.join(', ') : '',
+          country: formData.country,
+          location: formData.location || formData.country,
+          title: formData.title,
+          hourlyRate: formData.hourlyRate
         })
       });
 
@@ -28,7 +32,17 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
         throw new Error(data.message || 'Registration failed');
       }
 
-      loginUser('freelancer', data.token, data.user);
+      const mergedProfile = {
+        ...data.user,
+        ...formData,
+        name: formData.fullName,
+        location: formData.location || formData.country || data.user.location || 'India',
+        country: formData.country || data.user.country || 'India',
+        bio: formData.bio,
+        title: formData.title
+      };
+
+      loginUser('freelancer', data.token, mergedProfile);
       navigate('/freelancer/dashboard');
     } catch (error) {
       console.error(error);
@@ -61,6 +75,10 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
             <div className="review-item">
               <span className="review-label">Country</span>
               <span className="review-value">{formData.country || '-'}</span>
+            </div>
+            <div className="review-item">
+              <span className="review-label">Location / City</span>
+              <span className="review-value">{formData.location || '-'}</span>
             </div>
           </div>
         </div>

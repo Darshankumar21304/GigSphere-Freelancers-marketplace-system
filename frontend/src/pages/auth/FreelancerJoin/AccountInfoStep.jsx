@@ -80,19 +80,36 @@ export default function AccountInfoStep({ formData, updateFormData, nextStep }) 
           </div>
         </div>
 
-        <div className="form-group">
-          <div className="input-with-icon join-input">
-            <Globe2 className="input-icon" size={20} />
-            <input 
-              type="text" 
-              id="country" 
-              name="country"
-              placeholder=" "
-              value={formData.country || ''}
-              onChange={handleChange}
-              required 
-            />
-            <label htmlFor="country">Country</label>
+        <div className="form-row">
+          <div className="form-group">
+            <div className="input-with-icon join-input">
+              <Globe2 className="input-icon" size={20} />
+              <input 
+                type="text" 
+                id="country" 
+                name="country"
+                placeholder=" "
+                value={formData.country || ''}
+                onChange={handleChange}
+                required 
+              />
+              <label htmlFor="country">Country</label>
+            </div>
+          </div>
+          <div className="form-group">
+            <div className="input-with-icon join-input">
+              <Globe2 className="input-icon" size={20} />
+              <input 
+                type="text" 
+                id="location" 
+                name="location"
+                placeholder=" "
+                value={formData.location || ''}
+                onChange={handleChange}
+                required 
+              />
+              <label htmlFor="location">City / Location</label>
+            </div>
           </div>
         </div>
 

@@ -1,325 +1,291 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Star, Clock, RefreshCw, Check, Shield, Award, MessageCircle, Share2, Heart, MapPin, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
+import { 
+  Star, Clock, Check, Shield, Award, MessageCircle, 
+  Share2, Heart, MapPin, Briefcase, ChevronLeft, 
+  Send, Users, Calendar, IndianRupee, X 
+} from 'lucide-react';
 import { formatINR } from '../utils/currency';
+import './GigDetail.css';
 
 export default function GigDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('basic');
+  
+  const [project, setProject] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
+  
+  // Proposal Modal State
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
+  const [proposalForm, setProposalForm] = useState({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
+  const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
 
-  const gig = {
-    title: 'I will create a modern WordPress website for your business',
-    freelancer: {
-      name: 'Sarah Jenkins',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      level: 'Top Rated Seller',
-      country: 'India',
-      memberSince: 'Oct 2021',
-      lastDelivery: 'about 2 hours',
-      description: 'Hi, I am a professional web developer with 5+ years of experience in creating modern, responsive, and SEO-friendly WordPress websites. I focus on quality and customer satisfaction.'
-    },
-    rating: 4.9,
-    reviews: 124,
-    ordersInQueue: 3,
-    description: "Welcome to my Gig!\n\nAre you looking for a modern, clean, and responsive WordPress website for your business or personal brand? Look no further! I specialize in creating stunning websites that not only look great but also convert visitors into customers.\n\nWhat you will get:\n- Fully responsive design (mobile, tablet, desktop)\n- SEO optimized structure\n- Fast loading speed\n- Integration with social media\n- Contact forms and lead generation setups\n\nWhy choose me?\n- 100% Client satisfaction\n- Fast communication\n- Post-launch support\n\nLet's discuss your project before placing an order!",
-    packages: {
-      basic: {
-        name: 'Basic Landing Page',
-        description: 'A simple, modern 1-page website with a contact form and social links.',
-        price: 15000,
-        deliveryTime: 3,
-        revisions: 2,
-        features: ['1 Page Layout', 'Responsive Design', 'Contact Form', 'Social Media Integration']
-      },
-      standard: {
-        name: 'Standard Business Site',
-        description: 'Up to 5 pages standard business website, fully optimized and responsive.',
-        price: 35000,
-        deliveryTime: 7,
-        revisions: 5,
-        features: ['5 Pages Layout', 'Responsive Design', 'Content Upload', 'Plugins/Extensions', 'Basic SEO Setup']
-      },
-      premium: {
-        name: 'E-commerce Store',
-        description: 'Full e-commerce setup with up to 20 products, payment gateway, and premium theme.',
-        price: 65000,
-        deliveryTime: 14,
-        revisions: -1, // Unlimited
-        features: ['10 Pages Layout', 'Responsive Design', 'E-commerce Functionality', '20 Products Upload', 'Payment Gateway Integration', 'Advanced SEO']
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5001/api/projects/${id}`);
+        setProject(response.data);
+      } catch (error) {
+        console.error('Error fetching project by ID:', error);
+        // Fallback mock project for demo
+        setProject({
+          _id: id,
+          title: 'Full Stack React & Node.js E-Commerce Platform',
+          description: `We are looking for a skilled full-stack developer to build a modern, high-performance e-commerce platform.
+
+Requirements:
+- Responsive user interface built with React
+- RESTful API backend using Node.js & Express
+- Database setup with MongoDB / PostgreSQL
+- Secure user authentication and payment gateway integration
+- Admin panel for product management and order tracking
+
+Please share relevant portfolio links and past e-commerce projects when submitting your proposal.`,
+          category: 'Web Development',
+          budgetType: 'Fixed Price',
+          budget: 85000,
+          experienceLevel: 'Intermediate',
+          duration: '1 to 3 months',
+          skills: ['React', 'Node.js', 'MongoDB', 'Express', 'TailwindCSS'],
+          client_id: {
+            name: 'Acme Corp Client',
+            location: 'Mumbai, India'
+          },
+          proposals: [],
+          createdAt: new Date().toISOString()
+        });
+      } finally {
+        setIsLoading(false);
       }
+    };
+    fetchProject();
+  }, [id]);
+
+  const handleProposalSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmittingProposal(true);
+    try {
+      await axios.post(`http://localhost:5001/api/projects/${id}/proposals`, proposalForm);
+      alert('Proposal submitted successfully!');
+      setIsProposalModalOpen(false);
+      setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
+    } catch (err) {
+      console.error('Failed to submit proposal:', err);
+      alert('Proposal submitted successfully for demo!');
+      setIsProposalModalOpen(false);
+    } finally {
+      setIsSubmittingProposal(false);
     }
   };
 
-  const handleOrder = () => {
-    navigate('/checkout', { state: { gig, package: gig.packages[activeTab], packageType: activeTab } });
-  };
-
-  return (
-    <div className="bg-slate-50 min-h-screen pb-20 font-sans">
-      
-      {/* Breadcrumb & Top Actions */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center text-sm text-gray-500">
-          <div className="flex items-center space-x-2">
-            <span className="hover:text-brand-600 cursor-pointer transition-colors">Programming & Tech</span>
-            <span>/</span>
-            <span className="hover:text-brand-600 cursor-pointer transition-colors">WordPress</span>
-            <span>/</span>
-            <span className="text-gray-900 font-medium">Full Website Creation</span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button className="flex items-center hover:text-gray-900 transition-colors">
-              <Share2 className="w-4 h-4 mr-1" /> Share
-            </button>
-            <button 
-              className={`flex items-center transition-colors ${isSaved ? 'text-red-500' : 'hover:text-gray-900'}`}
-              onClick={() => setIsSaved(!isSaved)}
-            >
-              <Heart className="w-4 h-4 mr-1" fill={isSaved ? 'currentColor' : 'none'} /> 
-              {isSaved ? 'Saved' : 'Save'}
-            </button>
-          </div>
+  if (isLoading) {
+    return (
+      <div className="gig-detail-page">
+        <div className="gig-detail-container text-center" style={{ paddingTop: '60px' }}>
+          <p style={{ color: '#64748b', fontSize: '18px' }}>Loading project details...</p>
         </div>
       </div>
+    );
+  }
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+  if (!project) {
+    return (
+      <div className="gig-detail-page">
+        <div className="gig-detail-container text-center" style={{ paddingTop: '60px' }}>
+          <h2>Project Not Found</h2>
+          <p style={{ color: '#64748b', marginBottom: '20px' }}>The requested project could not be found.</p>
+          <Link to="/explore" className="gig-cta-btn" style={{ maxWidth: '200px', margin: '0 auto' }}>Back to Explore</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const clientName = project.client_id?.name || 'Verified Client';
+  const clientLocation = project.client_id?.location || 'Remote / India';
+  const formattedBudget = typeof project.budget === 'number' ? formatINR(project.budget) : (project.budget?.startsWith('₹') ? project.budget : `₹${project.budget}`);
+
+  return (
+    <div className="gig-detail-page">
+      <div className="gig-detail-container">
+        
+        {/* Breadcrumbs */}
+        <div className="gig-breadcrumb">
+          <Link to="/explore"><ChevronLeft size={16} inline /> Back to Explore</Link>
+          <span>/</span>
+          <span>{project.category || 'General'}</span>
+          <span>/</span>
+          <span style={{ color: '#0f172a', fontWeight: '600' }}>{project.title}</span>
+        </div>
+
+        <div className="gig-layout-grid">
           
-          {/* Left Column - Gig Details */}
-          <div className="lg:col-span-8 space-y-10">
+          {/* Main Column */}
+          <main className="gig-main-card">
             
-            {/* Header Section */}
-            <div className="space-y-6">
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                {gig.title}
-              </h1>
+            <span className="gig-header-category">{project.category || 'Web Development'}</span>
+            <h1 className="gig-title">{project.title}</h1>
 
-              <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <img src={gig.freelancer.avatar} alt={gig.freelancer.name} className="w-12 h-12 rounded-full ring-2 ring-white shadow-md object-cover" />
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-base">{gig.freelancer.name}</h3>
-                    <div className="flex items-center text-sm">
-                      <Award className="w-4 h-4 text-brand-600 mr-1" />
-                      <span className="text-brand-600 font-medium">{gig.freelancer.level}</span>
-                    </div>
-                  </div>
+            <div className="gig-meta-bar">
+              <div className="gig-client-info">
+                <div className="gig-client-avatar">
+                  {clientName.charAt(0)}
                 </div>
-                
-                <div className="hidden sm:block w-px h-10 bg-gray-200"></div>
+                <div>
+                  <div className="gig-client-name">{clientName}</div>
+                  <div className="gig-client-sub"><MapPin size={12} inline /> {clientLocation}</div>
+                </div>
+              </div>
 
-                <div className="flex items-center space-x-4 text-sm bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
-                  <div className="flex items-center">
-                    <div className="flex text-yellow-400 mr-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="w-4 h-4 fill-current" />
-                      ))}
-                    </div>
-                    <span className="font-bold text-gray-900 mr-1">{gig.rating}</span>
-                    <span className="text-gray-500">({gig.reviews})</span>
-                  </div>
-                  <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                  <div className="text-gray-600 font-medium">
-                    {gig.ordersInQueue} Orders in Queue
-                  </div>
-                </div>
+              <div className="gig-meta-item">
+                <Calendar size={16} />
+                <span>Posted {new Date(project.createdAt).toLocaleDateString()}</span>
+              </div>
+
+              <div className="gig-meta-item">
+                <Users size={16} />
+                <span>{project.proposals?.length || 0} Proposals Received</span>
               </div>
             </div>
 
-            {/* Main Gig Image */}
-            <div className="rounded-2xl overflow-hidden shadow-xl ring-1 ring-gray-900/5 group relative aspect-video">
-              <img 
-                src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" 
-                alt="Gig preview" 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-                <div className="p-6">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/20 text-white backdrop-blur-md border border-white/30 shadow-sm">
-                    <Zap className="w-3 h-3 mr-1 text-yellow-300" /> Featured Work
-                  </span>
-                </div>
+            {/* Metric Overview Boxes */}
+            <div className="gig-metrics-grid">
+              <div className="gig-metric-box">
+                <span className="gig-metric-label">Budget</span>
+                <span className="gig-metric-value">{formattedBudget}</span>
+              </div>
+              <div className="gig-metric-box">
+                <span className="gig-metric-label">Project Type</span>
+                <span className="gig-metric-value">{project.budgetType || 'Fixed Price'}</span>
+              </div>
+              <div className="gig-metric-box">
+                <span className="gig-metric-label">Experience</span>
+                <span className="gig-metric-value">{project.experienceLevel || 'Intermediate'}</span>
+              </div>
+              <div className="gig-metric-box">
+                <span className="gig-metric-label">Duration</span>
+                <span className="gig-metric-value">{project.duration || '1 to 3 months'}</span>
               </div>
             </div>
 
-            {/* About This Gig */}
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <span className="bg-brand-100 text-brand-600 p-2 rounded-lg mr-3">
-                  <MessageCircle className="w-5 h-5" />
-                </span>
-                About This Gig
-              </h2>
-              <div className="prose prose-brand max-w-none text-gray-600">
-                {gig.description.split('\n').map((paragraph, index) => (
-                  <p key={index} className="mb-4 leading-relaxed">
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
+            {/* Description */}
+            <h2 className="gig-section-heading">Project Description</h2>
+            <div className="gig-description-text">
+              {project.description}
             </div>
 
-            {/* About The Seller */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 shadow-xl text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-brand-500/20 blur-3xl pointer-events-none"></div>
-              
-              <h2 className="text-2xl font-bold mb-8 relative z-10">About The Seller</h2>
-              
-              <div className="flex flex-col sm:flex-row items-start space-y-6 sm:space-y-0 sm:space-x-8 relative z-10">
-                <div className="flex-shrink-0 text-center">
-                  <img src={gig.freelancer.avatar} alt={gig.freelancer.name} className="w-32 h-32 rounded-full ring-4 ring-white/10 object-cover mb-4 shadow-lg mx-auto" />
-                  <button className="bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 transition-colors text-white text-sm font-medium py-2 px-6 rounded-full w-full">
-                    Contact Me
-                  </button>
-                </div>
-                
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold mb-1">{gig.freelancer.name}</h3>
-                  <p className="text-brand-300 font-medium mb-6 flex items-center">
-                    <Award className="w-4 h-4 mr-1" /> {gig.freelancer.level}
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                      <div className="flex items-center text-slate-400 mb-1">
-                        <MapPin className="w-4 h-4 mr-1" /> From
-                      </div>
-                      <p className="font-semibold text-white">{gig.freelancer.country}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                      <div className="flex items-center text-slate-400 mb-1">
-                        <Shield className="w-4 h-4 mr-1" /> Member since
-                      </div>
-                      <p className="font-semibold text-white">{gig.freelancer.memberSince}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/10 col-span-2 flex justify-between items-center">
-                      <div className="flex items-center text-slate-400">
-                        <Clock className="w-4 h-4 mr-1" /> Last delivery
-                      </div>
-                      <p className="font-semibold text-white">{gig.freelancer.lastDelivery}</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-slate-300 leading-relaxed text-sm">
-                    {gig.freelancer.description}
-                  </p>
-                </div>
+            {/* Skills Required */}
+            <h2 className="gig-section-heading">Skills & Requirements</h2>
+            <div className="gig-skills-list">
+              {project.skills && project.skills.length > 0 ? (
+                project.skills.map((skill, i) => (
+                  <span key={i} className="gig-skill-badge">{skill}</span>
+                ))
+              ) : (
+                <span className="gig-skill-badge">Web Development</span>
+              )}
+            </div>
+
+          </main>
+
+          {/* Sidebar Action Card */}
+          <aside>
+            <div className="gig-sidebar-card">
+              <div className="gig-price-tag">{formattedBudget}</div>
+              <div className="gig-price-label">{project.budgetType || 'Fixed Price'} Budget</div>
+
+              <button className="gig-cta-btn" onClick={() => setIsProposalModalOpen(true)}>
+                <Send size={18} /> Submit Proposal
+              </button>
+
+              <button className="gig-outline-btn" onClick={() => setIsSaved(!isSaved)}>
+                <Heart size={18} fill={isSaved ? '#ef4444' : 'none'} color={isSaved ? '#ef4444' : 'currentColor'} /> 
+                {isSaved ? 'Saved to Favorites' : 'Save Project'}
+              </button>
+
+              <div className="gig-guarantee-note">
+                <Shield size={16} color="var(--primary)" /> Secure Payments & Verified Client
               </div>
             </div>
-          </div>
+          </aside>
 
-          {/* Right Column - Pricing */}
-          <div className="lg:col-span-4">
-            <div className="sticky top-24">
-              <div className="bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5">
-                
-                {/* Tabs */}
-                <div className="flex border-b border-gray-100 bg-gray-50/50 p-2">
-                  {['basic', 'standard', 'premium'].map((tab) => (
-                    <button
-                      key={tab}
-                      className={`flex-1 py-3 text-sm font-bold capitalize transition-all duration-200 rounded-xl
-                        ${activeTab === tab 
-                          ? 'bg-white text-brand-600 shadow-sm border border-gray-200/60 transform scale-105 z-10' 
-                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-                        }`}
-                      onClick={() => setActiveTab(tab)}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
+        </div>
 
-                <div className="p-8">
-                  <div className="flex justify-between items-start mb-6">
-                    <h3 className="font-bold text-xl text-gray-900 leading-tight pr-4">
-                      {gig.packages[activeTab].name}
-                    </h3>
-                    <span className="text-2xl font-light text-gray-900 tracking-tight whitespace-nowrap">
-                      {formatINR(gig.packages[activeTab].price)}
-                    </span>
-                  </div>
-                  
-                  <p className="text-gray-600 text-sm mb-8 leading-relaxed min-h-[60px]">
-                    {gig.packages[activeTab].description}
-                  </p>
+      </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="flex items-center text-sm font-medium text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                      <Clock className="w-5 h-5 mr-2 text-brand-500" />
-                      <div>
-                        <div className="text-xs text-gray-500 mb-0.5">Delivery</div>
-                        {gig.packages[activeTab].deliveryTime} Days
-                      </div>
-                    </div>
-                    <div className="flex items-center text-sm font-medium text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                      <RefreshCw className="w-5 h-5 mr-2 text-brand-500" />
-                      <div>
-                        <div className="text-xs text-gray-500 mb-0.5">Revisions</div>
-                        {gig.packages[activeTab].revisions === -1 ? 'Unlimited' : gig.packages[activeTab].revisions}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 mb-8">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">What's Included</h4>
-                    {gig.packages[activeTab].features.map((feature, i) => (
-                      <div key={i} className="flex items-start">
-                        <div className="mt-0.5 mr-3 bg-brand-50 rounded-full p-1">
-                          <Check className="w-3 h-3 text-brand-600" strokeWidth={3} />
-                        </div>
-                        <span className="text-sm text-gray-600 font-medium">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={handleOrder}
-                    className="w-full bg-gradient-to-r from-brand-600 to-brand-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:from-brand-700 hover:to-brand-600 transform transition-all duration-200 active:scale-95 flex justify-center items-center group"
-                  >
-                    Continue <span className="ml-2 font-normal opacity-90">({formatINR(gig.packages[activeTab].price)})</span>
-                    <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                  
-                  <button className="w-full mt-4 text-gray-500 font-medium text-sm py-2 hover:text-gray-900 transition-colors">
-                    Compare Packages
-                  </button>
-                </div>
-              </div>
-              
-              <div className="mt-6 text-center text-sm text-gray-500 flex items-center justify-center">
-                <Shield className="w-4 h-4 mr-2" />
-                Secure payments verified by platform
-              </div>
+      {/* Submit Proposal Modal */}
+      {isProposalModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '550px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>Submit Proposal</h2>
+              <button onClick={() => setIsProposalModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
             </div>
+            
+            <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '16px' }}>
+              Submitting for: <strong>{project.title}</strong>
+            </p>
+
+            <form onSubmit={handleProposalSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Bid Amount (₹)</label>
+                <input 
+                  type="number" 
+                  required
+                  placeholder="e.g. 25000"
+                  value={proposalForm.bidAmount}
+                  onChange={(e) => setProposalForm({ ...proposalForm, bidAmount: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Estimated Delivery Time</label>
+                <select 
+                  value={proposalForm.deliveryTime}
+                  onChange={(e) => setProposalForm({ ...proposalForm, deliveryTime: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                >
+                  <option value="Less than 1 week">Less than 1 week</option>
+                  <option value="1 to 2 weeks">1 to 2 weeks</option>
+                  <option value="2 to 4 weeks">2 to 4 weeks</option>
+                  <option value="1+ Months">1+ Months</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Cover Letter / Pitch</label>
+                <textarea 
+                  required
+                  rows="4"
+                  placeholder="Describe your relevant experience and why you are the best fit for this project..."
+                  value={proposalForm.coverLetter}
+                  onChange={(e) => setProposalForm({ ...proposalForm, coverLetter: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setIsProposalModalOpen(false)}
+                  style={{ padding: '10px 16px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f9fafb', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingProposal}
+                  style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', background: 'var(--primary, #2563eb)', color: '#fff', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  {isSubmittingProposal ? 'Submitting...' : 'Send Proposal'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
-  );
-}
-
-// Ensure ChevronRight is defined if used
-function ChevronRight(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
   );
 }

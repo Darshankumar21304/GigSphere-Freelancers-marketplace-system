@@ -37,8 +37,8 @@ export default function Profile() {
     lastName: savedProfile?.lastName || initialLastName,
     email: savedProfile?.email || (role === 'client' ? 'jane@company.com' : 'alex@freelance.com'),
     phone: savedProfile?.phone || '+91 98765 43210',
-    title: savedProfile?.title || (role === 'client' ? 'Product Manager' : 'Senior UI/UX Designer'),
-    location: savedProfile?.location || 'Mumbai',
+    title: savedProfile?.title || savedProfile?.profile?.title || (role === 'client' ? 'Product Manager' : 'Senior UI/UX Designer'),
+    location: savedProfile?.location || savedProfile?.city || 'Mumbai',
     state: savedProfile?.state || 'Maharashtra',
     country: savedProfile?.country || 'India',
     companyName: savedProfile?.companyName || 'TechNova Solutions',
@@ -47,7 +47,7 @@ export default function Profile() {
     website: savedProfile?.website || 'https://technova.in',
     companyDesc: savedProfile?.companyDesc || 'TechNova is a leading provider of innovative digital solutions, specializing in e-commerce platforms and mobile applications.',
     gstin: savedProfile?.gstin || '27AADCB2230M1Z2',
-    bio: savedProfile?.bio || (role === 'client' 
+    bio: savedProfile?.bio || savedProfile?.profile?.bio || (role === 'client' 
       ? 'Looking for talented designers and developers to build amazing products.' 
       : 'Passionate designer with 5+ years of experience creating user-centric digital products.'),
   });
@@ -63,7 +63,12 @@ export default function Profile() {
     if (!profileData.firstName || !profileData.email) return;
     setIsEditing(false);
     setHasChanges(false);
-    saveUserProfile({ ...savedProfile, ...profileData });
+    const updated = { 
+      ...savedProfile, 
+      ...profileData, 
+      name: `${profileData.firstName} ${profileData.lastName}` 
+    };
+    saveUserProfile(updated);
     setToastMessage('Profile updated successfully.');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);

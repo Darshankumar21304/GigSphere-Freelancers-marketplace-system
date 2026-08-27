@@ -4,7 +4,7 @@ const { User, FreelancerProfile } = require('../models');
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, bio, skills } = req.body;
+    const { name, email, password, role, bio, skills, location, country, title, hourlyRate } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
     
     // Check if user exists
@@ -17,20 +17,26 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
+    const userLocation = location || country || '';
+
     // Create user
     const newUser = await User.create({
       name,
       email: normalizedEmail,
       password_hash,
-      role: role || 'client'
+      role: role || 'client',
+      location: userLocation
     });
 
     // If freelancer, create profile
+    let profile = null;
     if (newUser.role === 'freelancer') {
-      await FreelancerProfile.create({
+      profile = await FreelancerProfile.create({
         user_id: newUser._id,
+        title: title || '',
         bio: bio || '',
-        skills: skills || ''
+        skills: skills || '',
+        hourlyRate: hourlyRate || 0
       });
     }
 
@@ -44,7 +50,17 @@ exports.register = async (req, res) => {
     res.status(201).json({ 
       message: 'User registered successfully', 
       token, 
-      user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role } 
+      user: { 
+        id: newUser._id, 
+        name: newUser.name, 
+        email: newUser.email, 
+        role: newUser.role,
+        location: newUser.location,
+        country: country || newUser.location,
+        bio: bio || '',
+        skills: skills || '',
+        title: title || ''
+      } 
     });
   } catch (error) {
     console.error(error);

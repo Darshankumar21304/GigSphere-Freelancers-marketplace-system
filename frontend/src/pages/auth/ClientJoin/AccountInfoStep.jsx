@@ -26,7 +26,10 @@ export default function AccountInfoStep({ formData, updateFormData, prevStep }) 
           name: formData.fullName,
           email: formData.email,
           password: formData.password,
-          role: 'client'
+          role: 'client',
+          companyName: formData.companyName,
+          location: formData.country || formData.location,
+          country: formData.country
         })
       });
 
@@ -35,7 +38,15 @@ export default function AccountInfoStep({ formData, updateFormData, prevStep }) 
         throw new Error(data.message || 'Registration failed');
       }
 
-      loginUser('client', data.token, data.user);
+      const mergedProfile = {
+        ...data.user,
+        ...formData,
+        name: formData.fullName,
+        location: formData.country || data.user.location || 'India',
+        country: formData.country || data.user.country || 'India'
+      };
+
+      loginUser('client', data.token, mergedProfile);
       navigate('/client/dashboard');
     } catch (error) {
       console.error(error);

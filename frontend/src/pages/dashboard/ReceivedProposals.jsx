@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Download, Search, Filter, Briefcase, ChevronDown, CheckCircle,
   MoreVertical, Eye, MessageSquare, User, Check, X, ShieldCheck,
@@ -79,8 +80,6 @@ const MOCK_PROPOSALS = [
     skills: ['SEO', 'Technical Writing', 'React', 'Content Strategy']
   }
 ];
-
-import { useNavigate } from 'react-router-dom';
 
 export default function ReceivedProposals() {
   const navigate = useNavigate();

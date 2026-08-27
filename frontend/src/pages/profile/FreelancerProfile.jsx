@@ -1,8 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Check, Star, MapPin, Globe, Clock, MessageSquare, Award } from 'lucide-react';
+import { getUserProfile } from '../../utils/authUtils';
 import './Profile.css';
 
 export default function FreelancerProfile() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const savedProfile = getUserProfile();
+
+  const [freelancer, setFreelancer] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        if (id) {
+          const res = await axios.get(`http://localhost:5001/api/users/${id}`);
+          setFreelancer(res.data);
+        } else if (savedProfile) {
+          setFreelancer(savedProfile);
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [id]);
+
+  const name = freelancer?.name || freelancer?.fullName || (savedProfile?.name || 'Alex Morgan');
+  const title = freelancer?.profile?.title || freelancer?.title || 'Senior Full-Stack Developer';
+  const location = freelancer?.location || freelancer?.profile?.location || freelancer?.country || 'Mumbai, India';
+  const bio = freelancer?.profile?.bio || freelancer?.bio || 'Passionate designer & developer with experience building high-quality digital products.';
+  const hourlyRate = freelancer?.profile?.hourlyRate || freelancer?.hourlyRate || '1500';
+
   return (
     <div className="profile-page">
       <div className="container profile-layout">
@@ -11,14 +45,14 @@ export default function FreelancerProfile() {
         <aside className="profile-sidebar">
           <div className="profile-card">
             <div className="profile-avatar-container">
-              <img src="https://i.pravatar.cc/300?img=47" alt="Alex Morgan" className="profile-avatar" />
+              <img src={freelancer?.avatar || 'https://i.pravatar.cc/300?img=47'} alt={name} className="profile-avatar" />
               <div className="verified-badge" title="Verified Identity">
                 <Check size={16} strokeWidth={3} />
               </div>
             </div>
             
-            <h1 className="profile-name">Alex Morgan</h1>
-            <p className="profile-title">Senior Full-Stack Developer</p>
+            <h1 className="profile-name">{name}</h1>
+            <p className="profile-title">{title}</p>
             
             <div className="profile-stats">
               <div className="stat-item">
@@ -27,13 +61,13 @@ export default function FreelancerProfile() {
               </div>
               <div className="stat-item">
                 <span className="stat-value">98%</span>
-                <span className="stat-label">AI Match</span>
+                <span className="stat-label">Match</span>
               </div>
             </div>
             
             <div className="profile-actions">
-              <button className="btn btn-primary btn-hire">Hire Me</button>
-              <button className="btn btn-outline" style={{width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+              <button className="btn btn-primary btn-hire" onClick={() => navigate('/client/dashboard/create-project')}>Hire Me</button>
+              <button className="btn btn-outline" onClick={() => navigate('/client/dashboard/chat')} style={{width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
                 <MessageSquare size={18} />
                 Message
               </button>
@@ -45,11 +79,11 @@ export default function FreelancerProfile() {
             <div className="info-list">
               <div className="info-item">
                 <MapPin size={18} />
-                <span>San Francisco, CA</span>
+                <span>{location}</span>
               </div>
               <div className="info-item">
                 <Globe size={18} />
-                <span>English, Spanish (Fluent)</span>
+                <span>English, Hindi (Fluent)</span>
               </div>
               <div className="info-item">
                 <Clock size={18} />
@@ -64,7 +98,7 @@ export default function FreelancerProfile() {
 
           <div className="profile-info-section">
             <h3 className="info-title">Rates</h3>
-            <div style={{fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)'}}>$85.00 <span style={{fontSize: '1rem', fontWeight: '400', color: 'var(--text-secondary)'}}>/ hr</span></div>
+            <div style={{fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)'}}>₹{hourlyRate} <span style={{fontSize: '1rem', fontWeight: '400', color: 'var(--text-secondary)'}}>/ hr</span></div>
           </div>
         </aside>
 
@@ -74,10 +108,7 @@ export default function FreelancerProfile() {
             <h2 className="content-title">Biography</h2>
             <div className="content-text">
               <p style={{marginBottom: '16px'}}>
-                I am a passionate Full-Stack Developer with over 8 years of experience building scalable web applications. My expertise lies in React ecosystem, Node.js, and cloud architecture. I have successfully delivered over 50 projects ranging from SaaS platforms to complex fintech dashboards.
-              </p>
-              <p>
-                I focus on clean code, responsive design, and optimal user experiences. I communicate clearly and always ensure my clients are satisfied with the final product. Let's build something amazing together!
+                {bio}
               </p>
             </div>
           </div>
