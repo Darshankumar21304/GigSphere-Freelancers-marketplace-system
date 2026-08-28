@@ -23,7 +23,8 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
           country: formData.country,
           location: formData.location || formData.country,
           title: formData.title,
-          hourlyRate: formData.hourlyRate
+          hourlyRate: formData.hourlyRate,
+          avatar: formData.profileImage || formData.avatar || ''
         })
       });
 
@@ -35,6 +36,8 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
       const mergedProfile = {
         ...data.user,
         ...formData,
+        avatar: data.user?.avatar || formData.profileImage || formData.avatar || '',
+        profileImage: data.user?.avatar || formData.profileImage || formData.avatar || '',
         name: formData.fullName,
         location: formData.location || formData.country || data.user.location || 'India',
         country: formData.country || data.user.country || 'India',

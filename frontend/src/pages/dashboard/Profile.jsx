@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Mail, Briefcase, MapPin, Edit2, Save, Camera, Shield, CheckCircle, 
   Settings, Building, Phone, AlertCircle, TrendingUp, Users, FileText, ChevronRight
 } from 'lucide-react';
 import { getUserRole, getUserProfile, saveUserProfile } from '../../utils/authUtils';
 import { formatINR } from '../../utils/currency';
+import { apiFetch } from '../../utils/api';
 import './ClientProfile.css';
 
 export default function Profile() {
   const role = getUserRole();
   const savedProfile = getUserProfile();
+  const fileInputRef = useRef(null);
   
   const [activeTab, setActiveTab] = useState('Overview');
   const [isEditing, setIsEditing] = useState(false);
@@ -33,6 +35,7 @@ export default function Profile() {
   }
 
   const [profileData, setProfileData] = useState({
+    avatar: savedProfile?.avatar || savedProfile?.profileImage || '',
     firstName: savedProfile?.firstName || initialFirstName,
     lastName: savedProfile?.lastName || initialLastName,
     email: savedProfile?.email || (role === 'client' ? 'jane@company.com' : 'alex@freelance.com'),
@@ -52,24 +55,122 @@ export default function Profile() {
       : 'Passionate designer with 5+ years of experience creating user-centric digital products.'),
   });
 
+  // Fetch up-to-date user profile from DB on mount
+  useEffect(() => {
+    const fetchDBProfile = async () => {
+      try {
+        const data = await apiFetch('/users/settings');
+        if (data && data.user) {
+          const u = data.user;
+          const p = data.profile || {};
+          const nameParts = (u.name || '').trim().split(' ');
+          const fName = nameParts[0] || u.firstName || '';
+          const lName = nameParts.slice(1).join(' ') || u.lastName || '';
+
+          setProfileData(prev => ({
+            ...prev,
+            avatar: u.avatar || prev.avatar,
+            firstName: fName || prev.firstName,
+            lastName: lName || prev.lastName,
+            email: u.email || prev.email,
+            phone: u.phone || prev.phone,
+            location: u.location || prev.location,
+            title: p.title || u.title || prev.title,
+            bio: p.bio || u.bio || prev.bio,
+            companyName: u.companyName || prev.companyName
+          }));
+
+          const updatedLocal = {
+            ...savedProfile,
+            name: u.name || `${fName} ${lName}`,
+            email: u.email,
+            avatar: u.avatar,
+            phone: u.phone,
+            location: u.location,
+            title: p.title || u.title,
+            bio: p.bio || u.bio
+          };
+          saveUserProfile(updatedLocal);
+        }
+      } catch (err) {
+        console.warn('Could not fetch user profile from DB, falling back to local state:', err);
+      }
+    };
+    fetchDBProfile();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setProfileData(prev => ({ ...prev, [name]: value }));
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    // Basic validation
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result;
+        setProfileData(prev => ({ ...prev, avatar: base64Data }));
+        const updated = { 
+          ...savedProfile, 
+          ...profileData, 
+          avatar: base64Data,
+          profileImage: base64Data
+        };
+        saveUserProfile(updated);
+
+        try {
+          await apiFetch('/users/settings', {
+            method: 'PUT',
+            body: JSON.stringify({ avatar: base64Data })
+          });
+        } catch (err) {
+          console.warn('Avatar DB save error:', err);
+        }
+
+        setToastMessage('Profile picture updated successfully.');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
     if (!profileData.firstName || !profileData.email) return;
     setIsEditing(false);
     setHasChanges(false);
+
+    const fullName = `${profileData.firstName} ${profileData.lastName}`.trim();
     const updated = { 
       ...savedProfile, 
       ...profileData, 
-      name: `${profileData.firstName} ${profileData.lastName}` 
+      name: fullName 
     };
     saveUserProfile(updated);
-    setToastMessage('Profile updated successfully.');
+
+    try {
+      await apiFetch('/users/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: fullName,
+          email: profileData.email,
+          phone: profileData.phone,
+          location: profileData.location,
+          avatar: profileData.avatar,
+          title: profileData.title,
+          bio: profileData.bio,
+          companyName: profileData.companyName,
+          companyDesc: profileData.companyDesc
+        })
+      });
+      setToastMessage('Profile updated successfully.');
+    } catch (err) {
+      console.error('Failed to update DB settings:', err);
+      setToastMessage('Profile updated locally.');
+    }
+
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
@@ -105,6 +206,19 @@ export default function Profile() {
 
   const tabs = ['Overview', 'Personal Information', ...(role === 'client' ? ['Company Details'] : []), 'Security', 'Preferences'];
 
+  const fields = [
+    profileData.avatar,
+    profileData.firstName,
+    profileData.lastName,
+    profileData.email,
+    profileData.phone,
+    profileData.title,
+    profileData.location,
+    profileData.bio
+  ];
+  const filledCount = fields.filter(f => f && String(f).trim().length > 0).length;
+  const profileStrength = Math.min(100, Math.round((filledCount / fields.length) * 100));
+
   return (
     <div className="gigsphere-client-profile">
       {/* Breadcrumbs */}
@@ -134,13 +248,24 @@ export default function Profile() {
         <div className="gcp-profile-main">
           <div className="gcp-profile-identity">
             <div className="gcp-avatar-wrapper group">
-              <div className="gcp-avatar">
-                {role === 'client' ? profileData.companyName?.charAt(0) : profileData.firstName?.charAt(0)}
+              <div className="gcp-avatar" style={{ overflow: 'hidden' }}>
+                {profileData.avatar ? (
+                  <img src={profileData.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  role === 'client' ? profileData.companyName?.charAt(0) : profileData.firstName?.charAt(0)
+                )}
               </div>
-              <button className="gcp-avatar-button">
+              <button className="gcp-avatar-button" type="button" onClick={() => fileInputRef.current?.click()}>
                 <Camera size={20} />
                 <span>Change</span>
               </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                accept="image/*" 
+                onChange={handleAvatarChange} 
+                style={{ display: 'none' }} 
+              />
             </div>
             <div className="gcp-profile-info">
               <div className="gcp-profile-name-row">
@@ -158,10 +283,10 @@ export default function Profile() {
           <div className="gcp-strength-panel">
             <div className="gcp-strength-header">
               <span className="gcp-strength-title">Profile Strength</span>
-              <span className="gcp-strength-value">85%</span>
+              <span className="gcp-strength-value">{profileStrength}%</span>
             </div>
             <div className="gcp-strength-progress">
-              <div className="gcp-strength-progress-fill" style={{ width: '85%' }}></div>
+              <div className="gcp-strength-progress-fill" style={{ width: `${profileStrength}%` }}></div>
             </div>
             <p className="gcp-strength-suggestions">Complete your profile to build trust.</p>
           </div>

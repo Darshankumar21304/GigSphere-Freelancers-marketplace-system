@@ -6,6 +6,7 @@ import {
   Star, MapPin, Clock, Calendar, FileText
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
+import { getStoredProposals, saveStoredProposals } from '../../utils/proposalUtils';
 import './ReceivedProposals.css';
 
 // Mock Data
@@ -15,75 +16,9 @@ const MOCK_PROJECTS = [
   { id: 'prj-2', title: 'SEO Content Writing for Tech Blog', status: 'In Progress', budget: 15000 }
 ];
 
-const MOCK_PROPOSALS = [
-  {
-    id: 'prop-1',
-    projectId: 'prj-1',
-    projectTitle: 'Modern E-commerce Website Design',
-    freelancer: {
-      name: 'Alex Rivera',
-      title: 'Senior UI/UX Designer',
-      avatar: 'https://i.pravatar.cc/150?img=11',
-      verified: true,
-      rating: 4.9,
-      reviews: 124,
-      location: 'New Delhi, India',
-      completedProjects: 85
-    },
-    status: 'New',
-    bidAmount: 75000,
-    deliveryTime: '3 Weeks',
-    submittedDate: 'Oct 25, 2023',
-    coverLetter: 'Hi there, I specialize in e-commerce UI/UX and have successfully redesigned 3 Shopify stores in the last quarter, increasing their conversion rates by an average of 22%. I have reviewed your requirements and I am confident in delivering a modern, glassmorphism aesthetic that perfectly suits your brand vision.',
-    skills: ['Figma', 'UI/UX', 'Prototyping', 'E-commerce']
-  },
-  {
-    id: 'prop-2',
-    projectId: 'prj-1',
-    projectTitle: 'Modern E-commerce Website Design',
-    freelancer: {
-      name: 'Sarah Chen',
-      title: 'Product Designer',
-      avatar: 'https://i.pravatar.cc/150?img=5',
-      verified: true,
-      rating: 4.7,
-      reviews: 42,
-      location: 'Mumbai, India',
-      completedProjects: 31
-    },
-    status: 'Shortlisted',
-    bidAmount: 90000,
-    deliveryTime: '4 Weeks',
-    submittedDate: 'Oct 23, 2023',
-    coverLetter: 'I would love to help you overhaul your Shopify store. My approach is user-centric, starting with wireframes and usability testing before moving to high-fidelity designs.',
-    skills: ['UI Design', 'Figma', 'Web Design']
-  },
-  {
-    id: 'prop-3',
-    projectId: 'prj-2',
-    projectTitle: 'SEO Content Writing for Tech Blog',
-    freelancer: {
-      name: 'Priya Sharma',
-      title: 'Technical Writer & SEO Expert',
-      avatar: 'https://i.pravatar.cc/150?img=44',
-      verified: true,
-      rating: 5.0,
-      reviews: 89,
-      location: 'Bangalore, India',
-      completedProjects: 120
-    },
-    status: 'Hired',
-    bidAmount: 14000,
-    deliveryTime: 'Ongoing',
-    submittedDate: 'Oct 20, 2023',
-    coverLetter: 'I am a specialized technical writer focusing on React and Node.js ecosystems. I can deliver 4 high-quality, long-form articles per month tailored to your specific audience.',
-    skills: ['SEO', 'Technical Writing', 'React', 'Content Strategy']
-  }
-];
-
 export default function ReceivedProposals() {
   const navigate = useNavigate();
-  const [proposals, setProposals] = useState(MOCK_PROPOSALS);
+  const [proposals, setProposals] = useState(() => getStoredProposals());
   const [selectedProject, setSelectedProject] = useState('all');
   const [activeTab, setActiveTab] = useState('All Proposals');
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,7 +29,11 @@ export default function ReceivedProposals() {
   const tabs = ['All Proposals', 'New', 'Under Review', 'Shortlisted', 'Hired', 'Rejected', 'Withdrawn'];
 
   const handleUpdateStatus = (proposalId, newStatus) => {
-    setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: newStatus } : p));
+    setProposals(prev => {
+      const updated = prev.map(p => p.id === proposalId ? { ...p, status: newStatus } : p);
+      saveStoredProposals(updated);
+      return updated;
+    });
     setMenuOpen(null);
     if (newStatus === 'Hired') {
       alert('Freelancer hired successfully! Navigating to Hired Freelancers...');
@@ -105,15 +44,18 @@ export default function ReceivedProposals() {
   // Filtering Logic
   const filteredProposals = proposals.filter(p => {
     const matchesProject = selectedProject === 'all' || p.projectId === selectedProject;
-    const matchesTab = activeTab === 'All Proposals' || p.status === activeTab;
-    const matchesSearch = p.freelancer.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.projectTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesTab = activeTab === 'All Proposals' || 
+                       p.status === activeTab || 
+                       (activeTab === 'New' && (p.status === 'Pending' || p.status === 'New'));
+    const freelancerName = (p.freelancer && p.freelancer.name) || p.clientName || 'Freelancer';
+    const matchesSearch = freelancerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (p.projectTitle && p.projectTitle.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (p.skills && p.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase())));
     return matchesProject && matchesTab && matchesSearch;
   }).sort((a, b) => {
     if (sortOption === 'Lowest Bid') return a.bidAmount - b.bidAmount;
     if (sortOption === 'Highest Bid') return b.bidAmount - a.bidAmount;
-    if (sortOption === 'Best Rated') return b.freelancer.rating - a.freelancer.rating;
+    if (sortOption === 'Best Rated') return ((b.freelancer && b.freelancer.rating) || 5.0) - ((a.freelancer && a.freelancer.rating) || 5.0);
     return 0; // default Newest First
   });
 

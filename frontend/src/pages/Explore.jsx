@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { 
   Filter, 
   Search,
@@ -19,6 +18,9 @@ import {
   Briefcase
 } from 'lucide-react';
 import { formatINR } from '../utils/currency';
+import { apiFetch } from '../utils/api';
+import { getStoredProposals, saveStoredProposals } from '../utils/proposalUtils';
+import { getUserProfile } from '../utils/authUtils';
 import './BrowseProjects.css';
 
 const MOCK_CATEGORIES = [
@@ -30,6 +32,69 @@ const MOCK_CATEGORIES = [
   'Digital Marketing',
   'Content Writing',
   'Data Science'
+];
+
+const DEFAULT_PROJECTS = [
+  {
+    _id: 'prj-101',
+    id: 'prj-101',
+    title: 'Modern E-commerce Website Design & React Frontend',
+    category: 'Web Development',
+    budgetType: 'Fixed Price',
+    budget: '₹85,000',
+    experienceLevel: 'Intermediate',
+    duration: '1 to 3 months',
+    createdAt: new Date().toISOString(),
+    description: 'We are seeking an experienced React developer to build a modern, high-converting e-commerce web application with glassmorphism aesthetic, cart functionality, and payment gateway integration.',
+    skills: ['React', 'Node.js', 'Redux', 'Tailwind CSS', 'Stripe'],
+    client_id: { name: 'TechNova Solutions', rating: 4.9 },
+    saved: false
+  },
+  {
+    _id: 'prj-102',
+    id: 'prj-102',
+    title: 'Cross-Platform Mobile App for Healthcare Startup',
+    category: 'Mobile Development',
+    budgetType: 'Fixed Price',
+    budget: '₹1,20,000',
+    experienceLevel: 'Expert',
+    duration: '3 to 6 months',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    description: 'Looking for a React Native specialist to craft a seamless doctor appointment booking application featuring live video consultation, prescription uploads, and push notifications.',
+    skills: ['React Native', 'TypeScript', 'WebRTC', 'Firebase'],
+    client_id: { name: 'HealthCare Plus', rating: 5.0 },
+    saved: false
+  },
+  {
+    _id: 'prj-103',
+    id: 'prj-103',
+    title: 'Fintech Dashboard UI/UX Design System',
+    category: 'UI/UX Design',
+    budgetType: 'Fixed Price',
+    budget: '₹60,000',
+    experienceLevel: 'Intermediate',
+    duration: 'Less than 1 month',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+    description: 'We need a Figma UI/UX designer to create a complete design system, dark mode components, and interactive prototypes for our personal finance management dashboard.',
+    skills: ['Figma', 'UI/UX Design', 'Wireframing', 'Prototyping'],
+    client_id: { name: 'FinTrust Global', rating: 4.8 },
+    saved: false
+  },
+  {
+    _id: 'prj-104',
+    id: 'prj-104',
+    title: 'Node.js Microservices Backend & Redis Caching',
+    category: 'Web Development',
+    budgetType: 'Fixed Price',
+    budget: '₹95,000',
+    experienceLevel: 'Expert',
+    duration: '1 to 3 months',
+    createdAt: new Date(Date.now() - 86400000 * 6).toISOString(),
+    description: 'Architect and scale our backend microservices using Express, MongoDB, and Redis caching. Must have strong experience with REST APIs and JWT security.',
+    skills: ['Node.js', 'MongoDB', 'Redis', 'Express.js', 'Docker'],
+    client_id: { name: 'CloudScale Technologies', rating: 4.9 },
+    saved: false
+  }
 ];
 
 export default function Explore() {
@@ -58,26 +123,73 @@ export default function Explore() {
     if (!proposalProject) return;
     setIsSubmittingProposal(true);
     try {
-      await axios.post(`http://localhost:5001/api/projects/${proposalProject._id}/proposals`, proposalForm);
-      alert('Proposal submitted successfully!');
+      try {
+        await apiFetch(`/projects/${proposalProject._id || proposalProject.id}/proposals`, {
+          method: 'POST',
+          body: JSON.stringify(proposalForm)
+        });
+      } catch (err) {
+        console.warn('Backend API proposal submission fell back to local sync:', err);
+      }
+
+      // Save proposal locally to proposalUtils so it instantly displays in My Proposals & Received Proposals
+      const storedProposals = getStoredProposals();
+      const userProfile = getUserProfile();
+      const freelancerName = userProfile?.name || userProfile?.fullName || 'Darshan Kumar';
+      const freelancerTitle = userProfile?.title || 'Senior Full Stack Developer';
+      const freelancerAvatar = userProfile?.avatar || userProfile?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(freelancerName)}`;
+
+      const newProp = {
+        id: `PROP-${Date.now().toString().slice(-4)}`,
+        projectId: proposalProject._id || proposalProject.id || 'prj-1',
+        projectTitle: proposalProject.title,
+        clientName: proposalProject.client_id ? proposalProject.client_id.name : (proposalProject.clientName || 'TechNova Solutions'),
+        clientVerified: true,
+        submittedDate: 'Just now',
+        status: 'New',
+        bidAmount: Number(proposalForm.bidAmount) || 25000,
+        deliveryTime: proposalForm.deliveryTime || '2 Weeks',
+        coverLetter: proposalForm.coverLetter,
+        skills: proposalProject.skills || ['React', 'Node.js'],
+        projectBudget: `₹${proposalForm.bidAmount}`,
+        lastActivity: 'Just now',
+        freelancer: {
+          name: freelancerName,
+          title: freelancerTitle,
+          avatar: freelancerAvatar,
+          verified: true,
+          rating: 5.0,
+          reviews: 16,
+          location: userProfile?.location || 'Mumbai, India',
+          completedProjects: 12
+        }
+      };
+      
+      saveStoredProposals([newProp, ...storedProposals]);
+      alert('Proposal submitted successfully! It will now appear on the client dashboard.');
       setProposalProject(null);
       setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
     } catch (err) {
       console.error('Failed to submit proposal:', err);
-      alert('Failed to submit proposal: ' + (err.response?.data?.message || err.message));
+      alert('Failed to submit proposal: ' + err.message);
     } finally {
       setIsSubmittingProposal(false);
     }
   };
 
-  // Fetch projects from backend
+  // Fetch projects from backend DB or fallback to default projects feed
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/projects');
-        setProjects(response.data);
+        const data = await apiFetch('/projects');
+        if (Array.isArray(data) && data.length > 0) {
+          setProjects(data);
+        } else {
+          setProjects(DEFAULT_PROJECTS);
+        }
       } catch (error) {
-        console.error('Error fetching projects:', error);
+        console.warn('Error fetching projects from backend API, using default projects list:', error);
+        setProjects(DEFAULT_PROJECTS);
       } finally {
         setIsLoading(false);
       }

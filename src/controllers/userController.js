@@ -47,14 +47,19 @@ const updateSettings = async (req, res) => {
   try {
     const userId = req.user.id;
     const { 
-      name, phone, location, language, preferences, 
+      name, phone, location, language, preferences, avatar, profileImage,
       title, bio, skills, experience, availability, hourlyRate 
     } = req.body;
     
+    const userUpdateFields = { name, phone, location, language, preferences };
+    if (avatar !== undefined || profileImage !== undefined) {
+      userUpdateFields.avatar = avatar || profileImage || '';
+    }
+
     // Update User
     const updatedUser = await User.findByIdAndUpdate(
       userId, 
-      { name, phone, location, language, preferences }, 
+      userUpdateFields, 
       { new: true, runValidators: true }
     ).select('-password_hash');
     

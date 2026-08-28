@@ -45,7 +45,7 @@ export default function FreelancerProfile() {
         <aside className="profile-sidebar">
           <div className="profile-card">
             <div className="profile-avatar-container">
-              <img src={freelancer?.avatar || 'https://i.pravatar.cc/300?img=47'} alt={name} className="profile-avatar" />
+              <img src={freelancer?.avatar || freelancer?.profileImage || savedProfile?.avatar || savedProfile?.profileImage || 'https://i.pravatar.cc/300?img=47'} alt={name} className="profile-avatar" />
               <div className="verified-badge" title="Verified Identity">
                 <Check size={16} strokeWidth={3} />
               </div>

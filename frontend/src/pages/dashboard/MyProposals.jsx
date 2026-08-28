@@ -5,113 +5,12 @@ import {
   MoreVertical, Eye, MessageSquare, Edit2, Trash2, ShieldCheck, FileSearch, Check, X
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
+import { getStoredProposals, saveStoredProposals, getStoredOffers, saveStoredOffers } from '../../utils/proposalUtils';
 import './MyProposals.css';
 
-const MOCK_PROPOSALS = [
-  {
-    id: 'PROP-101',
-    projectTitle: 'E-commerce App React Native',
-    clientName: 'TechNova Solutions',
-    clientVerified: true,
-    submittedDate: 'Oct 24, 2023',
-    status: 'Pending',
-    bidAmount: 45000,
-    deliveryTime: '3 Weeks',
-    coverLetter: 'Hi, I have extensive experience building React Native applications for e-commerce. I recently completed a very similar project for a retail client, resulting in a 30% increase in mobile conversions. I am confident I can deliver high-quality work within the required timeline.',
-    skills: ['React Native', 'Redux', 'Stripe Integration'],
-    projectBudget: '₹40,000 - ₹50,000',
-    lastActivity: '2 hours ago'
-  },
-  {
-    id: 'PROP-102',
-    projectTitle: 'Custom WordPress Theme Development',
-    clientName: 'Studio Creative',
-    clientVerified: true,
-    submittedDate: 'Oct 20, 2023',
-    status: 'Shortlisted',
-    bidAmount: 28000,
-    deliveryTime: '2 Weeks',
-    coverLetter: 'I am a WordPress expert with 5 years of experience creating custom themes from scratch. I reviewed your Figma files and I can build a pixel-perfect, responsive theme optimized for Core Web Vitals.',
-    skills: ['WordPress', 'PHP', 'CSS3', 'Figma'],
-    projectBudget: '₹25,000 - ₹35,000',
-    lastActivity: '1 day ago'
-  },
-  {
-    id: 'PROP-103',
-    projectTitle: 'Node.js Backend Microservices',
-    clientName: 'GlobalFin Inc',
-    clientVerified: false,
-    submittedDate: 'Oct 15, 2023',
-    status: 'Accepted',
-    bidAmount: 85000,
-    deliveryTime: '1 Month',
-    coverLetter: 'I specialize in Node.js backend architectures. I will design your microservices using Express, Redis for caching, and MongoDB. My architecture ensures high availability and scalability.',
-    skills: ['Node.js', 'MongoDB', 'Microservices', 'AWS'],
-    projectBudget: '₹80,000 - ₹1,00,000',
-    lastActivity: 'Oct 18, 2023'
-  },
-  {
-    id: 'PROP-104',
-    projectTitle: 'Logo and Brand Identity Design',
-    clientName: 'StartUp Hub',
-    clientVerified: true,
-    submittedDate: 'Oct 10, 2023',
-    status: 'Declined',
-    bidAmount: 15000,
-    deliveryTime: '1 Week',
-    coverLetter: 'As a visual designer, I can create a unique and memorable brand identity for StartUp Hub. I will provide 3 distinct logo concepts and full brand guidelines.',
-    skills: ['Illustrator', 'Branding', 'Graphic Design'],
-    projectBudget: '₹10,000 - ₹20,000',
-    lastActivity: 'Oct 12, 2023'
-  },
-  {
-    id: 'PROP-105',
-    projectTitle: 'SEO Content Writing',
-    clientName: 'Marketing Pro',
-    clientVerified: true,
-    submittedDate: 'Oct 05, 2023',
-    status: 'Withdrawn',
-    bidAmount: 5000,
-    deliveryTime: '3 Days',
-    coverLetter: 'I can write high-converting SEO articles for your tech blog.',
-    skills: ['SEO', 'Content Writing', 'Tech Writing'],
-    projectBudget: '₹5,000',
-    lastActivity: 'Oct 06, 2023'
-  }
-];
-
-const MOCK_OFFERS = [
-  {
-    id: 'OFF-201',
-    projectTitle: 'Senior Frontend Developer for SaaS',
-    clientName: 'CloudScale Inc',
-    clientVerified: true,
-    receivedDate: 'Oct 25, 2023',
-    status: 'Pending',
-    offerAmount: 120000,
-    deliveryTime: '2 Months',
-    projectDescription: 'We are looking for a senior frontend developer to help us migrate our legacy dashboard to React. You will be working with a team of 3 backend developers. The ideal candidate should have strong experience with Redux, Tailwind, and Webpack.',
-    skills: ['React', 'Redux', 'Tailwind CSS'],
-    clientStats: { hireRate: '85%', totalSpent: '₹12,00,000+', rating: 4.8 }
-  },
-  {
-    id: 'OFF-202',
-    projectTitle: 'UI/UX Design for Fintech App',
-    clientName: 'FinTrust',
-    clientVerified: true,
-    receivedDate: 'Oct 22, 2023',
-    status: 'Pending',
-    offerAmount: 60000,
-    deliveryTime: '3 Weeks',
-    projectDescription: 'We need a complete redesign of our mobile banking app. The current app has usability issues. We want a modern, clean, and trustworthy design. Deliverables include wireframes, high-fidelity mockups, and a clickable prototype.',
-    skills: ['Figma', 'UI/UX', 'Mobile Design'],
-    clientStats: { hireRate: '100%', totalSpent: '₹4,50,000+', rating: 5.0 }
-  }
-];
-
 export default function MyProposals() {
-  const [proposals, setProposals] = useState(MOCK_PROPOSALS);
-  const [offers, setOffers] = useState(MOCK_OFFERS);
+  const [proposals, setProposals] = useState(() => getStoredProposals());
+  const [offers, setOffers] = useState(() => getStoredOffers());
   const [activeTab, setActiveTab] = useState('All Proposals');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState('Newest');
@@ -130,7 +29,7 @@ export default function MyProposals() {
   const isOffersTab = activeTab === 'Received Offers';
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
+    const timer = setTimeout(() => setIsLoading(false), 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -164,7 +63,11 @@ export default function MyProposals() {
 
   const handleWithdraw = () => {
     if (withdrawModal.id) {
-      setProposals(prev => prev.map(p => p.id === withdrawModal.id ? { ...p, status: 'Withdrawn' } : p));
+      setProposals(prev => {
+        const updated = prev.map(p => p.id === withdrawModal.id ? { ...p, status: 'Withdrawn' } : p);
+        saveStoredProposals(updated);
+        return updated;
+      });
     }
     setWithdrawModal({ show: false, id: null });
     setMenuOpen(null);
@@ -174,11 +77,18 @@ export default function MyProposals() {
     if (!actionModal.offerId) return;
     
     if (actionModal.actionType === 'accept') {
-      setOffers(prev => prev.map(o => o.id === actionModal.offerId ? { ...o, status: 'Accepted' } : o));
+      setOffers(prev => {
+        const updated = prev.map(o => o.id === actionModal.offerId ? { ...o, status: 'Accepted' } : o);
+        saveStoredOffers(updated);
+        return updated;
+      });
     } else if (actionModal.actionType === 'decline') {
-      setOffers(prev => prev.map(o => o.id === actionModal.offerId ? { ...o, status: 'Declined' } : o));
+      setOffers(prev => {
+        const updated = prev.map(o => o.id === actionModal.offerId ? { ...o, status: 'Declined' } : o);
+        saveStoredOffers(updated);
+        return updated;
+      });
     }
-    // (If actionType === 'message', we would normally route to inbox)
     
     setActionModal({ show: false, actionType: null, offerId: null });
     setActionMessage('');

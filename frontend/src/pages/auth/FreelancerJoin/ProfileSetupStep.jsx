@@ -12,10 +12,13 @@ export default function ProfileSetupStep({ formData, updateFormData, nextStep, p
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Create a fake object URL for preview purposes
-      const imageUrl = URL.createObjectURL(file);
-      setPreviewImage(imageUrl);
-      updateFormData({ profileImage: imageUrl });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result;
+        setPreviewImage(base64Data);
+        updateFormData({ profileImage: base64Data, avatar: base64Data });
+      };
+      reader.readAsDataURL(file);
     }
   };
 

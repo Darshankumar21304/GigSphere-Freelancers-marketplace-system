@@ -4,6 +4,7 @@ import {
   Shield, Palette, CheckCircle, XCircle, UploadCloud 
 } from 'lucide-react';
 import { apiFetch } from '../../utils/api';
+import { getUserProfile, saveUserProfile } from '../../utils/authUtils';
 import './Settings.css';
 
 // Custom Toggle Component
@@ -17,22 +18,24 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('account');
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const savedProfile = getUserProfile();
 
   // Form States
   const [formData, setFormData] = useState({
     // Account
-    fullName: 'Sarah Jenkins',
-    email: 'sarah.jenkins@example.com',
-    phone: '+91 98765 43210',
-    location: 'Mumbai, India',
-    language: 'English',
+    avatar: savedProfile?.avatar || savedProfile?.profileImage || '',
+    fullName: savedProfile?.name || savedProfile?.fullName || 'Sarah Jenkins',
+    email: savedProfile?.email || 'sarah.jenkins@example.com',
+    phone: savedProfile?.phone || '+91 98765 43210',
+    location: savedProfile?.location || 'Mumbai, India',
+    language: savedProfile?.language || 'English',
     // Professional
-    title: 'Senior Full Stack Developer',
-    bio: 'I build scalable web applications using React, Node.js, and AWS.',
-    skills: 'React, Node.js, Express, MongoDB, AWS',
+    title: savedProfile?.title || 'Senior Full Stack Developer',
+    bio: savedProfile?.bio || 'I build scalable web applications using React, Node.js, and AWS.',
+    skills: savedProfile?.skills || 'React, Node.js, Express, MongoDB, AWS',
     experience: '5+ years',
     availability: 'Full-time (40 hrs/week)',
-    hourlyRate: '1500',
+    hourlyRate: savedProfile?.hourlyRate || '1500',
     // Security
     currentPassword: '',
     newPassword: '',
@@ -65,6 +68,7 @@ export default function Settings() {
         if (data.user) {
           const newFormData = {
             ...formData,
+            avatar: data.user.avatar || savedProfile?.avatar || savedProfile?.profileImage || '',
             fullName: data.user.name || '',
             email: data.user.email || '',
             phone: data.user.phone || '',
@@ -109,6 +113,18 @@ export default function Settings() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result;
+        handleInputChange('avatar', base64Data);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
@@ -119,6 +135,7 @@ export default function Settings() {
     try {
       const payload = {
         name: formData.fullName,
+        avatar: formData.avatar,
         phone: formData.phone,
         location: formData.location,
         language: formData.language,
@@ -157,6 +174,15 @@ export default function Settings() {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
+
+      if (savedProfile) {
+        saveUserProfile({
+          ...savedProfile,
+          name: formData.fullName,
+          avatar: formData.avatar,
+          profileImage: formData.avatar
+        });
+      }
 
       setInitialData({ ...formData });
       showToast('success', 'Settings saved successfully');
@@ -206,10 +232,24 @@ export default function Settings() {
             </div>
             <div className="section-body">
               <div className="avatar-upload">
-                <img src="https://i.pravatar.cc/150?img=5" alt="Avatar" className="avatar-preview" />
+                <img 
+                  src={formData.avatar || savedProfile?.avatar || savedProfile?.profileImage || "https://i.pravatar.cc/150?img=5"} 
+                  alt="Avatar" 
+                  className="avatar-preview" 
+                  style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
+                />
                 <div className="avatar-actions">
-                  <button className="btn-upload"><UploadCloud size={16} /> Change Photo</button>
-                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>JPG, GIF or PNG. Max size of 800K.</span>
+                  <label htmlFor="settings-avatar-input" className="btn-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <UploadCloud size={16} /> Change Photo
+                  </label>
+                  <input 
+                    id="settings-avatar-input" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoUpload} 
+                    style={{ display: 'none' }} 
+                  />
+                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>JPG, GIF or PNG. Max size 2MB.</span>
                 </div>
               </div>
               <div className="form-grid">

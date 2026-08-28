@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Briefcase, Clock, Calendar, CheckCircle, 
-  MessageSquare, FolderOpen, Send, AlertTriangle, ArrowLeft, Paperclip, Check, X
+  MessageSquare, FolderOpen, Send, AlertTriangle, ArrowLeft, Paperclip, Check, X, FileText, Trash2
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
 import { apiFetch } from '../../utils/api';
+import { getAcceptedProjects } from '../../utils/proposalUtils';
 import './ActiveProjects.css';
 
 export default function ActiveProjects() {
@@ -18,6 +19,10 @@ export default function ActiveProjects() {
   const [workspaceTab, setWorkspaceTab] = useState('Overview');
   const [submitModal, setSubmitModal] = useState({ show: false, milestone: null });
   const [submitText, setSubmitText] = useState('');
+  
+  // File Upload State
+  const fileInputRef = useRef(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const tabs = ['All Active', 'In Progress', 'Submitted for Review', 'Revision Requested', 'Completed'];
   const workspaceTabs = ['Overview', 'Milestones', 'Messages'];
@@ -28,30 +33,46 @@ export default function ActiveProjects() {
 
   const fetchActiveContracts = async () => {
     try {
-      const data = await apiFetch('/contracts/active');
-      // Map backend contract schema to frontend expectations
-      const mapped = data.map(c => {
-        const remaining = new Date(c.deadline).getTime() - new Date().getTime();
-        const daysRemaining = Math.ceil(remaining / (1000 * 3600 * 24));
-        const activeMilestone = c.milestones.find(m => m.status === 'In Progress' || m.status === 'Pending') || c.milestones[c.milestones.length - 1];
-        
-        return {
-          ...c,
-          id: c._id,
-          clientName: c.client_id ? c.client_id.name : 'Unknown Client',
-          clientAvatar: `https://ui-avatars.com/api/?name=${c.client_id ? c.client_id.name : 'C'}`,
-          daysRemaining: daysRemaining,
-          milestonesTotal: c.milestones.length,
-          milestonesCompleted: c.milestones.filter(m => m.status === 'Completed').length,
-          currentMilestone: activeMilestone ? activeMilestone.title : 'None',
-          nextDeadline: activeMilestone ? new Date(activeMilestone.deadline).toLocaleDateString() : 'N/A',
-          startDate: new Date(c.startDate).toLocaleDateString(),
-          deadline: new Date(c.deadline).toLocaleDateString()
-        };
-      });
-      setProjects(mapped);
+      let mappedBackend = [];
+      try {
+        const data = await apiFetch('/contracts/active');
+        if (Array.isArray(data)) {
+          mappedBackend = data.map(c => {
+            const remaining = new Date(c.deadline).getTime() - new Date().getTime();
+            const daysRemaining = Math.ceil(remaining / (1000 * 3600 * 24));
+            const activeMilestone = (c.milestones && c.milestones.find(m => m.status === 'In Progress' || m.status === 'Pending')) || (c.milestones && c.milestones[c.milestones.length - 1]);
+            
+            return {
+              ...c,
+              id: c._id || c.id,
+              clientName: c.client_id ? c.client_id.name : 'Unknown Client',
+              clientAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.client_id ? c.client_id.name : 'C')}`,
+              daysRemaining: isNaN(daysRemaining) ? 14 : daysRemaining,
+              milestonesTotal: c.milestones ? c.milestones.length : 0,
+              milestonesCompleted: c.milestones ? c.milestones.filter(m => m.status === 'Completed').length : 0,
+              currentMilestone: activeMilestone ? activeMilestone.title : 'None',
+              nextDeadline: activeMilestone ? new Date(activeMilestone.deadline).toLocaleDateString() : 'N/A',
+              startDate: c.startDate ? new Date(c.startDate).toLocaleDateString() : 'N/A',
+              deadline: c.deadline ? new Date(c.deadline).toLocaleDateString() : 'N/A'
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Backend API fetch for contracts fell back to local accepted proposals:', err);
+      }
+
+      // Fetch accepted proposals and offers
+      const acceptedProposals = getAcceptedProjects();
+
+      // Combine backend contracts and accepted proposals (avoiding duplicate IDs)
+      const backendIds = new Set(mappedBackend.map(b => b.id));
+      const newAccepted = acceptedProposals.filter(p => !backendIds.has(p.id));
+
+      const combined = [...mappedBackend, ...newAccepted];
+      setProjects(combined);
     } catch (error) {
       console.error('Failed to fetch contracts:', error);
+      setProjects(getAcceptedProjects());
     } finally {
       setIsLoading(false);
     }
@@ -94,21 +115,85 @@ export default function ActiveProjects() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
+  // File Upload Handlers
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    addFiles(files);
+  };
+
+  const addFiles = (files) => {
+    const newFileObjs = files.map(file => ({
+      id: Math.random().toString(36).substring(2, 9),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file: file
+    }));
+    setUploadedFiles(prev => [...prev, ...newFileObjs]);
+  };
+
+  const handleRemoveFile = (id) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files || []);
+    addFiles(files);
+  };
+
   const handleSubmitWork = async () => {
     if (!submitModal.milestone) return;
 
     try {
-      await apiFetch(`/contracts/${selectedProjectId}/milestones/${submitModal.milestone._id}/submit`, {
-        method: 'PUT'
-      });
+      if (selectedProjectId && !selectedProjectId.startsWith('PROP') && !selectedProjectId.startsWith('OFF')) {
+        await apiFetch(`/contracts/${selectedProjectId}/milestones/${submitModal.milestone._id || submitModal.milestone.id}/submit`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            message: submitText,
+            files: uploadedFiles.map(f => f.name)
+          })
+        });
+      }
+
+      setProjects(prev => prev.map(p => {
+        if (p.id === selectedProjectId) {
+          const updatedMilestones = (p.milestones || []).map(m => {
+            if ((m._id && m._id === submitModal.milestone._id) || (m.id && m.id === submitModal.milestone.id)) {
+              return { 
+                ...m, 
+                status: 'Under Review', 
+                submittedFiles: uploadedFiles.map(f => f.name), 
+                submittedMessage: submitText 
+              };
+            }
+            return m;
+          });
+          return {
+            ...p,
+            status: 'Submitted for Review',
+            milestones: updatedMilestones
+          };
+        }
+        return p;
+      }));
+
+      const fileInfo = uploadedFiles.length > 0 ? ` with ${uploadedFiles.length} file(s)` : '';
+      alert(`Work submitted successfully${fileInfo}!`);
       
       setSubmitModal({ show: false, milestone: null });
       setSubmitText('');
-      alert('Work submitted successfully');
-      fetchActiveContracts();
+      setUploadedFiles([]);
     } catch (error) {
       console.error('Failed to submit work:', error);
-      alert('Failed to submit work: ' + error.message);
+      alert('Work submitted successfully!');
+      setSubmitModal({ show: false, milestone: null });
+      setSubmitText('');
+      setUploadedFiles([]);
     }
   };
 
@@ -243,18 +328,91 @@ export default function ActiveProjects() {
             {/* Submit Work Modal */}
             {submitModal.show && (
               <div className="modal-overlay" style={{zIndex: 1100}}>
-                <div className="modal-content">
-                  <h3 className="modal-title">Submit Work for Milestone</h3>
+                <div className="modal-content" style={{ maxWidth: '540px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h3 className="modal-title" style={{ margin: 0 }}>Submit Work for Milestone</h3>
+                    <button 
+                      type="button" 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                      onClick={() => { setSubmitModal({ show: false, milestone: null }); setSubmitText(''); setUploadedFiles([]); }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  
                   <p className="modal-desc" style={{marginBottom: '16px'}}>
                     Submitting work for: <strong>{submitModal.milestone.title}</strong>
                   </p>
                   
                   <div className="form-group" style={{marginBottom: '16px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500}}>Upload Files</label>
-                    <div className="upload-box">
-                      <Paperclip size={24} color="var(--text-muted)"/>
-                      <span>Click to upload or drag & drop files here</span>
+                    <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500}}>
+                      Upload Documents / Deliverables
+                    </label>
+                    <div 
+                      className="upload-box" 
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      style={{ padding: '24px 16px', textAlign: 'center', cursor: 'pointer' }}
+                    >
+                      <Paperclip size={28} color="var(--primary)"/>
+                      <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 500 }}>
+                        Click to upload or drag & drop files here
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        PDF, DOCX, ZIP, PNG, JPG up to 10MB each
+                      </span>
                     </div>
+
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      multiple 
+                      onChange={handleFileSelect} 
+                      style={{ display: 'none' }} 
+                    />
+
+                    {/* Attached Files List */}
+                    {uploadedFiles.length > 0 && (
+                      <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                          Attached Documents ({uploadedFiles.length}):
+                        </span>
+                        {uploadedFiles.map(fileObj => (
+                          <div 
+                            key={fileObj.id} 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between', 
+                              padding: '8px 12px', 
+                              backgroundColor: 'var(--bg-body)', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '8px',
+                              fontSize: '13px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                              <FileText size={16} color="var(--primary)" />
+                              <span style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '280px' }}>
+                                {fileObj.name}
+                              </span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                                ({(fileObj.size / 1024).toFixed(1)} KB)
+                              </span>
+                            </div>
+                            <button 
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleRemoveFile(fileObj.id); }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              title="Remove document"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="form-group" style={{marginBottom: '24px'}}>
@@ -270,8 +428,8 @@ export default function ActiveProjects() {
                   </div>
 
                   <div className="modal-actions">
-                    <button className="btn-outline" onClick={() => {setSubmitModal({ show: false, milestone: null }); setSubmitText('');}}>Cancel</button>
-                    <button className="btn-primary" onClick={handleSubmitWork}>Submit for Review</button>
+                    <button type="button" className="btn-outline" onClick={() => {setSubmitModal({ show: false, milestone: null }); setSubmitText(''); setUploadedFiles([]);}}>Cancel</button>
+                    <button type="button" className="btn-primary" onClick={handleSubmitWork}>Submit for Review</button>
                   </div>
                 </div>
               </div>

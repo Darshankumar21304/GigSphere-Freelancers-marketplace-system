@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { CreditCard, Clock, Briefcase, CheckCircle, ArrowUpRight, DollarSign, Calendar, ShieldCheck } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatINR } from '../../utils/currency';
@@ -159,9 +160,9 @@ export default function ClientOverview() {
                 Latest transactions and milestone approvals across your active projects.
               </p>
             </div>
-            <a href="/client/dashboard/wallet" className="btn btn-outline" style={{ fontSize: '0.875rem', padding: '8px 16px', textDecoration: 'none' }}>
+            <Link to="/client/dashboard/wallet" className="btn btn-outline" style={{ fontSize: '0.875rem', padding: '8px 16px', textDecoration: 'none' }}>
               View All Payments
-            </a>
+            </Link>
           </div>
 
           <div className="payments-table-container">
