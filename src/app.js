@@ -25,6 +25,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/messages', require('./routes/messageRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/upload', require('./routes/uploadRoutes'));
 
 // Base route
 app.get('/', (req, res) => {

@@ -34,6 +34,14 @@ import ClientReviews from './pages/dashboard/ClientReviews';
 import Notifications from './pages/dashboard/Notifications';
 
 
+import AdminLayout from './components/AdminLayout';
+import AdminOverview from './pages/admin/AdminOverview';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminListings from './pages/admin/AdminListings';
+import AdminDisputes from './pages/admin/AdminDisputes';
+import AdminPayouts from './pages/admin/AdminPayouts';
+import AdminAiSecurity from './pages/admin/AdminAiSecurity';
+
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import StyleTest from './pages/StyleTest';
@@ -86,7 +94,15 @@ function App() {
               <Route path="notifications" element={<Notifications />} />
             </Route>
 
-
+            {/* Admin Dashboard Routes */}
+            <Route path="/admin/dashboard" element={<ProtectedRoute allowedRole="admin"><AdminLayout /></ProtectedRoute>}>
+              <Route index element={<AdminOverview />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="listings" element={<AdminListings />} />
+              <Route path="disputes" element={<AdminDisputes />} />
+              <Route path="payouts" element={<AdminPayouts />} />
+              <Route path="ai-security" element={<AdminAiSecurity />} />
+            </Route>
           </Routes>
         </main>
 

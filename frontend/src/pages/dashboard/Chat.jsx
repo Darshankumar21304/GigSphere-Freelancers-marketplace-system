@@ -84,8 +84,30 @@ export default function Chat() {
   };
 
   const handleFileChange = (e) => {
-    if (e.target.files[0]) {
-      setFile(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      const mime = selectedFile.type;
+      const isImg = mime.startsWith('image/');
+      const isVid = mime.startsWith('video/') || mime.startsWith('audio/');
+      const isDoc = mime.includes('pdf') || mime.includes('word') || mime.includes('text');
+
+      if (isImg && selectedFile.size > 10 * 1024 * 1024) {
+        alert(`Image '${selectedFile.name}' exceeds the 10 MB Cloudinary limit.`);
+        e.target.value = '';
+        return;
+      }
+      if (isDoc && selectedFile.size > 15 * 1024 * 1024) {
+        alert(`Document '${selectedFile.name}' exceeds the 15 MB Cloudinary limit.`);
+        e.target.value = '';
+        return;
+      }
+      if (isVid && selectedFile.size > 50 * 1024 * 1024) {
+        alert(`Video '${selectedFile.name}' exceeds the 50 MB Cloudinary limit.`);
+        e.target.value = '';
+        return;
+      }
+
+      setFile(selectedFile);
     }
   };
 
@@ -104,7 +126,8 @@ export default function Chat() {
         });
         fileUrl = uploadRes.data.fileUrl;
       } catch (error) {
-        console.error('Error uploading file:', error);
+        console.error('Error uploading file to Cloudinary:', error);
+        alert(error.response?.data?.message || 'Error uploading file to Cloudinary');
         return;
       }
     }

@@ -32,15 +32,12 @@ export default function Login() {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Login should happen by the already joined user (freelancers, clients) only
-      if (data.user.role !== 'freelancer' && data.user.role !== 'client') {
-        throw new Error('Only freelancers and clients can login.');
-      }
-
       loginUser(data.user.role, data.token, data.user);
       
       // Redirect based on role
-      if (data.user.role === 'freelancer') {
+      if (data.user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (data.user.role === 'freelancer') {
         navigate('/freelancer/dashboard');
       } else if (data.user.role === 'client') {
         navigate('/client/dashboard');

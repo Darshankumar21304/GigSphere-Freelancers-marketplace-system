@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, Search, User, Bell, LogOut, Menu, X } from 'lucide-react';
-import { getUserRole, isAuthenticated, logoutUser } from '../utils/authUtils';
+import { MessageSquare, Search, User, Bell, LogOut, Menu, X, ChevronDown, Rocket, Sparkles } from 'lucide-react';
+import { getUserRole, isAuthenticated, logoutUser, getUserProfile } from '../utils/authUtils';
+import AuthModal from './AuthModal';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -10,11 +11,32 @@ const Navbar = () => {
   const dashboardPath = isAuth && role ? `/${role}/dashboard` : '/auth/login';
   const navigate = useNavigate();
   const location = useLocation();
-  const isLandingPage = location.pathname === '/';
-  
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Auth Popup Modal State
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authTab, setAuthTab] = useState('login');
+  const [authRole, setAuthRole] = useState('client');
+
+  const openLoginModal = () => {
+    setAuthTab('login');
+    setShowAuthModal(true);
+    closeMobileMenu();
+  };
+
+  const openRegisterModal = (role = 'client') => {
+    setAuthTab('register');
+    setAuthRole(role);
+    setShowAuthModal(true);
+    closeMobileMenu();
+  };
+
+  const isAdminPage = location.pathname.startsWith('/admin');
+  if (isAdminPage) return null;
+
+  const isLandingPage = location.pathname === '/';
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
@@ -35,138 +57,119 @@ const Navbar = () => {
     setIsMobileMenuOpen(false);
   };
 
-  if (isLandingPage) {
-    return (
-      <nav className="navbar glass landing-navbar">
-        <div className="navbar-container">
-          <div className="navbar-left">
-            <Link to="/" className="navbar-brand large-logo" onClick={closeMobileMenu}>GigSphere</Link>
-          </div>
-          
-          <div className="navbar-center landing-nav-center">
-            <Link to="/explore" className="nav-link">Explore</Link>
-            <Link to="/freelancers" className="nav-link">Freelancers</Link>
-            <a href="#how-it-works" className="nav-link">How It Works</a>
-            <a href="#categories" className="nav-link">Categories</a>
-          </div>
-
-          <div className="navbar-right">
-            <div className="navbar-auth hidden-mobile">
-              <Link to="/auth/login" className="btn btn-outline">Log In</Link>
-              <Link to="/auth/register" className="btn btn-primary">Join GigSphere</Link>
-            </div>
-            <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-              {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
-            </button>
-          </div>
-        </div>
-        
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="mobile-menu animate-fade-in-up">
-            <div className="mobile-nav-links">
-              <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore</Link>
-              <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Freelancers</Link>
-              <a href="#how-it-works" className="nav-link" onClick={closeMobileMenu}>How It Works</a>
-              <a href="#categories" className="nav-link" onClick={closeMobileMenu}>Categories</a>
-              <div className="mobile-auth-buttons">
-                <Link to="/auth/login" className="btn btn-outline" onClick={closeMobileMenu}>Log In</Link>
-                <Link to="/auth/register" className="btn btn-primary" onClick={closeMobileMenu}>Join GigSphere</Link>
-              </div>
-            </div>
-          </div>
-        )}
-      </nav>
-    );
-  }
-
   return (
-    <nav className="navbar glass">
+    <nav className="navbar antigravity-navbar">
       <div className="navbar-container">
-        <div className="navbar-left">
-          <Link to="/" className="navbar-brand" onClick={closeMobileMenu}>GigSphere</Link>
-          <div className="navbar-links">
-            <Link to="/explore" className="nav-link">Explore</Link>
-            <Link to="/freelancers" className="nav-link">Freelancers</Link>
-            <Link to={dashboardPath} className="nav-link">Dashboard</Link>
-          </div>
-        </div>
         
-        <div className="navbar-search hidden-mobile">
-          <Search className="search-icon" size={18} />
-          <input type="text" placeholder="Search projects or freelancers..." className="search-input" />
+        {/* Left: Custom GigSphere Orbital Sphere Emblem Logo */}
+        <div className="navbar-left">
+          <Link to="/" className="antigravity-brand" onClick={closeMobileMenu}>
+            <div className="antigravity-logo-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="6" fill="url(#gigsphere_grad)" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" stroke="url(#gigsphere_grad_ring)" strokeWidth="2.2" strokeLinecap="round" transform="rotate(-30 12 12)" />
+                <defs>
+                  <linearGradient id="gigsphere_grad" x1="6" y1="6" x2="18" y2="18" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#1A73E8" />
+                    <stop offset="0.5" stopColor="#A142F4" />
+                    <stop offset="1" stopColor="#00E5FF" />
+                  </linearGradient>
+                  <linearGradient id="gigsphere_grad_ring" x1="2" y1="8" x2="22" y2="16" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#00E5FF" />
+                    <stop offset="0.5" stopColor="#1A73E8" />
+                    <stop offset="1" stopColor="#A142F4" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span className="brand-title">GigSphere</span>
+          </Link>
         </div>
 
+        {/* Center: Google Antigravity Style Navigation Links */}
+        <div className="navbar-center landing-nav-center">
+          <Link to="/explore" className="antigravity-nav-link">
+            Explore Marketplace <ChevronDown size={14} className="chevron-icon" />
+          </Link>
+          <Link to="/freelancers" className="antigravity-nav-link">
+            Find Freelancers <ChevronDown size={14} className="chevron-icon" />
+          </Link>
+          <a href="#how-it-works" className="antigravity-nav-link">
+            How It Works
+          </a>
+          <a href="#categories" className="antigravity-nav-link">
+            Categories <ChevronDown size={14} className="chevron-icon" />
+          </a>
+        </div>
+
+        {/* Right: Pill Buttons & Authenticated Actions */}
         <div className="navbar-right">
           {isAuth && (
-            <div className="hidden-mobile" style={{ display: 'flex', gap: '16px' }}>
+            <div className="hidden-mobile" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
               <Link to={`${dashboardPath}/notifications`} className="nav-icon-link">
-                <Bell size={22} />
+                <Bell size={20} />
                 <span className="badge badge-warning">3</span>
               </Link>
               <Link to={`${dashboardPath}/chat`} className="nav-icon-link">
-                <MessageSquare size={22} />
+                <MessageSquare size={20} />
                 <span className="badge badge-danger">1</span>
               </Link>
             </div>
           )}
-          
+
           <div className="navbar-auth hidden-mobile">
             {!isAuth ? (
               <>
-                <Link to="/auth/login" className="btn btn-outline">Log in</Link>
-                <Link to="/auth/register" className="btn btn-primary">Join</Link>
+                <button type="button" onClick={openLoginModal} className="antigravity-btn btn-ghost">
+                  Log In
+                </button>
+                <Link to="/auth/register" className="antigravity-btn btn-black">
+                  <Rocket size={15} className="rocket-animated" /> Join GigSphere
+                </Link>
               </>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <button onClick={handleLogout} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <LogOut size={16} /> Log out
-                </button>
-                <Link to={dashboardPath} className="user-profile-dropdown" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white' }}>
-                  <User size={24} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <Link to={dashboardPath} className="antigravity-btn btn-black" style={{ fontSize: '0.825rem', gap: '0.45rem', padding: '0.45rem 1.1rem' }}>
+                  {getUserProfile()?.avatar || getUserProfile()?.profilePhoto ? (
+                    <img src={getUserProfile().avatar || getUserProfile().profilePhoto} alt="User Avatar" style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <User size={15} />
+                  )}
+                  Dashboard
                 </Link>
+                <button type="button" onClick={handleLogout} className="antigravity-btn btn-ghost" title="Log Out" style={{ padding: '0.45rem 0.7rem', color: '#64748b' }}>
+                  <LogOut size={15} />
+                </button>
               </div>
             )}
           </div>
-          
+
           <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-            {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+            {isMobileMenuOpen ? <X size={26} /> : <Menu size={26} />}
           </button>
         </div>
+
       </div>
-      
-      {/* Mobile Menu */}
+
+      {/* Mobile Animated Drawer Menu */}
       {isMobileMenuOpen && (
         <div className="mobile-menu animate-fade-in-up">
-          <div className="mobile-search" style={{ position: 'relative', width: '100%', marginBottom: '16px' }}>
-             <Search className="search-icon" size={18} />
-             <input type="text" placeholder="Search..." className="search-input" />
-          </div>
           <div className="mobile-nav-links">
-            <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore</Link>
-            <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Freelancers</Link>
-            <Link to={dashboardPath} className="nav-link" onClick={closeMobileMenu}>Dashboard</Link>
-            
-            {isAuth && (
-              <div className="mobile-icons" style={{ display: 'flex', flexDirection: 'column', gap: '16px', margin: '16px 0' }}>
-                <Link to={`${dashboardPath}/notifications`} className="nav-icon-link" onClick={closeMobileMenu} style={{ justifyContent: 'flex-start' }}>
-                  <Bell size={24} style={{ marginRight: '12px' }} /> Notifications
-                </Link>
-                <Link to={`${dashboardPath}/chat`} className="nav-icon-link" onClick={closeMobileMenu} style={{ justifyContent: 'flex-start' }}>
-                  <MessageSquare size={24} style={{ marginRight: '12px' }} /> Messages
-                </Link>
-              </div>
-            )}
+            <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore Marketplace</Link>
+            <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Find Freelancers</Link>
+            <a href="#how-it-works" className="nav-link" onClick={closeMobileMenu}>How It Works</a>
+            <a href="#categories" className="nav-link" onClick={closeMobileMenu}>Categories</a>
+            {isAuth && <Link to={dashboardPath} className="nav-link" onClick={closeMobileMenu}>Dashboard</Link>}
             
             <div className="mobile-auth-buttons">
               {!isAuth ? (
                 <>
-                  <Link to="/auth/login" className="btn btn-outline" onClick={closeMobileMenu}>Log in</Link>
-                  <Link to="/auth/register" className="btn btn-primary" onClick={closeMobileMenu}>Join</Link>
+                  <button type="button" onClick={openLoginModal} className="antigravity-btn btn-ghost">Log In</button>
+                  <button type="button" onClick={() => openRegisterModal('client')} className="antigravity-btn btn-black">Join GigSphere</button>
                 </>
               ) : (
-                <button onClick={handleLogout} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}>
-                  <LogOut size={16} /> Log out
+                <button onClick={handleLogout} className="antigravity-btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
+                  <LogOut size={16} /> Log Out
                 </button>
               )}
             </div>
@@ -174,22 +177,31 @@ const Navbar = () => {
         </div>
       )}
 
-      {/* Logout Confirmation Modal */}
+      {/* Interactive Auth Modal Popup */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialTab={authTab}
+        defaultRole={authRole}
+      />
+
+      {/* Logout Modal */}
       {showLogoutConfirm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '10vh', zIndex: 9999 }}>
-          <div style={{ backgroundColor: 'var(--bg-surface, #fff)', padding: '24px', borderRadius: '12px', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ marginTop: 0, color: 'var(--text-main, #111)', fontSize: '20px', fontWeight: 600 }}>Confirm Logout</h3>
-            <p style={{ color: 'var(--text-muted, #666)', marginBottom: '24px', fontSize: '15px' }}>Are you sure you want to log out of your account?</p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '18px', fontWeight: 800 }}>Confirm Logout</h3>
+            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '14px' }}>Are you sure you want to log out of your account?</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
               <button 
                 onClick={() => setShowLogoutConfirm(false)}
-                style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border-color, #ccc)', background: 'transparent', cursor: 'pointer', fontWeight: 500, color: 'var(--text-main, #111)' }}
+                className="antigravity-btn btn-ghost"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmLogout}
-                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
+                className="antigravity-btn"
+                style={{ background: '#dc2626', color: '#fff' }}
               >
                 Yes, Logout
               </button>

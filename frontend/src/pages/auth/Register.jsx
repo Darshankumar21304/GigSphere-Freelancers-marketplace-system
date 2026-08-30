@@ -31,9 +31,31 @@ export default function Register() {
     <div className="auth-container">
       <div className="role-selection-wrapper">
         <div className="role-selection-header">
-            <h1>Join as a client or freelancer</h1>
-            <p>Select your role to get started with GigSphere</p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem', padding: '0.35rem 1.1rem 0.35rem 0.55rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '40px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="6" fill="url(#reg_gigsphere_grad)" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" stroke="url(#reg_gigsphere_grad_ring)" strokeWidth="2.2" strokeLinecap="round" transform="rotate(-30 12 12)" />
+                <defs>
+                  <linearGradient id="reg_gigsphere_grad" x1="6" y1="6" x2="18" y2="18" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#1A73E8" />
+                    <stop offset="0.5" stopColor="#A142F4" />
+                    <stop offset="1" stopColor="#00E5FF" />
+                  </linearGradient>
+                  <linearGradient id="reg_gigsphere_grad_ring" x1="2" y1="8" x2="22" y2="16" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#00E5FF" />
+                    <stop offset="0.5" stopColor="#1A73E8" />
+                    <stop offset="1" stopColor="#A142F4" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>GigSphere</span>
           </div>
+
+          <h1>Join as a client or freelancer</h1>
+          <p>Select your role to get started with GigSphere</p>
+        </div>
 
           <div className="role-cards-container">
             {/* Client Card */}

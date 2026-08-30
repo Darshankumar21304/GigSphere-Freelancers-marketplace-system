@@ -4,6 +4,8 @@ import {
   Shield, Palette, CheckCircle, XCircle, UploadCloud 
 } from 'lucide-react';
 import { apiFetch } from '../../utils/api';
+import { getUserProfile, saveUserProfile } from '../../utils/authUtils';
+import { uploadFileToCloudinary } from '../../utils/fileUpload';
 import './Settings.css';
 
 // Custom Toggle Component
@@ -195,6 +197,33 @@ export default function Settings() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
   ];
 
+  const [avatarUrl, setAvatarUrl] = useState(getUserProfile()?.avatar || 'https://i.pravatar.cc/150?img=5');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = React.useRef(null);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const res = await uploadFileToCloudinary(file, '/api/upload/avatar');
+      setAvatarUrl(res.avatarUrl);
+      
+      // Update local stored profile
+      const stored = getUserProfile() || {};
+      stored.avatar = res.avatarUrl;
+      stored.profilePhoto = res.avatarUrl;
+      saveUserProfile(stored);
+
+      showToast('success', 'Profile photo updated & saved on Cloudinary!');
+    } catch (err) {
+      showToast('error', err.message || 'Failed to upload photo to Cloudinary');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'account':
@@ -206,10 +235,19 @@ export default function Settings() {
             </div>
             <div className="section-body">
               <div className="avatar-upload">
-                <img src="https://i.pravatar.cc/150?img=5" alt="Avatar" className="avatar-preview" />
+                <img src={avatarUrl} alt="Avatar" className="avatar-preview" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #cbd5e1' }} />
                 <div className="avatar-actions">
-                  <button className="btn-upload"><UploadCloud size={16} /> Change Photo</button>
-                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>JPG, GIF or PNG. Max size of 800K.</span>
+                  <input 
+                    type="file" 
+                    ref={avatarInputRef} 
+                    onChange={handleAvatarChange} 
+                    accept="image/jpeg,image/png,image/webp,image/gif" 
+                    style={{ display: 'none' }} 
+                  />
+                  <button type="button" className="btn-upload" onClick={() => avatarInputRef.current?.click()} disabled={isUploadingAvatar}>
+                    <UploadCloud size={16} /> {isUploadingAvatar ? 'Uploading to Cloudinary...' : 'Change Photo'}
+                  </button>
+                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>JPG, PNG, WEBP or GIF. Max 10 MB (Cloudinary Secured).</span>
                 </div>
               </div>
               <div className="form-grid">

@@ -232,7 +232,7 @@ export default function Freelancers() {
                       
                       <div className="card-header" style={{alignItems: 'center'}}>
                         <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
-                          <img src={freelancer.avatar || 'https://via.placeholder.com/150'} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
+                          <img src={freelancer.avatar || 'https://i.pravatar.cc/150'} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
                           <div>
                             <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none'}}>
                               <h3 className="project-title" style={{marginBottom: '4px'}}>{freelancer.name}</h3>

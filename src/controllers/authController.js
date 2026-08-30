@@ -96,3 +96,46 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.googleLogin = async (req, res) => {
+  try {
+    const { email, name, role } = req.body;
+    const normalizedEmail = (email || 'google.user@gigsphere.com').toLowerCase().trim();
+
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      // Auto-create user via Google OAuth
+      const salt = await bcrypt.genSalt(10);
+      const password_hash = await bcrypt.hash(`google_${Date.now()}`, salt);
+
+      user = await User.create({
+        name: name || 'Google User',
+        email: normalizedEmail,
+        password_hash,
+        role: role || 'client'
+      });
+    }
+
+    const payload = {
+      id: user._id,
+      role: user.role
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+
+    res.json({
+      message: 'Google authentication successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Google authentication server error' });
+  }
+};

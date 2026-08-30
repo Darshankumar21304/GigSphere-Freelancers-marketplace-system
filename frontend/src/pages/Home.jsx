@@ -1,222 +1,313 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Search, Code, Palette, PenTool, Video, Music, TrendingUp, Star, 
-  CheckCircle, Shield, Briefcase, Zap, Globe, MessageSquare, 
-  ChevronRight, ArrowRight
+  CheckCircle2, ShieldCheck, Briefcase, Zap, Globe, MessageSquare, 
+  ChevronRight, ArrowRight, Sparkles, Lock, CreditCard, Award, 
+  ShieldAlert, RefreshCw, Cpu, Layers, DollarSign
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatINR } from '../utils/currency';
+import AntigravityCanvas from '../components/AntigravityCanvas';
+import AuthModal from '../components/AuthModal';
 import './Home.css';
 
 const categories = [
-  { name: 'Web Development', icon: Code, color: 'var(--primary)', bg: 'rgba(37, 99, 235, 0.1)' },
-  { name: 'Mobile App Development', icon: Code, color: 'rgb(245, 158, 11)', bg: 'rgba(245, 158, 11, 0.1)' },
-  { name: 'UI/UX Design', icon: Palette, color: 'rgb(219, 39, 119)', bg: 'rgba(219, 39, 119, 0.1)' },
-  { name: 'Graphic Design', icon: Palette, color: 'rgb(147, 51, 234)', bg: 'rgba(147, 51, 234, 0.1)' },
-  { name: 'Digital Marketing', icon: TrendingUp, color: 'var(--success)', bg: 'rgba(16, 185, 129, 0.1)' },
-  { name: 'Content Writing', icon: PenTool, color: 'var(--warning)', bg: 'rgba(245, 158, 11, 0.1)' },
-  { name: 'Video & Animation', icon: Video, color: 'rgb(147, 51, 234)', bg: 'rgba(147, 51, 234, 0.1)' },
-  { name: 'Data Science', icon: TrendingUp, color: 'var(--primary)', bg: 'rgba(37, 99, 235, 0.1)' },
+  { name: 'Web & Full Stack', icon: Code, color: '#1a73e8', bg: '#e8f0fe' },
+  { name: 'Mobile Apps (iOS & Android)', icon: Code, color: '#a142f4', bg: '#f3e8fd' },
+  { name: 'UI/UX & Product Design', icon: Palette, color: '#e52592', bg: '#fce8e6' },
+  { name: 'AI & Data Engineering', icon: Cpu, color: '#00e5ff', bg: '#e0f7fa' },
+  { name: 'Growth & Performance Marketing', icon: TrendingUp, color: '#34a853', bg: '#e6f4ea' },
+  { name: 'Content & Technical Writing', icon: PenTool, color: '#f9ab00', bg: '#fef7e0' },
+  { name: 'Video Editing & 3D Animation', icon: Video, color: '#a142f4', bg: '#f3e8fd' },
+  { name: 'Blockchain & Smart Contracts', icon: Layers, color: '#1a73e8', bg: '#e8f0fe' }
 ];
 
 const featuredFreelancers = [
   {
     id: 1,
     name: 'Priya Sharma',
-    title: 'Senior UI/UX Designer',
+    title: 'Lead UI/UX & Product Designer',
     avatar: 'https://i.pravatar.cc/150?img=5',
     rating: 4.9,
-    skills: ['Figma', 'UI Design', 'Wireframing'],
+    reviews: 142,
+    skills: ['Figma', 'Product Design', 'User Research'],
     location: 'Bangalore, India',
-    price: 1500,
+    price: 1800,
+    riskScore: 5
   },
   {
     id: 2,
     name: 'Arjun Mehta',
-    title: 'Full Stack Developer',
+    title: 'Senior Full Stack & Cloud Engineer',
     avatar: 'https://i.pravatar.cc/150?img=11',
     rating: 5.0,
-    skills: ['React', 'Node.js', 'MongoDB'],
+    reviews: 98,
+    skills: ['React', 'Node.js', 'MongoDB', 'AWS'],
     location: 'Pune, India',
-    price: 2000,
+    price: 2400,
+    riskScore: 8
   },
   {
     id: 3,
     name: 'Rohan Kumar',
-    title: 'Digital Marketing Expert',
+    title: 'AI Systems & LLM Integrator',
     avatar: 'https://i.pravatar.cc/150?img=14',
-    rating: 4.8,
-    skills: ['SEO', 'Google Ads', 'Content'],
+    rating: 4.9,
+    reviews: 76,
+    skills: ['Python', 'OpenAI', 'LangChain', 'FastAPI'],
     location: 'Mumbai, India',
-    price: 1000,
+    price: 2200,
+    riskScore: 10
   },
   {
     id: 4,
     name: 'Neha Verma',
-    title: 'Content Writer & Strategist',
+    title: 'Growth Specialist & Copywriter',
     avatar: 'https://i.pravatar.cc/150?img=9',
     rating: 4.9,
-    skills: ['Copywriting', 'Blogging', 'SEO'],
+    reviews: 110,
+    skills: ['Copywriting', 'SEO', 'Funnel Optimization'],
     location: 'Delhi, India',
-    price: 800,
+    price: 1200,
+    riskScore: 6
   }
 ];
 
 const featuredProjects = [
   {
     id: 1,
-    title: 'E-commerce Website Development',
-    description: 'Looking for an experienced React developer to build a modern e-commerce storefront.',
-    category: 'Web Development',
-    skills: ['React', 'Tailwind', 'Redux'],
-    budget: 50000,
+    title: 'Fintech SaaS Dashboard & Mobile App',
+    description: 'Looking for an experienced React & React Native developer to build a modern crypto/banking wallet app.',
+    category: 'Web & Full Stack',
+    skills: ['React Native', 'Tailwind', 'Node.js'],
+    budget: 75000,
     type: 'Fixed Price',
-    posted: '2 days ago'
+    posted: '2 hours ago'
   },
   {
     id: 2,
-    title: 'Logo & Brand Identity Design',
-    description: 'Need a minimalist logo and brand guidelines for a new tech startup.',
-    category: 'Graphic Design',
-    skills: ['Illustrator', 'Branding', 'Logo Design'],
-    budget: 15000,
+    title: 'AI Customer Support Bot & Workflow Engine',
+    description: 'Build a custom AI chatbot integrated with MongoDB and Puter/OpenAI APIs for automated ticket resolution.',
+    category: 'AI & Data Engineering',
+    skills: ['Python', 'LLMs', 'Node.js', 'FastAPI'],
+    budget: 45000,
     type: 'Fixed Price',
-    posted: '5 hours ago'
+    posted: '4 hours ago'
   },
   {
     id: 3,
-    title: 'SEO Optimization for Blog',
-    description: 'Require an SEO expert to optimize our WordPress blog and improve rankings.',
-    category: 'Digital Marketing',
-    skills: ['SEO', 'WordPress', 'Analytics'],
-    budget: 10000,
-    type: 'Monthly',
+    title: 'Minimalist Brand Identity & UI Kit',
+    description: 'Require a senior product designer to craft clean Google-style branding, vector icons, and a Figma design system.',
+    category: 'UI/UX & Product Design',
+    skills: ['Figma', 'Branding', 'Design Systems'],
+    budget: 30000,
+    type: 'Fixed Price',
     posted: '1 day ago'
   }
 ];
 
 export default function Home() {
+  // Interactive Landing Page Demos State
+  const [demoRiskVal, setDemoRiskVal] = useState(12);
+
+  // Auth Popup Modal State
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authTab, setAuthTab] = useState('register');
+  const [authRole, setAuthRole] = useState('client');
+
+  const openAuthModal = (tab = 'register', role = 'client') => {
+    setAuthTab(tab);
+    setAuthRole(role);
+    setShowAuthModal(true);
+  };
+
   return (
     <div className="gigsphere-landing-page">
-      {/* 1. HERO SECTION */}
+      
+      {/* 1. GOOGLE ANTIGRAVITY HERO SECTION */}
       <section className="hero-section">
-        <div className="container hero-container">
-          <div className="hero-content">
+        <AntigravityCanvas />
+
+        <div className="container hero-container" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="hero-content text-center" style={{ maxWidth: '860px', margin: '0 auto' }}>
+            
+            {/* Top GigSphere Brand Badge Emblem */}
+            <div className="hero-brand-badge">
+              <div className="hero-logo-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="6" fill="url(#hero_gigsphere_grad)" />
+                  <ellipse cx="12" cy="12" rx="10" ry="4" stroke="url(#hero_gigsphere_grad_ring)" strokeWidth="2.2" strokeLinecap="round" transform="rotate(-30 12 12)" />
+                  <defs>
+                    <linearGradient id="hero_gigsphere_grad" x1="6" y1="6" x2="18" y2="18" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#1A73E8" />
+                      <stop offset="0.5" stopColor="#A142F4" />
+                      <stop offset="1" stopColor="#00E5FF" />
+                    </linearGradient>
+                    <linearGradient id="hero_gigsphere_grad_ring" x1="2" y1="8" x2="22" y2="16" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#00E5FF" />
+                      <stop offset="0.5" stopColor="#1A73E8" />
+                      <stop offset="1" stopColor="#A142F4" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <span className="hero-brand-name">GigSphere</span>
+            </div>
+
+            {/* Main Headline */}
             <h1 className="hero-title">
-              Find the Right Talent. <br /><span className="highlight-text">Get Work Done.</span>
+              The next-generation <br />
+              <span className="gradient-text">freelance marketplace platform</span>
             </h1>
+            
             <p className="hero-subtitle">
-              GigSphere connects clients with skilled freelancers to build, design, market, and grow their ideas. 
-              The leading Indian freelance marketplace.
+              GigSphere connects visionary clients with top Indian freelancers powered by automated AI risk auditing, instant Razorpay deposits, and 100% escrow vault protection.
             </p>
             
-            <div className="hero-ctas">
-              <Link to="/explore" className="btn btn-primary btn-lg">Explore Projects</Link>
-              <Link to="/freelancers" className="btn btn-outline btn-lg">Find Freelancers</Link>
+            {/* Dual Pill CTA Buttons */}
+            <div className="hero-pill-ctas">
+              <Link to="/auth/client-join" className="pill-btn pill-dark shadow-glow">
+                <Briefcase size={18} /> Join as Client
+              </Link>
+              <Link to="/auth/freelancer-join" className="pill-btn pill-light">
+                <Award size={18} /> Join as Freelancer
+              </Link>
+              <Link to="/explore" className="pill-btn pill-outline">
+                Explore Marketplace <ArrowRight size={16} />
+              </Link>
             </div>
             
-            <div className="hero-stats">
-              <div className="stat-item">
-                <span className="stat-value">10k+</span>
-                <span className="stat-label">Freelancers</span>
+            {/* Telemetry Metrics Bar */}
+            <div className="hero-metrics-bar">
+              <div className="metric-item">
+                <div className="metric-val">₹1.2 Cr+</div>
+                <div className="metric-lbl">Escrow Funds Protected</div>
               </div>
-              <div className="stat-item">
-                <span className="stat-value">5k+</span>
-                <span className="stat-label">Projects Completed</span>
+              <div className="metric-divider"></div>
+              <div className="metric-item">
+                <div className="metric-val">15,000+</div>
+                <div className="metric-lbl">Verified Freelancers</div>
               </div>
-              <div className="stat-item">
-                <span className="stat-value">4.9/5</span>
-                <span className="stat-label">Average Rating</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="hero-visual">
-            <div className="hero-card-stack">
-              <div className="hero-floating-card card-1 glass">
-                <div className="card-header">
-                  <img src="https://i.pravatar.cc/150?img=5" alt="Freelancer" className="floating-avatar" />
-                  <div>
-                    <h4>Priya S.</h4>
-                    <p>UI/UX Designer</p>
-                  </div>
-                </div>
-                <div className="card-rating">
-                  <Star size={14} fill="var(--warning)" color="var(--warning)" /> 5.0 (120 reviews)
-                </div>
-              </div>
-              
-              <div className="hero-floating-card card-2 glass">
-                <div className="card-header">
-                  <div className="icon-box"><Code size={20} /></div>
-                  <div>
-                    <h4>Web Development</h4>
-                    <p>Starting at {formatINR(15000)}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="hero-main-image-wrapper">
-                <img 
-                  src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80" 
-                  alt="Team collaborating" 
-                  className="hero-main-image"
-                />
+              <div className="metric-divider"></div>
+              <div className="metric-item">
+                <div className="metric-val">99.8%</div>
+                <div className="metric-lbl">Dispute Resolution Rate</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 2. VALUE PROPOSITION */}
-      <section className="value-prop-section bg-light">
+      {/* 2. FEATURE MATRIX (COMPACT ANTIGRAVITY CAPSULES) */}
+      <section className="feature-matrix-section">
         <div className="container">
-          <div className="section-header text-center">
-            <h2 className="section-title">Everything You Need to Work Better</h2>
-            <p className="section-subtitle">Discover a seamless way to collaborate and achieve your goals.</p>
+          <div className="section-header text-center" style={{ marginBottom: '2rem' }}>
+            <h2 className="section-title">Engineered for Transparency, Security & Speed</h2>
           </div>
-          
-          <div className="value-cards-grid">
-            <div className="value-card">
-              <div className="value-icon"><Search size={28} /></div>
-              <h3>Find Skilled Freelancers</h3>
-              <p>Discover talented professionals across multiple categories, ready to bring your vision to life.</p>
-            </div>
+
+          <div className="antigravity-capsules-row">
             
-            <div className="value-card">
-              <div className="value-icon"><Briefcase size={28} /></div>
-              <h3>Post Your Project</h3>
-              <p>Tell freelancers what you need and receive proposals from skilled professionals instantly.</p>
+            {/* Capsule 1: AI Security */}
+            <div className="antigravity-chip blue-glow">
+              <div className="chip-icon blue"><Cpu size={20} /></div>
+              <div className="chip-body">
+                <span className="chip-title">Automated Risk Auditing</span>
+                <span className="chip-subtitle">AI Security Engine</span>
+              </div>
+              <Sparkles size={16} className="chip-sparkle" color="#1a73e8" />
             </div>
-            
-            <div className="value-card">
-              <div className="value-icon"><Shield size={28} /></div>
-              <h3>Work Securely</h3>
-              <p>Manage projects, milestones, communication, and payments safely in one place.</p>
+
+            {/* Capsule 2: Secure Payment */}
+            <div className="antigravity-chip green-glow">
+              <div className="chip-icon green"><Lock size={20} /></div>
+              <div className="chip-body">
+                <span className="chip-title">Razorpay Payment & Escrow</span>
+                <span className="chip-subtitle">Secure Payment Vault</span>
+              </div>
+              <CreditCard size={16} className="chip-sparkle" color="#10b981" />
             </div>
-            
-            <div className="value-card">
-              <div className="value-icon"><TrendingUp size={28} /></div>
-              <h3>Build Your Career</h3>
-              <p>Freelancers can showcase their skills, find projects, and grow their professional reputation.</p>
+
+            {/* Capsule 3: Dispute Resolution */}
+            <div className="antigravity-chip purple-glow">
+              <div className="chip-icon purple"><MessageSquare size={20} /></div>
+              <div className="chip-body">
+                <span className="chip-title">Evidence Defense & Verdicts</span>
+                <span className="chip-subtitle">Dispute Resolution</span>
+              </div>
+              <ShieldCheck size={16} className="chip-sparkle" color="#a142f4" />
             </div>
+
           </div>
         </div>
       </section>
 
-      {/* 3. EXPLORE CATEGORIES */}
+      {/* 3. DUAL INVITING AUDIENCE PORTALS ("FOR CLIENTS" vs "FOR FREELANCERS") */}
+      <section className="audience-portals-section">
+        <div className="container">
+          <div className="portals-grid">
+            
+            {/* For Clients Portal */}
+            <div className="portal-card client-portal hover-lift">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.5rem' }}>
+                <span className="portal-badge">FOR CLIENTS & BUSINESSES</span>
+                <Sparkles size={16} color="#1a73e8" />
+              </div>
+              <h2 style={{ fontSize: '1.35rem', marginBottom: '0.5rem', lineHeight: '1.3' }}>Hire vetted top 1% Indian freelancers</h2>
+              <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>Post project requirements, receive AI-screened proposals in minutes, and collaborate securely with zero upfront risk.</p>
+              
+              <ul className="portal-features" style={{ marginBottom: '1.25rem', gap: '0.4rem' }}>
+                <li style={{ fontSize: '0.8rem' }}><CheckCircle2 size={14} color="#1a73e8" /> 100% Escrow Protection on every milestone</li>
+                <li style={{ fontSize: '0.8rem' }}><CheckCircle2 size={14} color="#1a73e8" /> Automated AI skill matching & quality scoring</li>
+                <li style={{ fontSize: '0.8rem' }}><CheckCircle2 size={14} color="#1a73e8" /> Pay via Razorpay UPI, NetBanking, or Cards</li>
+              </ul>
+
+              <Link to="/auth/client-join" className="pill-btn pill-dark" style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}>
+                Hire Talent Now <ArrowRight size={15} />
+              </Link>
+            </div>
+
+            {/* For Freelancers Portal */}
+            <div className="portal-card freelancer-portal hover-lift">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.5rem' }}>
+                <span className="portal-badge alt">FOR FREELANCERS</span>
+                <Sparkles size={16} color="#10b981" />
+              </div>
+              <h2 style={{ fontSize: '1.35rem', marginBottom: '0.5rem', lineHeight: '1.3' }}>Keep 90% of earnings with instant payouts</h2>
+              <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>Build your portfolio, pitch to verified clients, and withdraw earnings directly to your UPI ID or Bank account.</p>
+              
+              <ul className="portal-features" style={{ marginBottom: '1.25rem', gap: '0.4rem' }}>
+                <li style={{ fontSize: '0.8rem' }}><CheckCircle2 size={14} color="#10b981" /> Instant Razorpay withdrawal payouts within 24h</li>
+                <li style={{ fontSize: '0.8rem' }}><CheckCircle2 size={14} color="#10b981" /> Verified clients with funded escrow vaults</li>
+                <li style={{ fontSize: '0.8rem' }}><CheckCircle2 size={14} color="#10b981" /> AI profile audit badge to win high-paying bids</li>
+              </ul>
+
+              <Link to="/auth/freelancer-join" className="pill-btn pill-green" style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}>
+                Join as Freelancer <ArrowRight size={15} />
+              </Link>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 4. EXPLORE CATEGORIES */}
       <section id="categories" className="categories-section">
         <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Explore Popular Services</h2>
-            <Link to="/explore" className="view-all-link">Browse all categories <ArrowRight size={16} /></Link>
+          <div className="section-header flex justify-between items-center">
+            <div>
+              <h2 className="section-title">Explore High-Demand Categories</h2>
+              <p className="section-subtitle">Find specialized talent across cutting-edge technology & creative domains.</p>
+            </div>
+            <Link to="/explore" className="pill-btn pill-outline hidden-mobile">
+              Browse All Categories <ArrowRight size={16} />
+            </Link>
           </div>
           
           <div className="category-grid">
             {categories.map((cat, idx) => (
-              <Link to={`/explore?category=${encodeURIComponent(cat.name)}`} key={idx} className="category-card">
+              <Link to={`/explore?category=${encodeURIComponent(cat.name)}`} key={idx} className="category-card hover-lift">
                 <div className="category-icon-wrapper" style={{ backgroundColor: cat.bg, color: cat.color }}>
-                  <cat.icon size={32} />
+                  <cat.icon size={24} />
                 </div>
                 <div className="category-info">
                   <h3 className="category-name">{cat.name}</h3>
@@ -228,97 +319,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. HOW IT WORKS */}
-      <section id="how-it-works" className="how-it-works-section bg-light">
-        <div className="container">
-          <div className="section-header text-center">
-            <h2 className="section-title">How GigSphere Works</h2>
-            <p className="section-subtitle">A simple, transparent process for both clients and freelancers.</p>
-          </div>
-          
-          <div className="how-it-works-split">
-            <div className="how-it-works-col">
-              <h3>For Clients</h3>
-              <div className="step-list">
-                <div className="step-item">
-                  <div className="step-number">1</div>
-                  <div className="step-content">
-                    <h4>Create a Project</h4>
-                    <p>Outline your requirements, budget, and timeline.</p>
-                  </div>
-                </div>
-                <div className="step-item">
-                  <div className="step-number">2</div>
-                  <div className="step-content">
-                    <h4>Receive Proposals</h4>
-                    <p>Review bids and portfolios from interested freelancers.</p>
-                  </div>
-                </div>
-                <div className="step-item">
-                  <div className="step-number">3</div>
-                  <div className="step-content">
-                    <h4>Hire the Right Freelancer</h4>
-                    <p>Select the best fit and start communicating directly.</p>
-                  </div>
-                </div>
-                <div className="step-item">
-                  <div className="step-number">4</div>
-                  <div className="step-content">
-                    <h4>Complete the Project</h4>
-                    <p>Approve the work and release secure payments.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="how-it-works-col">
-              <h3>For Freelancers</h3>
-              <div className="step-list">
-                <div className="step-item">
-                  <div className="step-number">1</div>
-                  <div className="step-content">
-                    <h4>Create Your Profile</h4>
-                    <p>Highlight your skills, experience, and portfolio.</p>
-                  </div>
-                </div>
-                <div className="step-item">
-                  <div className="step-number">2</div>
-                  <div className="step-content">
-                    <h4>Discover Projects</h4>
-                    <p>Browse open opportunities that match your expertise.</p>
-                  </div>
-                </div>
-                <div className="step-item">
-                  <div className="step-number">3</div>
-                  <div className="step-content">
-                    <h4>Submit Proposals</h4>
-                    <p>Send tailored pitches and negotiate rates.</p>
-                  </div>
-                </div>
-                <div className="step-item">
-                  <div className="step-number">4</div>
-                  <div className="step-content">
-                    <h4>Get Hired</h4>
-                    <p>Deliver great work and build your reputation.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. FEATURED FREELANCERS */}
+      {/* 5. TOP FEATURED FREELANCERS */}
       <section className="featured-freelancers-section">
         <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Meet Top Freelancers</h2>
-            <Link to="/freelancers" className="view-all-link">View all freelancers <ArrowRight size={16} /></Link>
+          <div className="section-header flex justify-between items-center">
+            <div>
+              <h2 className="section-title">Top Rated Vetted Talent</h2>
+              <p className="section-subtitle">Handpicked professionals with verified work history and AI safety badges.</p>
+            </div>
+            <Link to="/freelancers" className="pill-btn pill-outline hidden-mobile">
+              View All Freelancers <ArrowRight size={16} />
+            </Link>
           </div>
           
           <div className="freelancers-grid">
             {featuredFreelancers.map((freelancer) => (
-              <div key={freelancer.id} className="freelancer-card">
+              <div key={freelancer.id} className="freelancer-card hover-lift">
                 <div className="freelancer-header">
                   <img src={freelancer.avatar} alt={freelancer.name} className="freelancer-avatar" />
                   <div>
@@ -329,12 +345,12 @@ export default function Home() {
                 
                 <div className="freelancer-details">
                   <div className="detail-item">
-                    <Star size={14} className="icon-warning" />
-                    <span>{freelancer.rating} Rating</span>
+                    <Star size={14} fill="#f59e0b" color="#f59e0b" />
+                    <span>{freelancer.rating} ({freelancer.reviews})</span>
                   </div>
                   <div className="detail-item">
-                    <Globe size={14} className="icon-muted" />
-                    <span>{freelancer.location}</span>
+                    <ShieldCheck size={14} color="#10b981" />
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>AI Risk {freelancer.riskScore}%</span>
                   </div>
                 </div>
                 
@@ -346,10 +362,12 @@ export default function Home() {
                 
                 <div className="freelancer-footer">
                   <div className="freelancer-price">
-                    <span className="price-label">Starting at</span>
+                    <span className="price-label">Rate</span>
                     <span className="price-amount">{formatINR(freelancer.price)}/hr</span>
                   </div>
-                  <Link to={`/freelancer/${freelancer.id}`} className="btn btn-outline btn-sm">View Profile</Link>
+                  <Link to={`/freelancer/${freelancer.id}`} className="min-btn min-btn-primary">
+                    View Profile
+                  </Link>
                 </div>
               </div>
             ))}
@@ -357,17 +375,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 6. FEATURED PROJECTS */}
-      <section className="featured-projects-section bg-light">
+      {/* 6. FEATURED OPEN OPPORTUNITIES */}
+      <section className="featured-projects-section">
         <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Latest Opportunities</h2>
-            <Link to="/explore" className="view-all-link">Browse all projects <ArrowRight size={16} /></Link>
+          <div className="section-header flex justify-between items-center">
+            <div>
+              <h2 className="section-title">Latest Project Opportunities</h2>
+              <p className="section-subtitle">Verified client projects open for proposals right now.</p>
+            </div>
+            <Link to="/explore" className="pill-btn pill-outline hidden-mobile">
+              Browse All Projects <ArrowRight size={16} />
+            </Link>
           </div>
           
           <div className="projects-grid">
             {featuredProjects.map((project) => (
-              <div key={project.id} className="project-card">
+              <div key={project.id} className="project-card hover-lift">
                 <div className="project-header">
                   <span className="project-category">{project.category}</span>
                   <span className="project-posted">{project.posted}</span>
@@ -386,7 +409,9 @@ export default function Home() {
                     <span className="budget-amount">{formatINR(project.budget)}</span>
                     <span className="budget-type">{project.type}</span>
                   </div>
-                  <Link to={`/gig/${project.id}`} className="btn btn-primary btn-sm">View Project</Link>
+                  <Link to={`/gig/${project.id}`} className="min-btn min-btn-primary">
+                    Submit Bid
+                  </Link>
                 </div>
               </div>
             ))}
@@ -394,67 +419,28 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 7. TRUST SECTION */}
-      <section className="trust-section">
-        <div className="container text-center">
-          <h2 className="section-title">Built for Better Freelancing</h2>
-          <p className="section-subtitle">We provide the tools and security you need to focus on what matters: great work.</p>
-          
-          <div className="trust-features">
-            <div className="trust-feature">
-              <CheckCircle size={32} className="trust-icon" />
-              <h4>Verified Profiles</h4>
-              <p>Work with confident, verified professionals and clients.</p>
-            </div>
-            <div className="trust-feature">
-              <Shield size={32} className="trust-icon" />
-              <h4>Secure Payments</h4>
-              <p>Your funds are protected. Pay only for approved work.</p>
-            </div>
-            <div className="trust-feature">
-              <MessageSquare size={32} className="trust-icon" />
-              <h4>Professional Communication</h4>
-              <p>Built-in chat and file sharing for seamless collaboration.</p>
-            </div>
-            <div className="trust-feature">
-              <Star size={32} className="trust-icon" />
-              <h4>Ratings & Reviews</h4>
-              <p>Transparent feedback helps build a trusted community.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 8. CLIENT + FREELANCER SPLIT */}
-      <section className="split-cta-section">
-        <div className="container">
-          <div className="split-cards">
-            <div className="split-card client-card">
-              <h3>For Clients</h3>
-              <p>Turn your ideas into reality with skilled freelancers ready to execute your vision.</p>
-              <Link to="/auth/client-join" className="btn btn-primary">Find a Freelancer</Link>
-            </div>
-            
-            <div className="split-card freelancer-card">
-              <h3>For Freelancers</h3>
-              <p>Showcase your skills, find projects that match your expertise, and grow your business.</p>
-              <Link to="/auth/freelancer-join" className="btn btn-outline">Join as Freelancer</Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 9. FINAL CTA */}
+      {/* 7. FINAL GOOGLE ANTIGRAVITY PILL CTA */}
       <section className="final-cta-section">
         <div className="container text-center">
-          <h2 className="cta-title">Ready to Get Started?</h2>
-          <p className="cta-subtitle">Whether you're looking for skilled talent or your next opportunity, GigSphere brings you together.</p>
+          <h2 className="cta-title">Ready to experience the future of freelancing?</h2>
+          <p className="cta-subtitle">Join thousands of Indian businesses and top freelancers collaborating with AI security and instant Razorpay payouts.</p>
           <div className="cta-buttons">
-            <Link to="/auth/client-join" className="btn btn-primary btn-lg">Join as Client</Link>
-            <Link to="/auth/freelancer-join" className="btn btn-outline btn-lg cta-outline">Join as Freelancer</Link>
+            <Link to="/auth/client-join" className="pill-btn pill-white">
+              <Briefcase size={18} /> Join as Client
+            </Link>
+            <Link to="/auth/freelancer-join" className="pill-btn pill-dark">
+              <Award size={18} /> Join as Freelancer
+            </Link>
           </div>
         </div>
       </section>
+
+      {/* Interactive Log In Auth Modal Popup */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
+
     </div>
   );
 }

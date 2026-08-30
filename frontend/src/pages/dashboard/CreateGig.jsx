@@ -5,6 +5,7 @@ import {
   X, Briefcase, Calendar, Shield, Eye, Clock, IndianRupee
 } from 'lucide-react';
 import axios from 'axios';
+import { uploadFileToCloudinary } from '../../utils/fileUpload';
 import './CreateProject.css';
 
 const steps = [
@@ -64,11 +65,43 @@ export default function CreateGig() {
     setFormData(prev => ({ ...prev, skills: prev.skills.filter(s => s !== skillToRemove) }));
   };
 
-  const handleFileChange = (e) => {
-    if (e.target.files) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files)]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+
+  const handleFileChange = async (e) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const selectedFiles = Array.from(e.target.files);
+    setIsUploadingFiles(true);
+
+    try {
+      const uploadPromises = selectedFiles.map(async (file) => {
+        const mime = file.type;
+        const isImg = mime.startsWith('image/');
+        const isVid = mime.startsWith('video/') || mime.startsWith('audio/');
+        const isDoc = mime.includes('pdf') || mime.includes('word') || mime.includes('text');
+
+        if (isImg && file.size > 10 * 1024 * 1024) throw new Error(`Image '${file.name}' exceeds 10MB Cloudinary limit.`);
+        if (isDoc && file.size > 15 * 1024 * 1024) throw new Error(`Document '${file.name}' exceeds 15MB Cloudinary limit.`);
+        if (isVid && file.size > 50 * 1024 * 1024) throw new Error(`Video '${file.name}' exceeds 50MB Cloudinary limit.`);
+
+        const res = await uploadFileToCloudinary(file);
+        return {
+          name: file.name,
+          url: res.url,
+          publicId: res.publicId,
+          size: file.size
+        };
+      });
+
+      const uploadedResults = await Promise.all(uploadPromises);
+      setFiles(prev => [...prev, ...uploadedResults]);
+    } catch (err) {
+      alert(err.message || 'Error uploading file to Cloudinary');
+    } finally {
+      setIsUploadingFiles(false);
     }
   };
+
   const removeFile = (index) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
