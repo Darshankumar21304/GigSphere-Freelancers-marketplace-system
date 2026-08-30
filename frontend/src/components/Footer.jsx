@@ -4,6 +4,8 @@ import './Footer.css';
 
 const Footer = () => {
   const location = useLocation();
+  if (location.pathname.startsWith('/admin')) return null;
+
   const isLandingPage = location.pathname === '/';
 
   if (!isLandingPage) {

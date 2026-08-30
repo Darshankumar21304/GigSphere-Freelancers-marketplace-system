@@ -1,27 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/messageController');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { upload, validateFileSize } = require('../middleware/uploadMiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 
-// Ensure uploads dir exists
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)){
-    fs.mkdirSync(uploadDir);
-}
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir)
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname))
-  }
-});
-const upload = multer({ storage: storage });
-
-router.get('/history/:user1_id/:user2_id', messageController.getChatHistory);
-router.post('/upload', upload.single('file'), messageController.uploadFile);
+router.get('/history/:user1_id/:user2_id', authMiddleware, messageController.getChatHistory);
+router.post('/upload', authMiddleware, upload.single('file'), validateFileSize, messageController.uploadFile);
+router.get('/unread-count', authMiddleware, messageController.getUnreadCount);
+router.put('/read-all/:senderId', authMiddleware, messageController.markMessagesRead);
+router.get('/conversations', authMiddleware, messageController.getConversations);
 
 module.exports = router;

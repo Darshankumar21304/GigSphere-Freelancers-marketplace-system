@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  User, Briefcase, Lock, Bell, CreditCard, 
-  Shield, Palette, CheckCircle, XCircle, UploadCloud 
+import {
+  User, Briefcase, Lock, Bell, CreditCard,
+  Shield, Palette, CheckCircle, XCircle, UploadCloud
 } from 'lucide-react';
 import { apiFetch } from '../../utils/api';
-import { getUserProfile, saveUserProfile } from '../../utils/authUtils';
 import './Settings.css';
 
 // Custom Toggle Component
@@ -98,6 +97,9 @@ export default function Settings() {
           }
           setFormData(newFormData);
           setInitialData(newFormData);
+          if (data.user.avatar || data.user.profilePhoto) {
+            setAvatarUrl(data.user.avatar || data.user.profilePhoto);
+          }
         }
       } catch (error) {
         showToast('error', error.message || 'Failed to load settings');
@@ -139,6 +141,8 @@ export default function Settings() {
         phone: formData.phone,
         location: formData.location,
         language: formData.language,
+        avatar: avatarUrl,
+        profilePhoto: avatarUrl,
         preferences: {
           notifications: {
             email: formData.notifEmail,
@@ -170,23 +174,14 @@ export default function Settings() {
         hourlyRate: formData.hourlyRate
       };
 
-      await apiFetch('/users/settings', {
+      const response = await apiFetch('/users/settings', {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
 
-      if (savedProfile) {
-        saveUserProfile({
-          ...savedProfile,
-          name: formData.fullName,
-          avatar: formData.avatar,
-          profileImage: formData.avatar
-        });
-      }
-
       setInitialData({ ...formData });
       showToast('success', 'Settings saved successfully');
-      
+
       // Update theme if changed
       if (formData.theme === 'dark') {
         document.documentElement.classList.add('dark');
@@ -221,6 +216,33 @@ export default function Settings() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
   ];
 
+  const [avatarUrl, setAvatarUrl] = useState(getUserProfile()?.avatar || 'https://i.pravatar.cc/150?img=5');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = React.useRef(null);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const res = await uploadFileToCloudinary(file, '/api/upload/avatar');
+      setAvatarUrl(res.avatarUrl);
+
+      // Update local stored profile
+      const stored = getUserProfile() || {};
+      stored.avatar = res.avatarUrl;
+      stored.profilePhoto = res.avatarUrl;
+      saveUserProfile(stored);
+
+      showToast('success', 'Profile photo updated & saved on Cloudinary!');
+    } catch (err) {
+      showToast('error', err.message || 'Failed to upload photo to Cloudinary');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'account':
@@ -232,24 +254,10 @@ export default function Settings() {
             </div>
             <div className="section-body">
               <div className="avatar-upload">
-                <img 
-                  src={formData.avatar || savedProfile?.avatar || savedProfile?.profileImage || "https://i.pravatar.cc/150?img=5"} 
-                  alt="Avatar" 
-                  className="avatar-preview" 
-                  style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
-                />
+                <img src="https://i.pravatar.cc/150?img=5" alt="Avatar" className="avatar-preview" />
                 <div className="avatar-actions">
-                  <label htmlFor="settings-avatar-input" className="btn-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <UploadCloud size={16} /> Change Photo
-                  </label>
-                  <input 
-                    id="settings-avatar-input" 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handlePhotoUpload} 
-                    style={{ display: 'none' }} 
-                  />
-                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>JPG, GIF or PNG. Max size 2MB.</span>
+                  <button className="btn-upload"><UploadCloud size={16} /> Change Photo</button>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>JPG, GIF or PNG. Max size of 800K.</span>
                 </div>
               </div>
               <div className="form-grid">
@@ -281,7 +289,7 @@ export default function Settings() {
             </div>
           </>
         );
-      
+
       case 'professional':
         return (
           <>
@@ -442,7 +450,7 @@ export default function Settings() {
               <p className="section-desc">Control who can see your profile and activity.</p>
             </div>
             <div className="section-body">
-              <div className="form-group" style={{marginBottom: '24px'}}>
+              <div className="form-group" style={{ marginBottom: '24px' }}>
                 <label className="form-label">Profile Visibility</label>
                 <select className="form-select" value={formData.profileVisibility} onChange={e => handleInputChange('profileVisibility', e.target.value)}>
                   <option>Public (Visible to everyone)</option>
@@ -494,7 +502,7 @@ export default function Settings() {
                   <span className="form-label">Dark Mode</span>
                 </div>
                 <div className={`theme-card ${formData.theme === 'system' ? 'active' : ''}`} onClick={() => handleInputChange('theme', 'system')}>
-                  <div className="theme-preview" style={{background: 'linear-gradient(90deg, #f3f4f6 50%, #1f2937 50%)'}}></div>
+                  <div className="theme-preview" style={{ background: 'linear-gradient(90deg, #f3f4f6 50%, #1f2937 50%)' }}></div>
                   <span className="form-label">System Preference</span>
                 </div>
               </div>
@@ -510,7 +518,7 @@ export default function Settings() {
   return (
     <div className="gigsphere-freelancer-settings animate-fade-in-up">
       <div className="settings-container">
-        
+
         {/* Header */}
         <div className="page-header">
           <div className="breadcrumb">Dashboard / Settings</div>
@@ -519,12 +527,12 @@ export default function Settings() {
         </div>
 
         <div className="settings-layout">
-          
+
           {/* Navigation */}
           <nav className="settings-nav">
             {navItems.map(item => (
-              <button 
-                key={item.id} 
+              <button
+                key={item.id}
                 className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(item.id)}
               >
@@ -536,10 +544,10 @@ export default function Settings() {
           {/* Content */}
           <div className="settings-content">
             {renderContent()}
-            
+
             <div className="section-footer">
               {hasUnsavedChanges && (
-                <span style={{marginRight: 'auto', color: 'var(--text-muted)', fontSize: '13px', display: 'flex', alignItems: 'center'}}>
+                <span style={{ marginRight: 'auto', color: 'var(--text-muted)', fontSize: '13px', display: 'flex', alignItems: 'center' }}>
                   You have unsaved changes.
                 </span>
               )}

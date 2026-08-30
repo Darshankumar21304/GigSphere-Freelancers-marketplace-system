@@ -9,7 +9,9 @@ const projectSchema = new mongoose.Schema({
   skills: [{ type: String }],
   category: { type: String },
   duration: { type: String },
-  experienceLevel: { type: String, enum: ['Entry Level', 'Intermediate', 'Expert'], default: 'Intermediate' },
+  deadline: { type: String },
+  experienceLevel: { type: String, enum: ['Beginner', 'Entry Level', 'Intermediate', 'Expert'], default: 'Intermediate' },
+  attachments: [mongoose.Schema.Types.Mixed],
   proposals: [{
     freelancer_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     freelancer_name: { type: String },

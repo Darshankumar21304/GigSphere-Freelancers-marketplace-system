@@ -267,38 +267,42 @@
   align-items: center;
   gap: 8px;
   min-height: 52px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
   overflow-x: auto;
   margin-bottom: 24px;
+  background: #f8fafc;
+  border-radius: 40px;
 }
 
-.gcp-tab {
+.gcp-tab, .gcp-tab-button {
   appearance: none;
   -webkit-appearance: none;
-  border: none;
+  border: 1px solid transparent;
   outline: none;
   background: transparent;
-  padding: 14px 16px;
+  padding: 8px 20px;
+  border-radius: 30px;
   font-family: inherit;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  color: var(--text-secondary, #6b7280);
+  color: #64748b;
   white-space: nowrap;
   margin: 0;
   transition: all 0.2s ease;
 }
 
-.gcp-tab:hover {
-  color: var(--text-primary, #374151);
-  border-bottom-color: #d1d5db;
+.gcp-tab:hover, .gcp-tab-button:hover {
+  color: #0f172a;
+  background: #ffffff;
 }
 
-.gcp-tab-active, .gcp-tab-active:hover {
-  color: var(--primary, #2563eb);
-  border-bottom-color: var(--primary, #2563eb);
+.gcp-tab-active, .gcp-tab.active, .gcp-tab-button.active {
+  color: #1a73e8 !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.12) !important;
 }
 
 /* Content Grid Layout */

@@ -1,43 +1,91 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
-  /* Colors (Premium HSL-based Hex) */
-  --primary: #4F46E5; /* Indigo 600 */
-  --primary-hover: #4338CA;
-  --secondary: #0EA5E9; /* Sky 500 */
-  --success: #10B981;
-  --warning: #F59E0B;
-  --danger: #EF4444;
+  /* Google Antigravity & Executive Clean Colors */
+  --primary: #1a73e8; /* Google Blue */
+  --primary-hover: #1557b0;
+  --secondary: #6366f1; /* Indigo */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
   
-  --bg-light: #F8FAFC; /* Slate 50 */
-  --bg-dark: #09090B; /* Zinc 950 */
+  --bg-light: #f8fafc; /* Crisp Light Cool Gray */
+  --bg-dark: #0f172a; /* Executive Dark Slate */
   
-  --text-primary: #0F172A;
+  --text-primary: #0f172a;
   --text-secondary: #475569;
+  --text-muted: #64748b;
   
-  --white: #FFFFFF;
-  --border: #E2E8F0;
+  --white: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
 
   /* Typography */
-  --font-family: 'Poppins', sans-serif;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-glass: 0 4px 30px rgba(0, 0, 0, 0.1);
+  /* Modern Crisp Google Antigravity Elevation Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Legacy Neomorphic token overrides for clean rendering */
+  --shadow-neu-flat: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-neu-pressed: none;
+  --shadow-neu-hover: 0 4px 12px rgba(0,0,0,0.08);
 
   /* Radii */
-  --radius-md: 8px;
-  --radius-lg: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-xl: 20px;
+}
+
+/* Modern Card Component Styles */
+.neu-card, .min-card {
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--border) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-card-hover:hover {
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-2px);
+  border-color: var(--border-strong) !important;
+}
+
+.neu-inset {
+  background: #f8fafc !important;
+  box-shadow: none !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md);
+}
+
+.neu-btn, .min-btn {
+  background: #ffffff !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.neu-btn:hover, .min-btn:hover {
+  background: #f1f5f9 !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
 }
 
 [data-theme="dark"] {
   --bg-light: var(--bg-dark);
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --border: #27272A; /* Zinc 800 */
-  --white: #18181B; /* Zinc 900 */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border: #1e293b;
+  --white: #1e293b;
 }
 
 * {
@@ -52,32 +100,9 @@ body {
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Glassmorphism Utilities */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: var(--shadow-glass);
-}
-
-[data-theme="dark"] .glass {
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* 8px Grid Spacing Utilities (Examples) */
-.m-1 { margin: 8px; }
-.m-2 { margin: 16px; }
-.m-3 { margin: 24px; }
-.p-1 { padding: 8px; }
-.p-2 { padding: 16px; }
-.p-3 { padding: 24px; }
-
-/* Layout Utilities */
+/* Utilities */
 .container {
   width: 100%;
   max-width: 100%;
@@ -106,90 +131,29 @@ body {
 .rounded-xl { border-radius: var(--radius-xl); }
 .shadow-md { box-shadow: var(--shadow-md); }
 .shadow-lg { box-shadow: var(--shadow-lg); }
-.transition { transition: all 0.3s ease; }
 
-/* Micro-interactions & Premium Utilities */
 .hover-lift {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-}
-
-.hover-glow {
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-}
-
-.hover-glow:hover {
-  box-shadow: 0 0 20px rgba(79, 70, 229, 0.4);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-}
-
-[data-theme="dark"] .glass-panel {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-/* Skeleton Loading */
-.skeleton {
-  background: #e2e8f0;
-  background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%);
-  border-radius: var(--radius-md);
-  background-size: 200% 100%;
-  animation: 1.5s shine linear infinite;
-}
-
-[data-theme="dark"] .skeleton {
-  background: linear-gradient(110deg, #1e293b 8%, #334155 18%, #1e293b 33%);
-  background-size: 200% 100%;
-}
-
-@keyframes shine {
-  to {
-    background-position-x: -200%;
-  }
-}
-
-/* Custom Animations added for Dashboard UI Revamp */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
-@keyframes zoomIn {
-  from { opacity: 0; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1); }
-}
-.animate-zoom-in {
-  animation: zoomIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Custom shadow colors */
-.shadow-brand-500\/20 { box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.2); }
-.shadow-brand-500\/30 { box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.3); }
-.shadow-brand-500\/50 { box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.5); }
-.shadow-green-500\/30 { box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3); }
-.shadow-green-500\/50 { box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.5); }

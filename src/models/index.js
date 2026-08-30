@@ -9,6 +9,7 @@ const Review = require('./Review');
 const Project = require('./Project');
 const Contract = require('./Contract');
 const Transaction = require('./Transaction');
+const Notification = require('./Notification');
 
 module.exports = {
   User,
@@ -21,5 +22,6 @@ module.exports = {
   Review,
   Project,
   Contract,
-  Transaction
+  Transaction,
+  Notification
 };

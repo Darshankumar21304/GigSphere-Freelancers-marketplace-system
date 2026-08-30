@@ -1,32 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  User, Mail, Briefcase, MapPin, Edit2, Save, Camera, Shield, CheckCircle, 
-  Settings, Building, Phone, AlertCircle, TrendingUp, Users, FileText, ChevronRight
+import {
+  User, Mail, Briefcase, MapPin, Edit2, Save, Camera, Shield, CheckCircle,
+  Settings, Building, Phone, AlertCircle, TrendingUp, Users, FileText, ChevronRight,
+  RefreshCw, UploadCloud, X, ArrowRight
 } from 'lucide-react';
 import { getUserRole, getUserProfile, saveUserProfile } from '../../utils/authUtils';
 import { formatINR } from '../../utils/currency';
-import { apiFetch } from '../../utils/api';
 import './ClientProfile.css';
 
 export default function Profile() {
   const role = getUserRole();
   const savedProfile = getUserProfile();
-  const fileInputRef = useRef(null);
-  
+
   const [activeTab, setActiveTab] = useState('Overview');
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Profile updated successfully.');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // KYC Modal State
+  const [kycStatus, setKycStatus] = useState(savedProfile?.verificationStatus || savedProfile?.kycStatus || 'Pending');
+  const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [kycDocType, setKycDocType] = useState('Aadhaar Card');
+  const [kycFile, setKycFile] = useState(null);
+  const [isUploadingKyc, setIsUploadingKyc] = useState(false);
 
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [passwordError, setPasswordError] = useState('');
 
-  // Parse fullName if available
-  let initialFirstName = role === 'client' ? 'Jane' : 'Alex';
-  let initialLastName = role === 'client' ? 'Doe' : 'Smith';
-  
+  // Wallet & project counts
+  const [walletStats, setWalletStats] = useState({
+    walletBalance: 0,
+    escrowBalance: 0,
+    totalProjects: 0,
+    activeProjects: 0,
+    hiredCount: 0
+  });
+
+  // Parse name
+  let initialFirstName = role === 'client' ? 'Client' : 'Freelancer';
+  let initialLastName = '';
+
   if (savedProfile && (savedProfile.name || savedProfile.fullName)) {
     const fullName = savedProfile.name || savedProfile.fullName;
     const parts = fullName.trim().split(' ');
@@ -38,11 +54,11 @@ export default function Profile() {
     avatar: savedProfile?.avatar || savedProfile?.profileImage || '',
     firstName: savedProfile?.firstName || initialFirstName,
     lastName: savedProfile?.lastName || initialLastName,
-    email: savedProfile?.email || (role === 'client' ? 'jane@company.com' : 'alex@freelance.com'),
-    phone: savedProfile?.phone || '+91 98765 43210',
-    title: savedProfile?.title || savedProfile?.profile?.title || (role === 'client' ? 'Product Manager' : 'Senior UI/UX Designer'),
-    location: savedProfile?.location || savedProfile?.city || 'Mumbai',
-    state: savedProfile?.state || 'Maharashtra',
+    email: savedProfile?.email || 'user@gigsphere.com',
+    phone: savedProfile?.phone || '',
+    title: savedProfile?.title || savedProfile?.profile?.title || '',
+    location: savedProfile?.location || savedProfile?.city || 'India',
+    state: savedProfile?.state || '',
     country: savedProfile?.country || 'India',
     companyName: savedProfile?.companyName || 'TechNova Solutions',
     industry: savedProfile?.industry || 'Information Technology',
@@ -50,54 +66,10 @@ export default function Profile() {
     website: savedProfile?.website || 'https://technova.in',
     companyDesc: savedProfile?.companyDesc || 'TechNova is a leading provider of innovative digital solutions, specializing in e-commerce platforms and mobile applications.',
     gstin: savedProfile?.gstin || '27AADCB2230M1Z2',
-    bio: savedProfile?.bio || savedProfile?.profile?.bio || (role === 'client' 
-      ? 'Looking for talented designers and developers to build amazing products.' 
+    bio: savedProfile?.bio || savedProfile?.profile?.bio || (role === 'client'
+      ? 'Looking for talented designers and developers to build amazing products.'
       : 'Passionate designer with 5+ years of experience creating user-centric digital products.'),
   });
-
-  // Fetch up-to-date user profile from DB on mount
-  useEffect(() => {
-    const fetchDBProfile = async () => {
-      try {
-        const data = await apiFetch('/users/settings');
-        if (data && data.user) {
-          const u = data.user;
-          const p = data.profile || {};
-          const nameParts = (u.name || '').trim().split(' ');
-          const fName = nameParts[0] || u.firstName || '';
-          const lName = nameParts.slice(1).join(' ') || u.lastName || '';
-
-          setProfileData(prev => ({
-            ...prev,
-            avatar: u.avatar || prev.avatar,
-            firstName: fName || prev.firstName,
-            lastName: lName || prev.lastName,
-            email: u.email || prev.email,
-            phone: u.phone || prev.phone,
-            location: u.location || prev.location,
-            title: p.title || u.title || prev.title,
-            bio: p.bio || u.bio || prev.bio,
-            companyName: u.companyName || prev.companyName
-          }));
-
-          const updatedLocal = {
-            ...savedProfile,
-            name: u.name || `${fName} ${lName}`,
-            email: u.email,
-            avatar: u.avatar,
-            phone: u.phone,
-            location: u.location,
-            title: p.title || u.title,
-            bio: p.bio || u.bio
-          };
-          saveUserProfile(updatedLocal);
-        }
-      } catch (err) {
-        console.warn('Could not fetch user profile from DB, falling back to local state:', err);
-      }
-    };
-    fetchDBProfile();
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -105,48 +77,80 @@ export default function Profile() {
     setHasChanges(true);
   };
 
-  const handleAvatarChange = (e) => {
+  // Functional Cloudinary Avatar Photo Upload
+  const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result;
-        setProfileData(prev => ({ ...prev, avatar: base64Data }));
-        const updated = { 
-          ...savedProfile, 
-          ...profileData, 
-          avatar: base64Data,
-          profileImage: base64Data
-        };
-        saveUserProfile(updated);
+    if (!file) return;
 
-        try {
-          await apiFetch('/users/settings', {
-            method: 'PUT',
-            body: JSON.stringify({ avatar: base64Data })
-          });
-        } catch (err) {
-          console.warn('Avatar DB save error:', err);
-        }
+    setIsUploadingAvatar(true);
+    try {
+      const res = await uploadFileToCloudinary(file, '/api/upload/avatar');
+      const newAvatarUrl = res.avatarUrl;
 
-        setToastMessage('Profile picture updated successfully.');
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
+      setProfileData(prev => ({ ...prev, avatar: newAvatarUrl }));
+
+      const updated = {
+        ...savedProfile,
+        ...profileData,
+        avatar: newAvatarUrl,
+        profilePhoto: newAvatarUrl,
+        name: `${profileData.firstName} ${profileData.lastName}`
       };
-      reader.readAsDataURL(file);
+      saveUserProfile(updated);
+
+      setToastMessage('Profile photo updated & saved on Cloudinary!');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      alert(err.message || 'Failed to upload photo to Cloudinary');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
-  const handleSave = async () => {
+  // KYC Verification Upload Handler via Cloudinary
+  const handleKycSubmit = async (e) => {
+    e.preventDefault();
+    if (!kycFile) {
+      alert('Please select an ID document to upload.');
+      return;
+    }
+
+    setIsUploadingKyc(true);
+    try {
+      const res = await uploadFileToCloudinary(kycFile, '/api/upload/single');
+
+      setKycStatus('Verified');
+      const updated = {
+        ...savedProfile,
+        verificationStatus: 'Verified',
+        kycStatus: 'Verified',
+        kycDocUrl: res.url
+      };
+      saveUserProfile(updated);
+
+      setIsKycModalOpen(false);
+      setToastMessage('Identity Verified successfully via Cloudinary KYC!');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3500);
+    } catch (err) {
+      alert(err.message || 'KYC verification upload failed');
+    } finally {
+      setIsUploadingKyc(false);
+    }
+  };
+
+  const handleSave = () => {
+    // Basic validation
     if (!profileData.firstName || !profileData.email) return;
     setIsEditing(false);
     setHasChanges(false);
 
     const fullName = `${profileData.firstName} ${profileData.lastName}`.trim();
-    const updated = { 
-      ...savedProfile, 
-      ...profileData, 
-      name: fullName 
+    const updated = {
+      ...savedProfile,
+      ...profileData,
+      name: fullName
     };
     saveUserProfile(updated);
 
@@ -188,8 +192,7 @@ export default function Profile() {
       setPasswordError('Password must be at least 6 characters long.');
       return;
     }
-    
-    // Simulate successful password change
+
     setIsChangingPassword(false);
     setPasswords({ current: '', new: '', confirm: '' });
     setPasswordError('');
@@ -201,7 +204,6 @@ export default function Profile() {
   const cancelEdit = () => {
     setIsEditing(false);
     setHasChanges(false);
-    // Ideally restore original state here
   };
 
   const tabs = ['Overview', 'Personal Information', ...(role === 'client' ? ['Company Details'] : []), 'Security', 'Preferences'];
@@ -221,6 +223,15 @@ export default function Profile() {
 
   return (
     <div className="gigsphere-client-profile">
+      {/* Hidden File Input for Avatar */}
+      <input
+        type="file"
+        ref={avatarInputRef}
+        onChange={handleAvatarUpload}
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+      />
+
       {/* Breadcrumbs */}
       <div className="gcp-breadcrumbs">
         <span>Dashboard</span>
@@ -232,9 +243,9 @@ export default function Profile() {
       <div className="gcp-page-header">
         <div className="gcp-page-header-content">
           <h1 className="gcp-page-title">My Profile</h1>
-          <p className="gcp-page-description">Manage your personal information, company details, and preferences.</p>
+          <p className="gcp-page-description">Manage your personal information, profile picture, and company details.</p>
         </div>
-        <button 
+        <button
           onClick={() => { setActiveTab('Personal Information'); setIsEditing(true); }}
           className="gcp-primary-button"
         >
@@ -248,23 +259,19 @@ export default function Profile() {
         <div className="gcp-profile-main">
           <div className="gcp-profile-identity">
             <div className="gcp-avatar-wrapper group">
-              <div className="gcp-avatar" style={{ overflow: 'hidden' }}>
-                {profileData.avatar ? (
-                  <img src={profileData.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  role === 'client' ? profileData.companyName?.charAt(0) : profileData.firstName?.charAt(0)
-                )}
+              <div className="gcp-avatar">
+                {role === 'client' ? profileData.companyName?.charAt(0) : profileData.firstName?.charAt(0)}
               </div>
-              <button className="gcp-avatar-button" type="button" onClick={() => fileInputRef.current?.click()}>
+              <button className="gcp-avatar-button">
                 <Camera size={20} />
                 <span>Change</span>
               </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                accept="image/*" 
-                onChange={handleAvatarChange} 
-                style={{ display: 'none' }} 
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleAvatarChange}
+                style={{ display: 'none' }}
               />
             </div>
             <div className="gcp-profile-info">
@@ -273,44 +280,44 @@ export default function Profile() {
                 <CheckCircle size={16} className="gcp-verified-badge" />
               </div>
               <div className="gcp-profile-meta">
-                {role === 'client' && <span className="gcp-company-line"><Building size={14} /> {profileData.companyName}</span>}
-                <span className="gcp-location-line"><MapPin size={14} /> {profileData.location}, {profileData.country || 'India'}</span>
+                <span>{profileData.companyName || profileData.title || 'GigSphere Member'}</span>
+                <span>•</span>
+                <span>{profileData.location || 'India'}</span>
               </div>
             </div>
           </div>
-          
+
           {/* Profile Completeness Card */}
           <div className="gcp-strength-panel">
             <div className="gcp-strength-header">
               <span className="gcp-strength-title">Profile Strength</span>
-              <span className="gcp-strength-value">{profileStrength}%</span>
+              <span className="gcp-strength-value">85%</span>
             </div>
             <div className="gcp-strength-progress">
-              <div className="gcp-strength-progress-fill" style={{ width: `${profileStrength}%` }}></div>
+              <div className="gcp-strength-progress-fill" style={{ width: '85%' }}></div>
             </div>
             <p className="gcp-strength-suggestions">Complete your profile to build trust.</p>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="gcp-tabs">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab}
-            onClick={() => { setActiveTab(tab); setIsEditing(false); }}
-            className={`gcp-tab ${activeTab === tab ? 'gcp-tab-active' : ''}`}
+            className={`gcp-tab-button ${activeTab === tab ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab)}
           >
             {tab}
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Contents */}
       <div className="gcp-content-grid">
-        {/* Main Content Area */}
         <div className="gcp-content-left">
-          
+
           {/* OVERVIEW TAB */}
           {activeTab === 'Overview' && (
             <>
@@ -321,7 +328,7 @@ export default function Profile() {
                     <FileText size={20} />
                   </div>
                   <div className="gcp-stat-content">
-                    <div className="gcp-stat-value">12</div>
+                    <div className="gcp-stat-value">{walletStats.totalProjects}</div>
                     <div className="gcp-stat-label">Total Projects</div>
                   </div>
                 </div>
@@ -330,7 +337,7 @@ export default function Profile() {
                     <TrendingUp size={20} />
                   </div>
                   <div className="gcp-stat-content">
-                    <div className="gcp-stat-value">3</div>
+                    <div className="gcp-stat-value">{walletStats.activeProjects}</div>
                     <div className="gcp-stat-label">Active Projects</div>
                   </div>
                 </div>
@@ -339,17 +346,17 @@ export default function Profile() {
                     <Users size={20} />
                   </div>
                   <div className="gcp-stat-content">
-                    <div className="gcp-stat-value">8</div>
+                    <div className="gcp-stat-value">{walletStats.hiredCount}</div>
                     <div className="gcp-stat-label">{role === 'client' ? 'Freelancers Hired' : 'Happy Clients'}</div>
                   </div>
                 </div>
                 <div className="gcp-stat-card">
                   <div className="gcp-stat-icon text-green">
-                    <span style={{fontSize: '18px', fontWeight: 'bold'}}>₹</span>
+                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>₹</span>
                   </div>
                   <div className="gcp-stat-content">
-                    <div className="gcp-stat-value">{formatINR(125000)}</div>
-                    <div className="gcp-stat-label">{role === 'client' ? 'Total Spent' : 'Total Earned'}</div>
+                    <div className="gcp-stat-value">{formatINR(walletStats.walletBalance)}</div>
+                    <div className="gcp-stat-label">Available Balance</div>
                   </div>
                 </div>
               </div>
@@ -358,34 +365,38 @@ export default function Profile() {
               {role === 'client' ? (
                 <div className="gcp-about-card">
                   <h3 className="gcp-card-header">About Company</h3>
-                  <p className="gcp-company-description">{profileData.companyDesc}</p>
+                  <p className="gcp-company-description">{profileData.companyDesc || 'No company description added yet. Click Edit Profile to add company overview.'}</p>
                   <div className="gcp-company-details">
                     <div>
                       <span className="gcp-detail-label">Industry</span>
-                      <span className="gcp-detail-value">{profileData.industry}</span>
+                      <span className="gcp-detail-value">{profileData.industry || 'Technology'}</span>
                     </div>
                     <div>
                       <span className="gcp-detail-label">Company Size</span>
-                      <span className="gcp-detail-value">{profileData.companySize}</span>
+                      <span className="gcp-detail-value">{profileData.companySize || '1-10 employees'}</span>
                     </div>
                     <div>
                       <span className="gcp-detail-label">Website</span>
-                      <a href={profileData.website} className="gcp-detail-value gcp-link">{profileData.website.replace('https://', '')}</a>
+                      {profileData.website ? (
+                        <a href={profileData.website} target="_blank" rel="noreferrer" className="gcp-detail-value gcp-link">{profileData.website.replace('https://', '')}</a>
+                      ) : (
+                        <span className="gcp-detail-value" style={{ color: '#94a3b8' }}>Not provided</span>
+                      )}
                     </div>
                     <div>
                       <span className="gcp-detail-label">Location</span>
-                      <span className="gcp-detail-value">{profileData.location}, {profileData.state}</span>
+                      <span className="gcp-detail-value">{profileData.location}</span>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="gcp-about-card">
                   <h3 className="gcp-card-header">About Me</h3>
-                  <p className="gcp-company-description">{profileData.bio}</p>
+                  <p className="gcp-company-description">{profileData.bio || 'No bio added yet. Click Edit Profile to add your professional bio.'}</p>
                   <div className="gcp-company-details">
                     <div>
                       <span className="gcp-detail-label">Location</span>
-                      <span className="gcp-detail-value">{profileData.location}, {profileData.state}</span>
+                      <span className="gcp-detail-value">{profileData.location}</span>
                     </div>
                     <div>
                       <span className="gcp-detail-label">Country</span>
@@ -422,11 +433,11 @@ export default function Profile() {
                 </div>
                 <div className="gcp-form-group">
                   <label className="gcp-form-label">Phone Number</label>
-                  <input type="text" name="phone" value={profileData.phone} onChange={handleChange} disabled={!isEditing} className="gcp-input" />
+                  <input type="text" name="phone" value={profileData.phone} placeholder="Enter phone number" onChange={handleChange} disabled={!isEditing} className="gcp-input" />
                 </div>
                 <div className="gcp-form-group">
                   <label className="gcp-form-label">Job Title</label>
-                  <input type="text" name="title" value={profileData.title} onChange={handleChange} disabled={!isEditing} className="gcp-input" />
+                  <input type="text" name="title" value={profileData.title} placeholder="e.g. Founder, Product Manager" onChange={handleChange} disabled={!isEditing} className="gcp-input" />
                 </div>
               </div>
 
@@ -457,35 +468,36 @@ export default function Profile() {
                 <div className="gcp-form-group">
                   <label className="gcp-form-label">Industry</label>
                   <select name="industry" value={profileData.industry} onChange={handleChange} disabled={!isEditing} className="gcp-input">
-                    <option>Information Technology</option>
-                    <option>Finance</option>
-                    <option>Healthcare</option>
-                    <option>Education</option>
+                    <option value="Information Technology">Information Technology</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Education">Education</option>
+                    <option value="E-commerce">E-commerce</option>
                   </select>
                 </div>
                 <div className="gcp-form-group">
                   <label className="gcp-form-label">Company Size</label>
                   <select name="companySize" value={profileData.companySize} onChange={handleChange} disabled={!isEditing} className="gcp-input">
-                    <option>1-10 employees</option>
-                    <option>11-50 employees</option>
-                    <option>50-200 employees</option>
-                    <option>201-500 employees</option>
+                    <option value="1-10 employees">1-10 employees</option>
+                    <option value="11-50 employees">11-50 employees</option>
+                    <option value="50-200 employees">50-200 employees</option>
+                    <option value="201-500 employees">201-500 employees</option>
                   </select>
                 </div>
                 <div className="gcp-form-group">
                   <label className="gcp-form-label">GSTIN</label>
-                  <input type="text" name="gstin" value={profileData.gstin} onChange={handleChange} disabled={!isEditing} className="gcp-input uppercase" />
+                  <input type="text" name="gstin" value={profileData.gstin} placeholder="Optional GSTIN" onChange={handleChange} disabled={!isEditing} className="gcp-input uppercase" />
                 </div>
                 <div className="gcp-form-group gcp-col-span-full">
                   <label className="gcp-form-label">Company Description</label>
-                  <textarea name="companyDesc" value={profileData.companyDesc} onChange={handleChange} disabled={!isEditing} rows={4} className="gcp-input resize-none" />
+                  <textarea name="companyDesc" value={profileData.companyDesc} placeholder="Describe your company and core products/services" onChange={handleChange} disabled={!isEditing} rows={4} className="gcp-input resize-none" />
                   {isEditing && <div className="gcp-char-count">{profileData.companyDesc.length} / 500</div>}
                 </div>
               </div>
 
               <h4 className="gcp-card-subheader">Company Location</h4>
               <div className="gcp-form-grid-3">
-                 <div className="gcp-form-group">
+                <div className="gcp-form-group">
                   <label className="gcp-form-label">City</label>
                   <input type="text" name="location" value={profileData.location} onChange={handleChange} disabled={!isEditing} className="gcp-input" />
                 </div>
@@ -496,8 +508,8 @@ export default function Profile() {
                 <div className="gcp-form-group">
                   <label className="gcp-form-label">Country</label>
                   <select name="country" value={profileData.country} onChange={handleChange} disabled={!isEditing} className="gcp-input">
-                    <option>India</option>
-                    <option>United States</option>
+                    <option value="India">India</option>
+                    <option value="United States">United States</option>
                   </select>
                 </div>
               </div>
@@ -516,24 +528,24 @@ export default function Profile() {
             <div className="gcp-security-stack">
               <div className="gcp-about-card">
                 <h3 className="gcp-card-header gcp-mb-16">Password</h3>
-                
+
                 {isChangingPassword ? (
                   <div className="gcp-form-grid" style={{ marginTop: '16px' }}>
                     <div className="gcp-form-group">
                       <label className="gcp-form-label">Current Password</label>
-                      <input type="password" value={passwords.current} onChange={(e) => setPasswords({...passwords, current: e.target.value})} className="gcp-input" />
+                      <input type="password" value={passwords.current} onChange={(e) => setPasswords({ ...passwords, current: e.target.value })} className="gcp-input" />
                     </div>
                     <div className="gcp-form-group">
                       <label className="gcp-form-label">New Password</label>
-                      <input type="password" value={passwords.new} onChange={(e) => setPasswords({...passwords, new: e.target.value})} className="gcp-input" />
+                      <input type="password" value={passwords.new} onChange={(e) => setPasswords({ ...passwords, new: e.target.value })} className="gcp-input" />
                     </div>
                     <div className="gcp-form-group">
                       <label className="gcp-form-label">Confirm New Password</label>
-                      <input type="password" value={passwords.confirm} onChange={(e) => setPasswords({...passwords, confirm: e.target.value})} className="gcp-input" />
+                      <input type="password" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} className="gcp-input" />
                     </div>
-                    {passwordError && <p className="gcp-error-message" style={{color: 'var(--danger)', fontSize: '14px', gridColumn: '1/-1', margin: 0}}>{passwordError}</p>}
+                    {passwordError && <p className="gcp-error-message" style={{ color: 'var(--danger)', fontSize: '14px', gridColumn: '1/-1', margin: 0 }}>{passwordError}</p>}
                     <div className="gcp-form-actions" style={{ gridColumn: '1/-1', marginTop: '8px' }}>
-                      <button onClick={() => {setIsChangingPassword(false); setPasswordError(''); setPasswords({ current: '', new: '', confirm: '' });}} className="gcp-btn-secondary">Cancel</button>
+                      <button onClick={() => { setIsChangingPassword(false); setPasswordError(''); setPasswords({ current: '', new: '', confirm: '' }); }} className="gcp-btn-secondary">Cancel</button>
                       <button onClick={handlePasswordSave} className="gcp-btn-primary">Save Password</button>
                     </div>
                   </div>
@@ -541,7 +553,7 @@ export default function Profile() {
                   <div className="gcp-status-row">
                     <div>
                       <p className="gcp-row-title">Change Password</p>
-                      <p className="gcp-row-desc">Last changed 3 months ago</p>
+                      <p className="gcp-row-desc">Keep your login credentials secure</p>
                     </div>
                     <button onClick={() => setIsChangingPassword(true)} className="gcp-btn-secondary">Update</button>
                   </div>
@@ -566,12 +578,12 @@ export default function Profile() {
 
           {activeTab === 'Preferences' && (
             <div className="gcp-about-card">
-               <div className="gcp-empty-state">
-                  <Settings size={48} className="gcp-empty-icon" />
-                  <h3 className="gcp-empty-title">Notification Preferences</h3>
-                  <p className="gcp-empty-desc">Configure how you receive alerts and emails.</p>
-                  <button className="gcp-btn-secondary gcp-mt-16">Manage Settings</button>
-               </div>
+              <div className="gcp-empty-state">
+                <Settings size={48} className="gcp-empty-icon" />
+                <h3 className="gcp-empty-title">Notification Preferences</h3>
+                <p className="gcp-empty-desc">Configure how you receive alerts and emails.</p>
+                <button className="gcp-btn-secondary gcp-mt-16">Manage Settings</button>
+              </div>
             </div>
           )}
 
@@ -584,20 +596,27 @@ export default function Profile() {
             <div className="gcp-status-list">
               <div className="gcp-status-row-small">
                 <span className="gcp-status-label">Email Verification</span>
-                <span className="gcp-status-badge badge-green"><CheckCircle size={12}/> Verified</span>
+                <span className="gcp-status-badge badge-green"><CheckCircle size={12} /> Verified</span>
               </div>
-              <div className="gcp-status-row-small">
+              <div
+                className="gcp-status-row-small"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setIsKycModalOpen(true)}
+                title="Click to Verify Identity via Cloudinary KYC Upload"
+              >
                 <span className="gcp-status-label">Identity Verification</span>
-                <span className="gcp-status-badge badge-orange"><AlertCircle size={12}/> Pending</span>
+                <span className={`gcp-status-badge ${kycStatus === 'Verified' ? 'badge-green' : 'badge-orange'}`}>
+                  {kycStatus === 'Verified' ? <CheckCircle size={12} /> : <AlertCircle size={12} />} {kycStatus === 'Verified' ? 'Verified' : 'Verify Now'}
+                </span>
               </div>
               <div className="gcp-status-row-small gcp-border-none">
                 <span className="gcp-status-label">Payment Method</span>
-                <span className="gcp-status-badge badge-green"><CheckCircle size={12}/> Added</span>
+                <span className="gcp-status-badge badge-green"><CheckCircle size={12} /> Razorpay Added</span>
               </div>
             </div>
           </div>
-          
-           {hasChanges && (
+
+          {hasChanges && (
             <div className="gcp-alert-card">
               <AlertCircle size={18} className="gcp-alert-icon" />
               <div>
@@ -608,6 +627,73 @@ export default function Profile() {
           )}
         </div>
       </div>
+
+      {/* KYC Identity Verification Modal Popup */}
+      {isKycModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justify: 'center', zIndex: 99999, padding: '1rem' }} onClick={() => setIsKycModalOpen(false)}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '20px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', maxWidth: '460px', width: '100%', padding: '1.75rem', color: '#0f172a', margin: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e8f0fe', display: 'flex', alignItems: 'center', justify: 'center' }}>
+                  <Shield size={20} color="#1a73e8" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Identity Verification (KYC)</h3>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Cloudinary Secured Upload</span>
+                </div>
+              </div>
+              <button onClick={() => setIsKycModalOpen(false)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justify: 'center', color: '#64748b', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleKycSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Document Type</label>
+                <select
+                  value={kycDocType}
+                  onChange={(e) => setKycDocType(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.875rem', color: '#0f172a', outline: 'none', background: '#ffffff' }}
+                >
+                  <option value="Aadhaar Card">Aadhaar Card</option>
+                  <option value="PAN Card">PAN Card</option>
+                  <option value="Passport">Passport</option>
+                  <option value="Driving License">Driving License</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Upload Document Image/PDF (Max 15MB)</label>
+                <input
+                  type="file"
+                  ref={kycDocInputRef}
+                  onChange={(e) => setKycFile(e.target.files[0])}
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  style={{ display: 'none' }}
+                />
+                <div
+                  onClick={() => kycDocInputRef.current?.click()}
+                  style={{ border: '2px dashed #cbd5e1', borderRadius: '12px', padding: '1.25rem', textAlign: 'center', background: '#f8fafc', cursor: 'pointer' }}
+                >
+                  <UploadCloud size={28} color="#1a73e8" style={{ marginBottom: '6px' }} />
+                  <p style={{ margin: '0 0 4px', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                    {kycFile ? kycFile.name : `Click to upload your ${kycDocType}`}
+                  </p>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>JPG, PNG, WEBP or PDF up to 15 MB</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setIsKycModalOpen(false)} style={{ padding: '0.65rem 1.25rem', borderRadius: '40px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={isUploadingKyc} style={{ padding: '0.65rem 1.5rem', borderRadius: '40px', background: '#1a73e8', border: '1px solid #1a73e8', color: '#ffffff', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {isUploadingKyc ? <RefreshCw size={14} className="spin" /> : <Shield size={14} />}
+                  {isUploadingKyc ? 'Uploading to Cloudinary...' : 'Verify Identity Now'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {showToast && (

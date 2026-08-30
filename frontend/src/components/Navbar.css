@@ -1,117 +1,205 @@
-.navbar {
+/* Google Antigravity Navbar Design System */
+
+.antigravity-navbar {
   position: sticky;
   top: 0;
-  z-index: 50;
-  border-bottom: 1px solid var(--border);
-  padding: var(--radius-md) 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  transition: all 0.25s ease;
 }
 
 .navbar-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 60px;
+  height: 62px;
+  max-width: 1240px;
+  margin: 0 auto;
   padding: 0 24px;
 }
 
 .navbar-left, .navbar-right {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 28px;
 }
 
-.navbar-brand {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--primary);
+/* Antigravity Logo & Brand Emblem */
+.antigravity-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   text-decoration: none;
+  color: #0f172a;
 }
 
-.navbar-links {
+.antigravity-logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.25s ease;
+}
+
+.antigravity-brand:hover .antigravity-logo-icon {
+  transform: rotate(-10deg) scale(1.08);
+}
+
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.brand-subtitle {
+  font-size: 0.725rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1a73e8, #a142f4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left: 0.15rem;
+}
+
+/* Center Animated Links */
+.landing-nav-center {
   display: none;
 }
 
-@media (min-width: 768px) {
-  .navbar-links {
+@media (min-width: 840px) {
+  .landing-nav-center {
     display: flex;
-    gap: 24px;
+    align-items: center;
+    gap: 2rem;
   }
 }
 
-.nav-link {
-  color: var(--text-secondary);
-  font-weight: 500;
+.antigravity-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 600;
   text-decoration: none;
+  position: relative;
+  padding: 0.4rem 0;
   transition: color 0.2s ease;
 }
 
-.nav-link:hover {
-  color: var(--primary);
+.antigravity-nav-link .chevron-icon {
+  color: #94a3b8;
+  transition: transform 0.2s ease;
 }
 
-.admin-link:hover {
-  color: var(--danger);
+.antigravity-nav-link:hover {
+  color: #1a73e8;
 }
 
-.navbar-search {
-  display: none;
-  position: relative;
-  flex: 1;
-  max-width: 400px;
-  margin: 0 32px;
+.antigravity-nav-link:hover .chevron-icon {
+  color: #1a73e8;
+  transform: translateY(2px);
 }
 
-@media (min-width: 1024px) {
-  .navbar-search {
-    display: flex;
-    align-items: center;
-  }
-}
-
-.search-icon {
+/* Animated Underline Effect */
+.antigravity-nav-link::after {
+  content: '';
   position: absolute;
-  left: 12px;
-  color: var(--text-secondary);
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg, #1a73e8, #a142f4);
+  border-radius: 2px;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.search-input {
+.antigravity-nav-link:hover::after {
   width: 100%;
-  padding: 10px 12px 10px 40px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: var(--bg-light);
-  font-family: inherit;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
 }
 
-.search-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+/* Pill Buttons */
+.antigravity-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.25rem;
+  border-radius: 40px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  border: 1px solid transparent;
 }
 
+.btn-black {
+  background: #0f172a;
+  color: #ffffff;
+  border: 1px solid #0f172a;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.btn-black:hover {
+  background: #1e293b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+  color: #ffffff;
+}
+
+.btn-black:hover .rocket-animated {
+  transform: translateY(-2px) rotate(15deg);
+}
+
+.rocket-animated {
+  transition: transform 0.2s ease;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #475569;
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover {
+  color: #1a73e8;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+/* Notification & Message Badges */
 .nav-icon-link {
   position: relative;
-  color: var(--text-secondary);
+  color: #64748b;
   text-decoration: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: color 0.15s ease;
 }
 
 .nav-icon-link:hover {
-  color: var(--primary);
+  color: #1a73e8;
 }
 
 .badge {
   position: absolute;
-  top: -6px;
-  right: -8px;
+  top: -5px;
+  right: -7px;
   font-size: 0.65rem;
-  font-weight: 700;
-  color: white;
+  font-weight: 800;
+  color: #ffffff;
   border-radius: 50%;
   width: 16px;
   height: 16px;
@@ -120,96 +208,28 @@
   justify-content: center;
 }
 
-.badge-warning { background-color: var(--warning); }
-.badge-danger { background-color: var(--danger); }
+.badge-warning { background-color: #f59e0b; }
+.badge-danger { background-color: #ef4444; }
 
-.navbar-auth {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-  font-family: inherit;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--secondary);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-outline {
-  background-color: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-}
-
-.btn-outline:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-/* Landing Page Specific Navbar Styles */
-.landing-navbar {
-  border-bottom: none;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-.large-logo {
-  font-size: 32px; /* ~32px for mobile */
-}
-
-@media (min-width: 768px) {
-  .large-logo {
-    font-size: 40px; /* ~38-44px for desktop */
-  }
-}
-
-.landing-nav-center {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .landing-nav-center {
-    display: flex;
-    gap: 32px;
-    align-items: center;
-  }
-}
-
-/* Mobile Menu Styles */
-@media (max-width: 767px) {
-  .hidden-mobile {
-    display: none !important;
-  }
-}
-
+/* Mobile Menu & Drawer */
 .mobile-menu-toggle {
   display: none;
   background: none;
   border: none;
-  color: var(--text-primary);
+  color: #0f172a;
   cursor: pointer;
   padding: 4px;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 839px) {
   .mobile-menu-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .hidden-mobile {
+    display: none !important;
   }
 }
 
@@ -218,40 +238,31 @@
   top: 100%;
   left: 0;
   width: 100%;
-  background: var(--bg-light);
-  border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
-  padding: 24px;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-}
-
-[data-theme="dark"] .mobile-menu {
-  background: var(--bg-dark);
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  padding: 20px 24px;
+  z-index: 90;
 }
 
 .mobile-nav-links {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .mobile-nav-links .nav-link {
-  font-size: 1.125rem;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .mobile-auth-buttons {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.mobile-auth-buttons .btn {
-  width: 100%;
-  text-align: center;
-  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
 }

@@ -2,10 +2,20 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { loginUser } from '../../../utils/authUtils';
+import LegalModal from '../../../components/LegalModal';
 
 export default function AccountInfoStep({ formData, updateFormData, prevStep }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Legal Modal State
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalTab, setLegalTab] = useState('terms');
+
+  const openLegalModal = (tab = 'terms') => {
+    setLegalTab(tab);
+    setShowLegalModal(true);
+  };
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -144,7 +154,7 @@ export default function AccountInfoStep({ formData, updateFormData, prevStep }) 
             required 
           />
           <label htmlFor="terms">
-            I agree to the GigSphere <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+            I agree to the GigSphere <button type="button" onClick={() => openLegalModal('terms')} className="link-btn" style={{ fontSize: '0.85rem' }}>Terms of Service</button> and <button type="button" onClick={() => openLegalModal('privacy')} className="link-btn" style={{ fontSize: '0.85rem' }}>Privacy Policy</button>
           </label>
         </div>
 
@@ -157,6 +167,13 @@ export default function AccountInfoStep({ formData, updateFormData, prevStep }) 
           </button>
         </div>
       </form>
+
+      {/* Interactive Legal Modal Popup */}
+      <LegalModal 
+        isOpen={showLegalModal}
+        onClose={() => setShowLegalModal(false)}
+        defaultTab={legalTab}
+      />
     </div>
   );
 }

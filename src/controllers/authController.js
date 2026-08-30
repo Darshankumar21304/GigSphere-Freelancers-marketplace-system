@@ -5,19 +5,19 @@ const { User, FreelancerProfile } = require('../models');
 exports.register = async (req, res) => {
   try {
     const { name, email, password, role, bio, skills, location, country, title, hourlyRate, avatar, profileImage } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required for registration.' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedPassword = password.trim();
-    
+
     // Check if user exists
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
-      return res.status(400).json({ 
-        message: 'An account with this email already exists. Please log in with your password, or reset your password if you forgot it.' 
+      return res.status(400).json({
+        message: 'An account with this email already exists. Please log in with your password, or reset your password if you forgot it.'
       });
     }
 
@@ -57,13 +57,13 @@ exports.register = async (req, res) => {
 
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
 
-    res.status(201).json({ 
-      message: 'User registered successfully', 
-      token, 
-      user: { 
-        id: newUser._id, 
-        name: newUser.name, 
-        email: newUser.email, 
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
         role: newUser.role,
         avatar: newUser.avatar,
         location: newUser.location,
@@ -71,7 +71,7 @@ exports.register = async (req, res) => {
         bio: bio || '',
         skills: skills || '',
         title: title || ''
-      } 
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -111,16 +111,16 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
 
-    res.json({ 
-      token, 
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
-        role: user.role, 
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
         avatar: user.avatar || '',
         location: user.location || ''
-      } 
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -143,7 +143,7 @@ exports.resetPassword = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(newPassword.trim(), salt);
-    
+
     user.password_hash = password_hash;
     await user.save();
 
@@ -153,4 +153,3 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: 'Server error resetting password: ' + error.message });
   }
 };
-

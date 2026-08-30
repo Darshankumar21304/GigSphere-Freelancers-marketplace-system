@@ -4,7 +4,7 @@ const getFreelancers = async (req, res) => {
   try {
     // Find users who have the role of freelancer
     const freelancers = await User.find({ role: 'freelancer' }).select('-password_hash');
-    
+
     // Fetch their profiles
     const freelancerIds = freelancers.map(f => f._id);
     const profiles = await FreelancerProfile.find({ user_id: { $in: freelancerIds } });
@@ -30,12 +30,12 @@ const getSettings = async (req, res) => {
     const userId = req.user.id;
     const user = await User.findById(userId).select('-password_hash');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    
+
     let profile = null;
     if (user.role === 'freelancer') {
       profile = await FreelancerProfile.findOne({ user_id: userId });
     }
-    
+
     res.json({ user, profile });
   } catch (error) {
     console.error('Error fetching settings:', error);
@@ -46,23 +46,18 @@ const getSettings = async (req, res) => {
 const updateSettings = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { 
-      name, phone, location, language, preferences, avatar, profileImage,
-      title, bio, skills, experience, availability, hourlyRate 
+    const {
+      name, phone, location, language, preferences,
+      title, bio, skills, experience, availability, hourlyRate
     } = req.body;
-    
-    const userUpdateFields = { name, phone, location, language, preferences };
-    if (avatar !== undefined || profileImage !== undefined) {
-      userUpdateFields.avatar = avatar || profileImage || '';
-    }
 
     // Update User
     const updatedUser = await User.findByIdAndUpdate(
-      userId, 
-      userUpdateFields, 
+      userId,
+      { name, phone, location, language, preferences },
       { new: true, runValidators: true }
     ).select('-password_hash');
-    
+
     let updatedProfile = null;
     if (updatedUser.role === 'freelancer') {
       updatedProfile = await FreelancerProfile.findOneAndUpdate(
@@ -71,7 +66,7 @@ const updateSettings = async (req, res) => {
         { new: true, upsert: true, runValidators: true }
       );
     }
-    
+
     res.json({ user: updatedUser, profile: updatedProfile });
   } catch (error) {
     console.error('Error updating settings:', error);

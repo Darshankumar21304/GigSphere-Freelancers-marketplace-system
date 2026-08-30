@@ -1,39 +1,43 @@
 import React from 'react';
-import { DollarSign, ShoppingBag, CheckCircle, Clock } from 'lucide-react';
+import { DollarSign, ShoppingBag, CheckCircle, Clock, Sparkles, FolderPlus, Search } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
+import { getUserProfile } from '../../utils/authUtils';
 import './Dashboard.css';
 
-const chartData = [
-  { name: 'Jan', earnings: 40000 },
-  { name: 'Feb', earnings: 30000 },
-  { name: 'Mar', earnings: 20000 },
-  { name: 'Apr', earnings: 27800 },
-  { name: 'May', earnings: 18900 },
-  { name: 'Jun', earnings: 23900 },
-  { name: 'Jul', earnings: 34900 },
-];
-
 export default function Overview() {
+  const userProfile = getUserProfile();
+  const userName = userProfile?.name || 'Valued Freelancer';
+
+  const userEarnings = userProfile?.totalEarnings || 0;
+  const activeProjectsCount = userProfile?.activeProjectsCount || 0;
+  const completedProjectsCount = userProfile?.completedProjectsCount || 0;
+  const pendingClearance = userProfile?.pendingClearance || 0;
+
+  const chartData = userProfile?.chartData || [];
+  const recentProjects = userProfile?.projects || [];
+
   const stats = [
-    { label: 'Total Earnings', value: formatINR(1245000), icon: DollarSign, color: 'var(--success)', bg: 'rgba(16, 185, 129, 0.1)' },
-    { label: 'Active Projects', value: '8', icon: ShoppingBag, color: 'var(--primary)', bg: 'rgba(37, 99, 235, 0.1)' },
-    { label: 'Completed Projects', value: '142', icon: CheckCircle, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-    { label: 'Pending Clearance', value: formatINR(84000), icon: Clock, color: 'var(--warning)', bg: 'rgba(245, 158, 11, 0.1)' },
+    { label: 'Total Earnings', value: formatINR(userEarnings), icon: DollarSign, color: '#10b981', bg: '#dcfce7' },
+    { label: 'Active Projects', value: String(activeProjectsCount), icon: ShoppingBag, color: '#1a73e8', bg: '#e8f0fe' },
+    { label: 'Completed Projects', value: String(completedProjectsCount), icon: CheckCircle, color: '#a142f4', bg: '#f3e8fd' },
+    { label: 'Pending Clearance', value: formatINR(pendingClearance), icon: Clock, color: '#f59e0b', bg: '#fef3c7' },
   ];
 
   return (
-    <div>
+    <div className="client-dashboard-container">
       <div className="overview-header">
         <div>
-          <h1 className="overview-title">Dashboard Overview</h1>
-          <p className="overview-subtitle">Welcome back, Sarah! Here's what's happening with your business today.</p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.85rem', background: '#e8f0fe', color: '#1a73e8', borderRadius: '30px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+            <Sparkles size={13} /> Verified Freelancer Pro
+          </div>
+          <h1 className="overview-title">Welcome back, {userName}!</h1>
+          <p className="overview-subtitle">Here's your earnings summary, active project contracts, and proposals.</p>
         </div>
-        <select className="date-filter">
-          <option>Last 30 Days</option>
-          <option>This Year</option>
-          <option>All Time</option>
-        </select>
+        <Link to="/explore" className="pill-btn pill-dark" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.25rem', borderRadius: '40px', background: '#0f172a', color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '0.875rem' }}>
+          <Search size={16} /> Browse Open Jobs
+        </Link>
       </div>
 
       {/* KPI Cards */}
@@ -41,7 +45,7 @@ export default function Overview() {
         {stats.map((stat, idx) => (
           <div key={idx} className="kpi-card">
             <div className="kpi-icon-wrapper" style={{ backgroundColor: stat.bg }}>
-              <stat.icon size={28} color={stat.color} />
+              <stat.icon size={22} color={stat.color} />
             </div>
             <div>
               <p className="kpi-label">{stat.label}</p>
@@ -53,95 +57,79 @@ export default function Overview() {
 
       <div className="dashboard-grid">
         {/* Chart Panel */}
-        <div className="dashboard-panel">
-          <h2 className="panel-title">Earnings Overview</h2>
-          <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatINR(val)} />
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)' }} />
-                <Area type="monotone" dataKey="earnings" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEarnings)" />
-              </AreaChart>
-            </ResponsiveContainer>
+        <div className="dashboard-panel" style={{ gridColumn: '1 / -1' }}>
+          <h2 className="panel-title">Earnings Analytics</h2>
+          <div style={{ width: '100%', height: '280px', minWidth: 0, minHeight: '280px' }}>
+            {chartData.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc', color: '#64748b' }}>
+                <DollarSign size={36} color="#10b981" style={{ marginBottom: '8px' }} />
+                <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontWeight: 800 }}>No Earnings Recorded Yet</h4>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>Submit proposals to open client jobs to start earning on GigSphere.</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.7}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatINR(val)} />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }} />
+                  <Area type="monotone" dataKey="earnings" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorEarnings)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
-        </div>
-
-        {/* To Do List */}
-        <div className="dashboard-panel">
-          <h2 className="panel-title">To-Do List</h2>
-          <ul className="todo-list">
-            <li className="todo-item">
-              <input type="checkbox" className="todo-checkbox" />
-              <div>
-                <p className="todo-title">Deliver Order #1209</p>
-                <p className="todo-meta urgent">Due in 5 hours</p>
-              </div>
-            </li>
-            <li className="todo-item">
-              <input type="checkbox" className="todo-checkbox" />
-              <div>
-                <p className="todo-title">Reply to John Doe</p>
-                <p className="todo-meta">Unread message</p>
-              </div>
-            </li>
-            <li className="todo-item">
-              <input type="checkbox" className="todo-checkbox" />
-              <div>
-                <p className="todo-title">Update Profile Portfolio</p>
-                <p className="todo-meta">Optional</p>
-              </div>
-            </li>
-            <li className="todo-item">
-              <input type="checkbox" className="todo-checkbox" />
-              <div>
-                <p className="todo-title">Review new proposal</p>
-                <p className="todo-meta">Client: Acme Corp</p>
-              </div>
-            </li>
-          </ul>
         </div>
 
         {/* Recent Projects Overview */}
         <div className="dashboard-panel" style={{ gridColumn: '1 / -1' }}>
-          <h2 className="panel-title">Recent Projects</h2>
+          <h2 className="panel-title">Active Contracts & Projects</h2>
           <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Project</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 2, 3].map((item) => (
-                  <tr key={item}>
-                    <td>
-                      <div className="client-cell">
-                        <img src={`https://i.pravatar.cc/150?img=${item + 20}`} className="client-avatar" alt="" />
-                        <span className="client-name">Client {item}</span>
-                      </div>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>Logo Design for Startup</td>
-                    <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatINR(15000)}</td>
-                    <td>
-                      <span className={`status-badge ${item === 1 ? 'status-completed' : 'status-progress'}`}>
-                        {item === 1 ? 'Completed' : 'In Progress'}
-                      </span>
-                    </td>
+            {recentProjects.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px 20px', color: '#64748b', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc' }}>
+                <FolderPlus size={36} color="#1a73e8" style={{ marginBottom: '10px' }} />
+                <h4 style={{ margin: '0 0 6px', color: '#0f172a', fontWeight: 800, fontSize: '1.05rem' }}>No Active Contracts</h4>
+                <p style={{ margin: '0 0 16px', fontSize: '0.875rem' }}>Apply for freelance gigs to get hired and receive milestone funds into your wallet.</p>
+                <Link to="/explore" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.2rem', borderRadius: '30px', background: '#0f172a', color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <Search size={15} /> Find Freelance Work
+                </Link>
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Client Name</th>
+                    <th>Project Name</th>
+                    <th>Contract Amount</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentProjects.map((proj, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        <div className="client-cell">
+                          <img src={proj.clientAvatar || 'https://i.pravatar.cc/150'} className="client-avatar" alt="" />
+                          <span className="client-name">{proj.clientName}</span>
+                        </div>
+                      </td>
+                      <td style={{ color: '#0f172a', fontWeight: '600' }}>{proj.title}</td>
+                      <td style={{ fontWeight: '700', color: '#0f172a' }}>{formatINR(proj.budget)}</td>
+                      <td>
+                        <span className={`status-badge ${proj.status === 'Completed' ? 'status-completed' : 'status-progress'}`}>
+                          {proj.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

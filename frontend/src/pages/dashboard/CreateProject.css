@@ -377,36 +377,52 @@
 /* Budget & Option Cards */
 .gcpj-budget-type-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
   gap: 16px;
 }
 
 .gcpj-budget-type-card {
-  padding: 16px;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
+  padding: 18px 16px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--surface, #ffffff);
-  color: var(--text-secondary, #4b5563);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  background: #ffffff;
+  color: #475569;
+  min-width: 120px;
+  box-sizing: border-box;
+}
+
+.gcpj-budget-type-card:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
 }
 
 .gcpj-budget-type-card > div {
-  font-weight: 600;
-  color: var(--text-primary, #111827);
+  font-weight: 700;
+  color: #0f172a;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .gcpj-budget-type-selected {
-  border-color: var(--primary, #2563eb);
-  background: rgba(37, 99, 235, 0.05);
-  box-shadow: 0 0 0 1px var(--primary, #2563eb);
+  border-color: #1a73e8 !important;
+  background: #e8f0fe !important;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.15) !important;
 }
+
+.gcpj-budget-type-selected > div {
+  color: #1a73e8 !important;
+}
+
 .gcpj-budget-type-selected > svg {
-  color: var(--primary, #2563eb);
+  color: #1a73e8 !important;
 }
 
 .gcpj-currency-input-wrapper {
