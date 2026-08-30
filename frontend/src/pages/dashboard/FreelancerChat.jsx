@@ -33,7 +33,10 @@ export default function FreelancerChat() {
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/messages/conversations');
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://localhost:5001/api/messages/conversations', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         setConversations(response.data || []);
         if (response.data && response.data.length > 0) {
           setActiveConversation(response.data[0]);
@@ -53,8 +56,21 @@ export default function FreelancerChat() {
 
     const fetchHistory = async () => {
       try {
-        const response = await axios.get(`http://localhost:5001/api/messages/history/${currentUser._id || currentUser.id || 'freelancer'}/${activeConversation.partnerId}`);
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // 1. Fetch history with authorization headers
+        const response = await axios.get(
+          `http://localhost:5001/api/messages/history/${currentUser._id || currentUser.id || 'freelancer'}/${activeConversation.partnerId}`,
+          { headers }
+        );
         setMessages(response.data || []);
+
+        // 2. Mark messages as read in the database
+        await axios.put(`http://localhost:5001/api/messages/read-all/${activeConversation.partnerId}`, {}, { headers }).catch(() => null);
+
+        // 3. Clear unreadCount locally
+        setConversations(prev => prev.map(c => c.partnerId === activeConversation.partnerId ? { ...c, unreadCount: 0 } : c));
       } catch (error) {
         setMessages([]);
       }
@@ -165,22 +181,41 @@ export default function FreelancerChat() {
             ) : (
               filteredConversations.map(conv => (
                 <div 
-                  key={conv.id || conv.partnerId} 
+                  key={conv.partnerId} 
                   className={`conversation-item ${activeConversation?.partnerId === conv.partnerId ? 'active' : ''}`} 
                   onClick={() => { setActiveConversation(conv); setMobileView('chat'); }}
                 >
                   <div className="avatar-wrapper">
-                    <img src={conv.avatar || "https://i.pravatar.cc/150?img=11"} alt={conv.partnerName} className="avatar" />
+                    <img src={conv.partnerAvatar || "https://i.pravatar.cc/150?img=11"} alt={conv.partnerName} className="avatar" />
                     <div className="status-dot"></div>
                   </div>
                   <div className="conv-info">
                     <div className="conv-header">
                       <h3 className="client-name">{conv.partnerName}</h3>
-                      <span className="conv-time">{conv.time || 'Now'}</span>
+                      <span className="conv-time">{conv.lastMessageTime || 'Now'}</span>
                     </div>
-                    <p className="conv-project">{conv.projectTitle || 'Client Project'}</p>
-                    <div className="conv-preview-wrapper">
-                      <p className="conv-preview">{conv.lastMessage || 'Click to open conversation'}</p>
+                    <p className="conv-project" style={{ textTransform: 'capitalize', fontSize: '0.75rem', color: '#1a73e8', fontWeight: '800', margin: '2px 0 4px' }}>
+                      {conv.partnerRole}
+                    </p>
+                    <div className="conv-preview-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <p className="conv-preview" style={{ flex: 1, marginRight: '8px' }}>{conv.lastMessage || 'Click to open conversation'}</p>
+                      {conv.unreadCount > 0 && (
+                        <span style={{ 
+                          background: '#ef4444', 
+                          color: '#fff', 
+                          borderRadius: '50%', 
+                          fontSize: '10px', 
+                          fontWeight: '800', 
+                          minWidth: '18px', 
+                          height: '18px', 
+                          padding: '0 4px',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center' 
+                        }}>
+                          {conv.unreadCount}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

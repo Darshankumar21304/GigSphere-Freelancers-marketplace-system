@@ -1,16 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const proposalController = require('../controllers/proposalController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.get('/received', (req, res) => {
-  res.json([]);
-});
+router.use(authMiddleware);
 
-router.get('/my-proposals', (req, res) => {
-  res.json([]);
-});
-
-router.patch('/:id/status', (req, res) => {
-  res.json({ message: 'Proposal status updated', status: req.body.status });
-});
+router.get('/received', proposalController.getReceivedProposals);
+router.get('/my-proposals', proposalController.getMyProposals);
+router.patch('/:id/status', proposalController.updateProposalStatus);
 
 module.exports = router;

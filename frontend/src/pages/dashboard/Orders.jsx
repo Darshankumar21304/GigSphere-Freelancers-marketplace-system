@@ -93,6 +93,34 @@ export default function Orders() {
     fetchWorkspaceContract();
   }, [activeWorkspace]);
 
+  const handleReleaseEscrow = async (milestoneId, amount) => {
+    try {
+      const res = await apiFetch(`/contracts/${activeContract._id}/milestones/${milestoneId}/approve`, {
+        method: 'PUT'
+      });
+      if (res && res.success) {
+        setWorkspaceMilestones(prev => prev.map(item => item.id === milestoneId ? { ...item, status: 'Paid' } : item));
+        alert(`Payment of ${formatINR(amount)} released successfully to freelancer!`);
+      }
+    } catch (err) {
+      alert(err.message || 'Error releasing escrow payment');
+    }
+  };
+
+  const handleFundEscrow = async (milestoneId, amount) => {
+    try {
+      const res = await apiFetch(`/contracts/${activeContract._id}/milestones/${milestoneId}/fund`, {
+        method: 'PUT'
+      });
+      if (res && res.success) {
+        setWorkspaceMilestones(prev => prev.map(item => item.id === milestoneId ? { ...item, status: 'In Progress' } : item));
+        alert(`Escrow of ${formatINR(amount)} funded successfully!`);
+      }
+    } catch (err) {
+      alert(err.message || 'Error funding escrow milestone');
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
   }, []);
@@ -531,10 +559,7 @@ export default function Orders() {
                         <td style={{ padding: '14px 12px', textAlign: 'right' }}>
                           {m.status === 'In Progress' ? (
                             <button 
-                              onClick={() => {
-                                setWorkspaceMilestones(prev => prev.map(item => item.id === m.id ? { ...item, status: 'Paid' } : item));
-                                alert(`Payment of ${formatINR(m.amount)} released successfully to freelancer!`);
-                              }}
+                              onClick={() => handleReleaseEscrow(m.id, m.amount)}
                               style={{ padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
                             >
                               Release Escrow
@@ -543,9 +568,7 @@ export default function Orders() {
                             <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 700 }}>✓ Released</span>
                           ) : (
                             <button 
-                              onClick={() => {
-                                setWorkspaceMilestones(prev => prev.map(item => item.id === m.id ? { ...item, status: 'In Progress' } : item));
-                              }}
+                              onClick={() => handleFundEscrow(m.id, m.amount)}
                               style={{ padding: '6px 14px', background: '#1a73e8', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
                             >
                               Fund Escrow

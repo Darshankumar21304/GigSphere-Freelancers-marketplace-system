@@ -28,6 +28,7 @@ app.use('/api/proposals', require('./routes/proposalRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 // Base route
 app.get('/', (req, res) => {

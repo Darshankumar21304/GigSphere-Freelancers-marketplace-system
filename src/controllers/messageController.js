@@ -71,3 +71,87 @@ exports.uploadFile = async (req, res) => {
     res.status(500).json({ message: error.message || 'Server error uploading chat attachment to Cloudinary' });
   }
 };
+
+// GET /api/messages/unread-count
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const count = await Message.countDocuments({ receiver_id: userId, read: false });
+    res.json({ success: true, count });
+  } catch (error) {
+    console.error('Error fetching unread message count:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// PUT /api/messages/read-all/:senderId
+exports.markMessagesRead = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { senderId } = req.params;
+    
+    await Message.updateMany(
+      { receiver_id: userId, sender_id: senderId, read: false },
+      { read: true }
+    );
+    
+    res.json({ success: true, message: 'Messages marked as read' });
+  } catch (error) {
+    console.error('Error marking messages read:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// GET /api/messages/conversations
+exports.getConversations = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { User } = require('../models');
+
+    const messages = await Message.find({
+      $or: [{ sender_id: userId }, { receiver_id: userId }]
+    }).sort({ createdAt: -1 });
+
+    const partnersMap = new Map();
+
+    for (const msg of messages) {
+      const partnerId = msg.sender_id.toString() === userId.toString() 
+        ? msg.receiver_id.toString() 
+        : msg.sender_id.toString();
+
+      if (!partnersMap.has(partnerId)) {
+        partnersMap.set(partnerId, {
+          lastMessage: msg.message_text,
+          lastMessageTime: msg.createdAt
+        });
+      }
+    }
+
+    const conversationsList = [];
+    for (const [partnerId, data] of partnersMap.entries()) {
+      const partnerUser = await User.findById(partnerId).catch(() => null);
+      if (!partnerUser) continue;
+
+      const unreadCount = await Message.countDocuments({
+        sender_id: partnerId,
+        receiver_id: userId,
+        read: false
+      });
+
+      conversationsList.push({
+        partnerId: partnerUser._id,
+        partnerName: partnerUser.name,
+        partnerAvatar: partnerUser.avatar || partnerUser.profilePhoto || 'https://i.pravatar.cc/150?img=5',
+        partnerRole: partnerUser.role,
+        lastMessage: data.lastMessage,
+        lastMessageTime: new Date(data.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        unreadCount
+      });
+    }
+
+    res.json(conversationsList);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

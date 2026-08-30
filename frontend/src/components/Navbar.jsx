@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Search, User, Bell, LogOut, Menu, X, ChevronDown, Rocket, Sparkles } from 'lucide-react';
 import { getUserRole, isAuthenticated, logoutUser, getUserProfile } from '../utils/authUtils';
+import { apiFetch } from '../utils/api';
 import AuthModal from './AuthModal';
 import './Navbar.css';
 
@@ -14,6 +15,32 @@ const Navbar = () => {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    if (!isAuth) return;
+
+    const fetchCounts = async () => {
+      try {
+        const notifs = await apiFetch('/notifications').catch(() => []);
+        if (Array.isArray(notifs)) {
+          setUnreadNotifications(notifs.filter(n => !n.read).length);
+        }
+
+        const msgUnread = await apiFetch('/messages/unread-count').catch(() => ({ count: 0 }));
+        if (msgUnread && typeof msgUnread.count === 'number') {
+          setUnreadMessages(msgUnread.count);
+        }
+      } catch (err) {
+        console.error('Error fetching unread counts:', err);
+      }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 8000); // Check every 8 seconds
+    return () => clearInterval(interval);
+  }, [isAuth, location.pathname]);
 
   // Auth Popup Modal State
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -108,11 +135,15 @@ const Navbar = () => {
             <div className="hidden-mobile" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
               <Link to={`${dashboardPath}/notifications`} className="nav-icon-link">
                 <Bell size={20} />
-                <span className="badge badge-warning">3</span>
+                {unreadNotifications > 0 && (
+                  <span className="badge badge-warning">{unreadNotifications}</span>
+                )}
               </Link>
               <Link to={`${dashboardPath}/chat`} className="nav-icon-link">
                 <MessageSquare size={20} />
-                <span className="badge badge-danger">1</span>
+                {unreadMessages > 0 && (
+                  <span className="badge badge-danger">{unreadMessages}</span>
+                )}
               </Link>
             </div>
           )}

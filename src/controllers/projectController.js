@@ -83,6 +83,16 @@ const submitProposal = async (req, res) => {
     project.proposals.push(newProposal);
     await project.save();
 
+    // Trigger Notification to Client (project owner)
+    const { createNotification } = require('./notificationController');
+    const senderName = newProposal.freelancer_name;
+    await createNotification(
+      project.client_id,
+      'proposal',
+      'New Proposal Received',
+      `${senderName} has submitted a proposal of ₹${Number(bidAmount).toLocaleString()} for your project "${project.title}".`
+    );
+
     res.status(201).json({ message: 'Proposal submitted successfully', project });
   } catch (error) {
     console.error('Error submitting proposal:', error);

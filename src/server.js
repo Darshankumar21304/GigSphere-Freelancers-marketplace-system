@@ -35,6 +35,20 @@ io.on('connection', (socket) => {
         room: data.room
       });
 
+      // Fetch sender details to customize notification description
+      const { User } = require('./models');
+      const sender = await User.findById(data.sender_id).catch(() => null);
+      const senderName = sender ? sender.name : 'A user';
+
+      // Create a database notification for the receiver
+      const { createNotification } = require('./controllers/notificationController');
+      await createNotification(
+        data.receiver_id,
+        'message',
+        `New Message from ${senderName}`,
+        `You received a new message: "${data.message_text.substring(0, 60)}${data.message_text.length > 60 ? '...' : ''}"`
+      );
+
       // Emit to the room
       io.to(data.room).emit('receive_message', {
         id: newMessage._id,
