@@ -137,8 +137,23 @@ const updateProject = async (req, res) => {
   }
 };
 
+// Get projects for the logged-in client (with accepted proposal details)
+const getMyProjects = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const projects = await Project.find({ client_id: userId })
+      .populate('client_id', 'name email')
+      .sort({ createdAt: -1 });
+    res.json(projects);
+  } catch (error) {
+    console.error('Error fetching client projects:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllProjects,
+  getMyProjects,
   getProjectById,
   createProject,
   submitProposal,

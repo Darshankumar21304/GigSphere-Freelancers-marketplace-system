@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiFetch } from '../../utils/api';
 import { Check, Star, MapPin, Globe, Clock, MessageSquare, Award } from 'lucide-react';
 import { getUserProfile } from '../../utils/authUtils';
 import './Profile.css';
@@ -17,8 +17,8 @@ export default function FreelancerProfile() {
     const fetchProfile = async () => {
       try {
         if (id) {
-          const res = await axios.get(`http://localhost:5001/api/users/${id}`);
-          setFreelancer(res.data);
+          const data = await apiFetch(`/users/${id}`);
+          setFreelancer(data);
         } else if (savedProfile) {
           setFreelancer(savedProfile);
         }
@@ -44,14 +44,21 @@ export default function FreelancerProfile() {
         {/* Left Sidebar */}
         <aside className="profile-sidebar">
           <div className="profile-card">
-            <div className="profile-avatar-container">
-              <img src={freelancer?.avatar || 'https://i.pravatar.cc/300?img=47'} alt={name} className="profile-avatar" />
-              <div className="verified-badge" title="Verified Identity">
-                <Check size={16} strokeWidth={3} />
-              </div>
+            <div className="avatar-container">
+              <img src={freelancer?.avatar || freelancer?.profilePhoto || "https://i.pravatar.cc/300"} alt={name} className="profile-avatar" />
+              {freelancer?.kycStatus === 'Verified' && (
+                <div className="verified-badge" title="Identity Verified">
+                  <Check size={16} strokeWidth={3} />
+                </div>
+              )}
             </div>
             
-            <h1 className="profile-name">{name}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', margin: '12px 0 4px', flexWrap: 'wrap' }}>
+              <h1 className="profile-name" style={{ margin: 0 }}>{name}</h1>
+              {freelancer?.kycStatus === 'Verified' && (
+                <Check size={14} color="#10b981" style={{ background: '#dcfce7', borderRadius: '50%', padding: '2px', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} title="Verified Freelancer" />
+              )}
+            </div>
             <p className="profile-title">{title}</p>
             
             <div className="profile-stats">

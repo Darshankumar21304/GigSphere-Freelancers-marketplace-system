@@ -32,6 +32,7 @@ import ClientOverview from './pages/dashboard/ClientOverview';
 import ClientSpending from './pages/dashboard/ClientSpending';
 import ClientReviews from './pages/dashboard/ClientReviews';
 import Notifications from './pages/dashboard/Notifications';
+import Disputes from './pages/dashboard/Disputes';
 
 
 import AdminLayout from './components/AdminLayout';
@@ -41,6 +42,7 @@ import AdminListings from './pages/admin/AdminListings';
 import AdminDisputes from './pages/admin/AdminDisputes';
 import AdminPayouts from './pages/admin/AdminPayouts';
 import AdminAiSecurity from './pages/admin/AdminAiSecurity';
+import AdminKyc from './pages/admin/AdminKyc';
 
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -79,6 +81,7 @@ function App() {
               <Route path="settings" element={<Profile />} />
               <Route path="hired" element={<HiredFreelancers />} />
               <Route path="reviews" element={<ClientReviews />} />
+              <Route path="disputes" element={<Disputes />} />
               <Route path="notifications" element={<Notifications />} />
             </Route>
             
@@ -92,6 +95,7 @@ function App() {
               <Route path="create-gig" element={<CreateGig />} />
               <Route path="profile" element={<Profile />} />
               <Route path="reviews" element={<Reviews />} />
+              <Route path="disputes" element={<Disputes />} />
               <Route path="settings" element={<Settings />} />
               <Route path="notifications" element={<Notifications />} />
             </Route>
@@ -103,6 +107,7 @@ function App() {
               <Route path="listings" element={<AdminListings />} />
               <Route path="disputes" element={<AdminDisputes />} />
               <Route path="payouts" element={<AdminPayouts />} />
+              <Route path="kyc" element={<AdminKyc />} />
               <Route path="ai-security" element={<AdminAiSecurity />} />
             </Route>
           </Routes>

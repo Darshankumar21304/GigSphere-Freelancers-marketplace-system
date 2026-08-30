@@ -96,7 +96,9 @@ export default function Reviews() {
           {filteredReviews.map(rev => (
             <div key={rev._id || rev.id} style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>{rev.clientName || 'Client'}</h4>
+                <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
+                  {rev.reviewer_id?.companyName || rev.reviewer_id?.name || `${rev.reviewer_id?.firstName || ''} ${rev.reviewer_id?.lastName || ''}`.trim() || rev.clientName || 'Client'}
+                </h4>
                 <div style={{ display: 'flex', gap: '2px' }}>
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} size={16} fill={i < rev.rating ? '#f59e0b' : '#e2e8f0'} color={i < rev.rating ? '#f59e0b' : '#e2e8f0'} />

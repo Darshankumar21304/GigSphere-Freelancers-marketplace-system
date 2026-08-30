@@ -73,6 +73,14 @@ export default function Profile() {
     avatar: savedProfile?.avatar || savedProfile?.profilePhoto || ''
   });
 
+  const getAbsoluteUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `https://${url}`;
+  };
+
   useEffect(() => {
     fetchLiveStats();
   }, []);
@@ -120,6 +128,8 @@ export default function Profile() {
           bio: u.bio || (settingsData.profile?.bio) || '',
           avatar: u.avatar || u.profilePhoto || ''
         });
+
+        setKycStatus(u.kycStatus || 'Unverified');
       }
     } catch (err) {
       console.error('Failed to load live profile stats:', err);
@@ -144,16 +154,41 @@ export default function Profile() {
 
       setProfileData(prev => ({ ...prev, avatar: newAvatarUrl }));
       
-      const updated = { 
-        ...savedProfile, 
-        ...profileData, 
+      const payload = {
+        name: `${profileData.firstName} ${profileData.lastName}`,
+        phone: profileData.phone,
+        location: profileData.location,
+        state: profileData.state,
+        country: profileData.country,
+        companyName: profileData.companyName,
+        industry: profileData.industry,
+        companySize: profileData.companySize,
+        website: profileData.website,
+        companyDesc: profileData.companyDesc,
+        gstin: profileData.gstin,
         avatar: newAvatarUrl,
-        profilePhoto: newAvatarUrl,
-        name: `${profileData.firstName} ${profileData.lastName}` 
+        profilePhoto: newAvatarUrl
       };
-      saveUserProfile(updated);
 
-      setToastMessage('Profile photo updated & saved on Cloudinary!');
+      const response = await apiFetch('/users/settings', {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+
+      if (response && response.user) {
+        saveUserProfile(response.user);
+      } else {
+        const updated = { 
+          ...savedProfile, 
+          ...profileData, 
+          avatar: newAvatarUrl,
+          profilePhoto: newAvatarUrl,
+          name: `${profileData.firstName} ${profileData.lastName}` 
+        };
+        saveUserProfile(updated);
+      }
+
+      setToastMessage('Profile photo updated & saved successfully!');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
@@ -163,7 +198,6 @@ export default function Profile() {
     }
   };
 
-  // KYC Verification Upload Handler via Cloudinary
   const handleKycSubmit = async (e) => {
     e.preventDefault();
     if (!kycFile) {
@@ -175,17 +209,23 @@ export default function Profile() {
     try {
       const res = await uploadFileToCloudinary(kycFile, '/api/upload/single');
       
-      setKycStatus('Verified');
-      const updated = {
-        ...savedProfile,
-        verificationStatus: 'Verified',
-        kycStatus: 'Verified',
-        kycDocUrl: res.url
-      };
-      saveUserProfile(updated);
+      const response = await apiFetch('/users/kyc', {
+        method: 'PUT',
+        body: JSON.stringify({
+          docUrl: res.url,
+          docType: kycDocType
+        })
+      });
+
+      if (response && response.user) {
+        saveUserProfile(response.user);
+        setKycStatus(response.user.kycStatus || 'Pending Approval');
+      } else {
+        setKycStatus('Pending Approval');
+      }
 
       setIsKycModalOpen(false);
-      setToastMessage('Identity Verified successfully via Cloudinary KYC!');
+      setToastMessage('KYC Identity Document submitted for review successfully!');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3500);
     } catch (err) {
@@ -331,11 +371,15 @@ export default function Profile() {
             </div>
             <div className="gcp-profile-info">
               <div className="gcp-profile-name-row">
-                <h2 className="gcp-profile-name">{profileData.firstName} {profileData.lastName}</h2>
-                <CheckCircle size={16} className="gcp-verified-badge" />
+                <h2 className="gcp-profile-name">
+                  {role === 'client' 
+                    ? (profileData.companyName || `${profileData.firstName} ${profileData.lastName}`)
+                    : `${profileData.firstName} ${profileData.lastName}`}
+                </h2>
+                {kycStatus === 'Verified' && <CheckCircle size={16} className="gcp-verified-badge" />}
               </div>
               <div className="gcp-profile-meta">
-                <span>{profileData.companyName || profileData.title || 'GigSphere Member'}</span>
+                <span>{role === 'client' ? (profileData.title || 'Client Partner') : (profileData.title || 'Freelancer Professional')}</span>
                 <span>•</span>
                 <span>{profileData.location || 'India'}</span>
               </div>
@@ -421,7 +465,9 @@ export default function Profile() {
                     <div>
                       <span className="gcp-detail-label">Website</span>
                       {profileData.website ? (
-                        <a href={profileData.website} target="_blank" rel="noreferrer" className="gcp-detail-value gcp-link">{profileData.website.replace('https://', '')}</a>
+                        <a href={getAbsoluteUrl(profileData.website)} target="_blank" rel="noreferrer" className="gcp-detail-value gcp-link">
+                          {profileData.website.replace('https://', '').replace('http://', '')}
+                        </a>
                       ) : (
                         <span className="gcp-detail-value" style={{ color: '#94a3b8' }}>Not provided</span>
                       )}
@@ -531,6 +577,10 @@ export default function Profile() {
                   <label className="gcp-form-label">GSTIN</label>
                   <input type="text" name="gstin" value={profileData.gstin} placeholder="Optional GSTIN" onChange={handleChange} disabled={!isEditing} className="gcp-input uppercase" />
                 </div>
+                <div className="gcp-form-group">
+                  <label className="gcp-form-label">Company Website</label>
+                  <input type="text" name="website" value={profileData.website} placeholder="e.g. https://mycompany.com" onChange={handleChange} disabled={!isEditing} className="gcp-input" />
+                </div>
                 <div className="gcp-form-group gcp-col-span-full">
                   <label className="gcp-form-label">Company Description</label>
                   <textarea name="companyDesc" value={profileData.companyDesc} placeholder="Describe your company and core products/services" onChange={handleChange} disabled={!isEditing} rows={4} className="gcp-input resize-none" />
@@ -618,13 +668,29 @@ export default function Profile() {
               </div>
               <div 
                 className="gcp-status-row-small" 
-                style={{ cursor: 'pointer' }}
-                onClick={() => setIsKycModalOpen(true)}
-                title="Click to Verify Identity via Cloudinary KYC Upload"
+                style={{ cursor: kycStatus === 'Pending Approval' || kycStatus === 'Verified' ? 'default' : 'pointer' }}
+                onClick={() => {
+                  if (kycStatus === 'Pending Approval') {
+                    alert('Your KYC document is under review by the Admin team.');
+                  } else if (kycStatus === 'Verified') {
+                    alert('Your KYC verification is already completed.');
+                  } else {
+                    setIsKycModalOpen(true);
+                  }
+                }}
+                title={kycStatus === 'Pending Approval' ? 'KYC Under Review' : kycStatus === 'Verified' ? 'KYC Completed' : 'Click to Verify Identity'}
               >
                 <span className="gcp-status-label">Identity Verification</span>
-                <span className={`gcp-status-badge ${kycStatus === 'Verified' ? 'badge-green' : 'badge-orange'}`}>
-                  {kycStatus === 'Verified' ? <CheckCircle size={12}/> : <AlertCircle size={12}/>} {kycStatus === 'Verified' ? 'Verified' : 'Verify Now'}
+                <span className={`gcp-status-badge ${
+                  kycStatus === 'Verified' ? 'badge-green' : 
+                  kycStatus === 'Pending Approval' ? 'badge-blue' : 
+                  kycStatus === 'Rejected' ? 'badge-red' : 'badge-orange'
+                }`}>
+                  {kycStatus === 'Verified' && <CheckCircle size={12}/>}
+                  {kycStatus === 'Pending Approval' && <AlertCircle size={12}/>}
+                  {kycStatus === 'Rejected' && <X size={12}/>}
+                  {kycStatus === 'Action Required' && <AlertCircle size={12}/>}
+                  {kycStatus === 'Unverified' ? 'Verify Now' : kycStatus}
                 </span>
               </div>
               <div className="gcp-status-row-small gcp-border-none">
@@ -640,6 +706,20 @@ export default function Profile() {
               <div>
                 <p className="gcp-alert-title">Unsaved Changes</p>
                 <p className="gcp-alert-desc">You have unsaved changes in your profile. Make sure to save them before leaving.</p>
+              </div>
+            </div>
+          )}
+
+          {(kycStatus === 'Rejected' || kycStatus === 'Action Required') && (
+            <div className="gcp-alert-card" style={{ background: '#fef2f2', border: '1px solid #fecaca', marginTop: '12px' }}>
+              <AlertCircle size={18} style={{ color: '#dc2626', marginTop: '2px', flexShrink: 0 }} />
+              <div>
+                <p className="gcp-alert-title" style={{ color: '#dc2626' }}>KYC Action Required</p>
+                <p className="gcp-alert-desc" style={{ color: '#7f1d1d', margin: 0, fontSize: '13px' }}>
+                  {kycStatus === 'Rejected' 
+                    ? 'Your document was rejected. Please click the red status badge to re-upload your document.' 
+                    : 'Additional details or clearer documents are requested. Please click the blue status badge to re-upload.'}
+                </p>
               </div>
             </div>
           )}

@@ -757,3 +757,92 @@ exports.approveWithdrawal = async (req, res) => {
     res.status(500).json({ message: 'Error approving withdrawal payout' });
   }
 };
+
+// 18. Get users with KYC submissions
+exports.getKycList = async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = { kycStatus: { $ne: 'Unverified' } };
+    
+    if (status && status !== 'all') {
+      query.kycStatus = status;
+    }
+
+    const users = await User.find(query)
+      .select('name email role kycStatus kycDocUrl kycDocType kycSubmittedAt aiRiskScore aiReason')
+      .sort({ kycSubmittedAt: -1 });
+
+    res.json({ success: true, count: users.length, users });
+  } catch (error) {
+    console.error('Get KYC list error:', error);
+    res.status(500).json({ message: 'Server error retrieving KYC list' });
+  }
+};
+
+// 19. Review User KYC Document (Approve, Reject, Request More Docs)
+exports.reviewKycStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reason } = req.body; // action: 'Verified', 'Rejected', 'Action Required'
+
+    if (!['Verified', 'Rejected', 'Action Required'].includes(action)) {
+      return res.status(400).json({ message: 'Invalid action. Must be Verified, Rejected, or Action Required' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.kycStatus = action;
+    if (action === 'Verified') {
+      user.verificationStatus = 'verified';
+    } else if (action === 'Rejected') {
+      user.verificationStatus = 'unverified';
+      user.kycDocUrl = null; // Clear document link so they must re-upload
+    } else if (action === 'Action Required') {
+      user.verificationStatus = 'unverified';
+    }
+
+    if (reason) {
+      user.aiReason = `Admin KYC Note: ${reason}`;
+    }
+    
+    await user.save();
+
+    // Trigger Notification for User
+    const { createNotification } = require('./notificationController');
+    let notificationTitle = 'Identity Verification Update';
+    let notificationDesc = '';
+
+    if (action === 'Verified') {
+      notificationDesc = 'Congratulations! Your identity verification (KYC) has been approved by the administrators.';
+    } else if (action === 'Rejected') {
+      notificationDesc = `Your KYC document submission was rejected. Reason: ${reason || 'Invalid details'}. Please submit a valid document.`;
+    } else if (action === 'Action Required') {
+      notificationDesc = `More information or clearer documents are required for your KYC approval. Note: ${reason || 'Please upload a clearer image'}.`;
+    }
+
+    await createNotification(
+      user._id,
+      'system',
+      notificationTitle,
+      notificationDesc
+    );
+
+    res.json({
+      success: true,
+      message: `KYC status updated to ${action} successfully.`,
+      user: {
+        id: user._id,
+        kycStatus: user.kycStatus,
+        verificationStatus: user.verificationStatus
+      }
+    });
+  } catch (error) {
+    console.error('Review KYC error:', error);
+    res.status(500).json({ message: 'Server error updating KYC review' });
+  }
+};
+
+exports.globalDisputes = globalDisputes;

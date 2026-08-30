@@ -163,7 +163,7 @@ exports.updateBankDetails = async (req, res) => {
 // 5. Request Freelancer Payout / Withdrawal
 exports.requestWithdrawal = async (req, res) => {
   try {
-    const { amount, payoutMethod } = req.body; // 'UPI' or 'Bank Transfer'
+    const { amount, payoutMethod, upiId, accountHolder, accountNumber, ifscCode, bankName } = req.body;
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: 'Valid withdrawal amount is required' });
     }
@@ -177,9 +177,27 @@ exports.requestWithdrawal = async (req, res) => {
       return res.status(400).json({ message: `Insufficient wallet balance. Available: ₹${(user.walletBalance || 0).toLocaleString()}` });
     }
 
+    // Save/update bank details if submitted inside the withdrawal request
+    if (payoutMethod === 'UPI' && upiId) {
+      user.bankDetails = {
+        ...user.bankDetails,
+        upiId: upiId
+      };
+      await user.save();
+    } else if (payoutMethod === 'Bank Transfer' && accountNumber) {
+      user.bankDetails = {
+        ...user.bankDetails,
+        accountHolder: accountHolder || user.bankDetails?.accountHolder || user.name,
+        accountNumber: accountNumber,
+        ifscCode: ifscCode || '',
+        bankName: bankName || ''
+      };
+      await user.save();
+    }
+
     const payoutInfo = payoutMethod === 'UPI' 
-      ? `UPI: ${user.bankDetails?.upiId || 'Pending UPI setup'}`
-      : `Bank: ${user.bankDetails?.bankName || 'HDFC'} A/C ${user.bankDetails?.accountNumber || 'xxxx'} (IFSC: ${user.bankDetails?.ifscCode || 'xxxx'})`;
+      ? `UPI: ${upiId || user.bankDetails?.upiId || 'Pending UPI setup'}`
+      : `Bank: ${bankName || user.bankDetails?.bankName || 'Bank'} A/C ${accountNumber || user.bankDetails?.accountNumber || 'xxxx'} (IFSC: ${ifscCode || user.bankDetails?.ifscCode || 'xxxx'}) Holder: ${accountHolder || user.bankDetails?.accountHolder || user.name}`;
 
     // Deduct amount from available balance
     user.walletBalance -= amount;

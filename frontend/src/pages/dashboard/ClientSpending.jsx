@@ -30,6 +30,11 @@ export default function ClientSpending() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState('UPI');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [bankName, setBankName] = useState('');
 
   // GPay Style Payment Success Modal State
   const [successModal, setSuccessModal] = useState({
@@ -49,6 +54,11 @@ export default function ClientSpending() {
       const data = await apiFetch('/wallet');
       setWalletBalance(data.walletBalance || 0);
       setEscrowBalance(data.escrowBalance || 0);
+      setUpiId(data.bankDetails?.upiId || '');
+      setAccountHolder(data.bankDetails?.accountHolder || '');
+      setAccountNumber(data.bankDetails?.accountNumber || '');
+      setIfscCode(data.bankDetails?.ifscCode || '');
+      setBankName(data.bankDetails?.bankName || '');
       setPaymentsList(data.transactions || []);
     } catch (err) {
       console.error('Failed to load wallet/payments:', err);
@@ -166,7 +176,15 @@ export default function ClientSpending() {
     try {
       const res = await apiFetch('/wallet/withdraw', {
         method: 'POST',
-        body: JSON.stringify({ amount, payoutMethod: withdrawMethod })
+        body: JSON.stringify({ 
+          amount, 
+          payoutMethod: withdrawMethod,
+          upiId,
+          accountHolder,
+          accountNumber,
+          ifscCode,
+          bankName
+        })
       });
 
       setMsg(res.message || `Withdrawal request for ₹${amount.toLocaleString()} submitted successfully!`);
@@ -197,9 +215,6 @@ export default function ClientSpending() {
       {/* Header */}
       <div className="overview-header">
         <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.85rem', background: '#e8f0fe', color: '#1a73e8', borderRadius: '30px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-            <Sparkles size={13} /> Razorpay Secured Escrow
-          </div>
           <h1 className="overview-title">Spending & Escrow Analytics</h1>
           <p className="overview-subtitle">Manage project investments, release milestone payments, and withdraw funds.</p>
         </div>
@@ -319,16 +334,19 @@ export default function ClientSpending() {
                 {filteredPayments.map((pay, index) => {
                   const txnId = pay.razorpayPaymentId ? `RZP-${String(pay.razorpayPaymentId).slice(-8).toUpperCase()}` : `TXN-${String(pay._id || index + 101).slice(-6).toUpperCase()}`;
                   const isCompleted = pay.status === 'completed' || pay.status === 'Released';
+                  const isPositive = pay.amount > 0;
                   return (
                     <tr key={pay._id || pay.id || index}>
                       <td style={{ fontWeight: 700, color: '#0f172a' }}>{txnId}</td>
                       <td style={{ fontWeight: 600, color: '#0f172a' }}>{pay.title || pay.description || pay.milestone || 'Wallet Deposit'}</td>
                       <td style={{ color: '#64748b' }}>{pay.paymentMethod || pay.payment_method || 'Razorpay Gateway'}</td>
-                      <td className="payment-amount" style={{ color: isCompleted ? '#10b981' : '#0f172a' }}>{formatINR(pay.amount)}</td>
+                      <td className="payment-amount" style={{ color: isPositive ? '#10b981' : '#dc2626', fontWeight: 800 }}>
+                        {isPositive ? '+' : ''}{formatINR(pay.amount)}
+                      </td>
                       <td style={{ color: '#64748b' }}>{new Date(pay.createdAt || pay.created_at || Date.now()).toLocaleDateString()}</td>
                       <td>
-                        <span className={`payment-status-badge ${isCompleted ? 'released' : 'pending'}`}>
-                          <CheckCircle size={14} /> {isCompleted ? 'Completed' : pay.status}
+                        <span className={`payment-status-badge ${isCompleted ? 'released' : pay.status === 'pending' ? 'pending' : 'revoked'}`}>
+                          <CheckCircle size={14} /> {pay.status === 'completed' ? 'Completed' : pay.status}
                         </span>
                       </td>
                     </tr>
@@ -457,6 +475,69 @@ export default function ClientSpending() {
                       <option value="Bank Transfer">Direct Bank Transfer</option>
                     </select>
                   </div>
+
+                  {withdrawMethod === 'UPI' ? (
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>UPI ID for Payout <span style={{ color: '#dc2626' }}>*</span></label>
+                      <input 
+                        type="text" 
+                        value={upiId} 
+                        onChange={(e) => setUpiId(e.target.value)}
+                        placeholder="e.g. name@upi"
+                        style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                        required 
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Holder Name <span style={{ color: '#dc2626' }}>*</span></label>
+                        <input 
+                          type="text" 
+                          value={accountHolder} 
+                          onChange={(e) => setAccountHolder(e.target.value)}
+                          placeholder="e.g. John Doe"
+                          style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                          required 
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Bank Name <span style={{ color: '#dc2626' }}>*</span></label>
+                        <input 
+                          type="text" 
+                          value={bankName} 
+                          onChange={(e) => setBankName(e.target.value)}
+                          placeholder="e.g. HDFC Bank"
+                          style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                          required 
+                        />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Number <span style={{ color: '#dc2626' }}>*</span></label>
+                          <input 
+                            type="text" 
+                            value={accountNumber} 
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            placeholder="e.g. 1234567890"
+                            style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                            required 
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>IFSC Code <span style={{ color: '#dc2626' }}>*</span></label>
+                          <input 
+                            type="text" 
+                            value={ifscCode} 
+                            onChange={(e) => setIfscCode(e.target.value)}
+                            placeholder="e.g. HDFC0000123"
+                            style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                            required 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 

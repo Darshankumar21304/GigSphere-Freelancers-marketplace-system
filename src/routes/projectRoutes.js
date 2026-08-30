@@ -7,6 +7,9 @@ const authorizeRoles = require('../middleware/rbacMiddleware');
 // Get all projects
 router.get('/', projectController.getAllProjects);
 
+// Get logged-in client's own projects
+router.get('/my', authenticateToken, projectController.getMyProjects);
+
 // Get single project by ID
 router.get('/:id', projectController.getProjectById);
 

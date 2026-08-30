@@ -41,4 +41,8 @@ router.post('/ai/support-chat', adminController.askAiSupportAssistant);
 router.get('/withdrawals', adminController.getAllWithdrawals);
 router.put('/withdrawals/:id/approve', adminController.approveWithdrawal);
 
+// KYC Verification Reviews
+router.get('/kyc', adminController.getKycList);
+router.put('/users/:id/kyc-review', adminController.reviewKycStatus);
+
 module.exports = router;

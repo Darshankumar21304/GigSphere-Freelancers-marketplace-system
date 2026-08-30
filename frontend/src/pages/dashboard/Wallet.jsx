@@ -40,6 +40,11 @@ export default function Wallet() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState('UPI');
   const [withdrawing, setWithdrawing] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [bankName, setBankName] = useState('');
 
   // Bank Details Form State
   const [bankForm, setBankForm] = useState({
@@ -62,6 +67,11 @@ export default function Wallet() {
       setWalletBalance(data.walletBalance || 0);
       setEscrowBalance(data.escrowBalance || 0);
       setBankDetails(data.bankDetails || {});
+      setUpiId(data.bankDetails?.upiId || '');
+      setAccountHolder(data.bankDetails?.accountHolder || '');
+      setAccountNumber(data.bankDetails?.accountNumber || '');
+      setIfscCode(data.bankDetails?.ifscCode || '');
+      setBankName(data.bankDetails?.bankName || '');
       setBankForm({
         accountHolder: data.bankDetails?.accountHolder || '',
         accountNumber: data.bankDetails?.accountNumber || '',
@@ -162,7 +172,15 @@ export default function Wallet() {
     try {
       const res = await apiFetch('/wallet/withdraw', {
         method: 'POST',
-        body: JSON.stringify({ amount, payoutMethod: withdrawMethod })
+        body: JSON.stringify({ 
+          amount, 
+          payoutMethod: withdrawMethod,
+          upiId,
+          accountHolder,
+          accountNumber,
+          ifscCode,
+          bankName
+        })
       });
 
       setMsg(res.message);
@@ -411,10 +429,73 @@ export default function Wallet() {
                   onChange={(e) => setWithdrawMethod(e.target.value)}
                   style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.875rem', color: '#0f172a', outline: 'none', boxSizing: 'border-box', background: '#ffffff', cursor: 'pointer' }}
                 >
-                  <option value="UPI">UPI Instant Payout ({bankDetails.upiId || 'Not Setup'})</option>
-                  <option value="Bank Transfer">Direct Bank Transfer ({bankDetails.bankName || 'Bank'} A/C)</option>
+                  <option value="UPI">UPI Instant Payout</option>
+                  <option value="Bank Transfer">Direct Bank Transfer</option>
                 </select>
               </div>
+
+              {withdrawMethod === 'UPI' ? (
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>UPI ID for Payout <span style={{ color: '#dc2626' }}>*</span></label>
+                  <input 
+                    type="text" 
+                    value={upiId} 
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="e.g. name@upi"
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                    required 
+                  />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Holder Name <span style={{ color: '#dc2626' }}>*</span></label>
+                    <input 
+                      type="text" 
+                      value={accountHolder} 
+                      onChange={(e) => setAccountHolder(e.target.value)}
+                      placeholder="e.g. John Doe"
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Bank Name <span style={{ color: '#dc2626' }}>*</span></label>
+                    <input 
+                      type="text" 
+                      value={bankName} 
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="e.g. HDFC Bank"
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                      required 
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Number <span style={{ color: '#dc2626' }}>*</span></label>
+                      <input 
+                        type="text" 
+                        value={accountNumber} 
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder="e.g. 1234567890"
+                        style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>IFSC Code <span style={{ color: '#dc2626' }}>*</span></label>
+                      <input 
+                        type="text" 
+                        value={ifscCode} 
+                        onChange={(e) => setIfscCode(e.target.value)}
+                        placeholder="e.g. HDFC0000123"
+                        style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                        required 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowWithdrawModal(false)} style={{ padding: '0.65rem 1.25rem', borderRadius: '40px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>

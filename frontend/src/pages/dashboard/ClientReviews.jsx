@@ -33,7 +33,7 @@ const MOCK_FREELANCER_REVIEWS = [
 ];
 
 export default function ClientReviews() {
-  const [reviews, setReviews] = useState(MOCK_FREELANCER_REVIEWS);
+  const [reviews, setReviews] = useState([]);
   const [activeTab, setActiveTab] = useState('All Reviews');
   const [sortOption, setSortOption] = useState('Newest');
   const [isLoading, setIsLoading] = useState(true);
@@ -43,10 +43,42 @@ export default function ClientReviews() {
 
   const tabs = ['All Reviews', '5 Stars', '4 Stars', '3 Stars', '2 Stars', '1 Star'];
 
+  const parseReview = (rev) => {
+    return {
+      id: rev._id || rev.id,
+      freelancerName: rev.freelancer_id?.name || `${rev.freelancer_id?.firstName || ''} ${rev.freelancer_id?.lastName || ''}`.trim() || rev.freelancerName || 'Freelancer',
+      freelancerAvatar: rev.freelancer_id?.avatar || rev.freelancerAvatar || '',
+      role: rev.freelancer_id?.title || (rev.freelancer_id?.role === 'freelancer' ? 'Freelancer Specialist' : '') || rev.role || 'Professional',
+      rating: rev.rating,
+      date: rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (rev.date || 'Today'),
+      timestamp: rev.createdAt ? new Date(rev.createdAt).getTime() : Date.now(),
+      projectTitle: rev.projectTitle || 'Project Delivery',
+      text: rev.comment || rev.text || '',
+      skills: rev.skills || ['Delivery'],
+      status: 'Published'
+    };
+  };
+
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    fetchReviews();
   }, []);
+
+  const fetchReviews = async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiFetch('/reviews');
+      if (Array.isArray(data)) {
+        setReviews(data.map(parseReview));
+      } else {
+        setReviews([]);
+      }
+    } catch (error) {
+      console.error('Error fetching client reviews:', error);
+      setReviews([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const totalReviews = reviews.length;
   const overallRating = totalReviews > 0 ? (reviews.reduce((acc, curr) => acc + curr.rating, 0) / totalReviews).toFixed(1) : '0.0';
@@ -65,8 +97,8 @@ export default function ClientReviews() {
   }).sort((a, b) => {
     if (sortOption === 'Highest Rated') return b.rating - a.rating;
     if (sortOption === 'Lowest Rated') return a.rating - b.rating;
-    if (sortOption === 'Oldest') return a.date.localeCompare(b.date);
-    return b.date.localeCompare(a.date); // Newest
+    if (sortOption === 'Oldest') return (a.timestamp || 0) - (b.timestamp || 0);
+    return (b.timestamp || 0) - (a.timestamp || 0); // Newest
   });
 
   const totalPages = Math.ceil(filteredReviews.length / reviewsPerPage) || 1;

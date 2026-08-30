@@ -7,7 +7,8 @@ import {
   AlertTriangle, 
   Building2,
   ShieldCheck, 
-  LogOut
+  LogOut,
+  FileCheck
 } from 'lucide-react';
 import { logoutUser } from '../utils/authUtils';
 import './AdminLayout.css';
@@ -18,7 +19,7 @@ export default function AdminLayout() {
 
   const confirmLogout = () => {
     logoutUser();
-    navigate('/auth/login');
+    navigate('/');
   };
 
   return (
@@ -56,6 +57,11 @@ export default function AdminLayout() {
           <NavLink to="/admin/dashboard/payouts" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <Building2 size={18} />
             <span>Payouts</span>
+          </NavLink>
+
+          <NavLink to="/admin/dashboard/kyc" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            <FileCheck size={18} />
+            <span>KYC Approvals</span>
           </NavLink>
 
           <NavLink to="/admin/dashboard/ai-security" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>

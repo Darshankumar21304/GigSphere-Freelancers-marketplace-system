@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { apiFetch } from '../utils/api';
 import { 
   Star, Clock, Check, Shield, Award, MessageCircle, 
   Share2, Heart, MapPin, Briefcase, ChevronLeft, 
@@ -25,8 +25,8 @@ export default function GigDetail() {
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        const response = await axios.get(`http://localhost:5001/api/projects/${id}`);
-        setProject(response.data);
+        const data = await apiFetch(`/projects/${id}`);
+        setProject(data);
       } catch (error) {
         console.error('Error fetching project by ID:', error);
         // Fallback mock project for demo
@@ -67,14 +67,16 @@ Please share relevant portfolio links and past e-commerce projects when submitti
     e.preventDefault();
     setIsSubmittingProposal(true);
     try {
-      await axios.post(`http://localhost:5001/api/projects/${id}/proposals`, proposalForm);
+      await apiFetch(`/projects/${id}/proposals`, {
+        method: 'POST',
+        body: JSON.stringify(proposalForm)
+      });
       alert('Proposal submitted successfully!');
       setIsProposalModalOpen(false);
       setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
     } catch (err) {
       console.error('Failed to submit proposal:', err);
-      alert('Proposal submitted successfully for demo!');
-      setIsProposalModalOpen(false);
+      alert('Failed to submit proposal: ' + err.message);
     } finally {
       setIsSubmittingProposal(false);
     }

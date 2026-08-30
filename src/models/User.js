@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema({
   gstin: { type: String },
   state: { type: String },
   country: { type: String },
+  kycStatus: { type: String, enum: ['Unverified', 'Pending Approval', 'Verified', 'Rejected', 'Action Required'], default: 'Unverified' },
+  kycDocUrl: { type: String, default: null },
+  kycDocType: { type: String, default: 'Aadhaar Card' },
+  kycSubmittedAt: { type: Date },
   preferences: {
     notifications: {
       email: { type: Boolean, default: true },

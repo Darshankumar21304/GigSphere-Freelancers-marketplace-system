@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PlusCircle, ClipboardList, MessageSquare, 
   Settings, LogOut, Wallet, Briefcase, FileText, Users, 
-  CreditCard, Star, Bell, Search, Folder, Menu, X
+  CreditCard, Star, Bell, Search, Folder, Menu, X, AlertTriangle
 } from 'lucide-react';
 import { getUserRole, logoutUser } from '../utils/authUtils';
 import '../pages/dashboard/Dashboard.css';
@@ -21,7 +21,7 @@ export default function DashboardLayout() {
 
   const confirmLogout = () => {
     logoutUser();
-    navigate('/auth/login');
+    navigate('/');
   };
 
   const toggleSidebar = () => {
@@ -40,6 +40,7 @@ export default function DashboardLayout() {
     { name: 'Received Proposals', path: '/client/dashboard/proposals', icon: FileText },
     { name: 'Hired Freelancers', path: '/client/dashboard/hired', icon: Users },
     { name: 'Payments', path: '/client/dashboard/wallet', icon: CreditCard },
+    { name: 'Disputes', path: '/client/dashboard/disputes', icon: AlertTriangle },
     { name: 'Reviews', path: '/client/dashboard/reviews', icon: Star },
   ];
 
@@ -51,6 +52,7 @@ export default function DashboardLayout() {
     { name: 'Active Projects', path: '/freelancer/dashboard/active-projects', icon: Briefcase },
     { name: 'Portfolio', path: '/freelancer/dashboard/portfolio', icon: Folder },
     { name: 'Earnings', path: '/freelancer/dashboard/wallet', icon: Wallet },
+    { name: 'Disputes', path: '/freelancer/dashboard/disputes', icon: AlertTriangle },
     { name: 'Reviews', path: '/freelancer/dashboard/reviews', icon: Star },
   ];
 

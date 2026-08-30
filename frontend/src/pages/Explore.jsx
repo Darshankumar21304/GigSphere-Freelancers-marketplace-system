@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { apiFetch } from '../utils/api';
 import { 
   Filter, 
   Search,
@@ -58,13 +58,16 @@ export default function Explore() {
     if (!proposalProject) return;
     setIsSubmittingProposal(true);
     try {
-      await axios.post(`http://localhost:5001/api/projects/${proposalProject._id}/proposals`, proposalForm);
+      await apiFetch(`/projects/${proposalProject._id}/proposals`, {
+        method: 'POST',
+        body: JSON.stringify(proposalForm)
+      });
       alert('Proposal submitted successfully!');
       setProposalProject(null);
       setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
     } catch (err) {
       console.error('Failed to submit proposal:', err);
-      alert('Failed to submit proposal: ' + (err.response?.data?.message || err.message));
+      alert('Failed to submit proposal: ' + err.message);
     } finally {
       setIsSubmittingProposal(false);
     }
@@ -74,8 +77,8 @@ export default function Explore() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/projects');
-        setProjects(response.data);
+        const data = await apiFetch('/projects');
+        setProjects(data);
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { apiFetch } from '../utils/api';
 import { 
   Filter, 
   Search,
@@ -41,8 +42,8 @@ export default function Freelancers() {
   useEffect(() => {
     const fetchFreelancers = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/users/freelancers');
-        setFreelancers(response.data);
+        const data = await apiFetch('/users/freelancers');
+        setFreelancers(data);
       } catch (error) {
         console.error('Error fetching freelancers:', error);
       } finally {
@@ -234,10 +235,13 @@ export default function Freelancers() {
                         <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
                           <img src={freelancer.avatar || 'https://i.pravatar.cc/150'} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
                           <div>
-                            <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none'}}>
-                              <h3 className="project-title" style={{marginBottom: '4px'}}>{freelancer.name}</h3>
+                            <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'}}>
+                              <h3 className="project-title" style={{marginBottom: 0}}>{freelancer.name}</h3>
+                              {freelancer.kycStatus === 'Verified' && (
+                                <CheckCircle size={14} color="#10b981" fill="#dcfce7" title="Verified Freelancer" />
+                              )}
                             </Link>
-                            <p style={{margin: 0, fontSize: '14px', color: 'var(--text-main)', fontWeight: 500}}>{(freelancer.profile && freelancer.profile.title) || 'Freelancer'}</p>
+                            <p style={{margin: 0, fontSize: '14px', color: 'var(--text-main)', fontWeight: 500, marginTop: '4px'}}>{(freelancer.profile && freelancer.profile.title) || 'Freelancer'}</p>
                             <div className="client-info" style={{marginTop: '4px'}}>
                               <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
                                 <MapPin size={14} /> Remote

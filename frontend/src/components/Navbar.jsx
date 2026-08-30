@@ -113,21 +113,23 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* Center: Google Antigravity Style Navigation Links */}
-        <div className="navbar-center landing-nav-center">
-          <Link to="/explore" className="antigravity-nav-link">
-            Explore Marketplace <ChevronDown size={14} className="chevron-icon" />
-          </Link>
-          <Link to="/freelancers" className="antigravity-nav-link">
-            Find Freelancers <ChevronDown size={14} className="chevron-icon" />
-          </Link>
-          <a href="#how-it-works" className="antigravity-nav-link">
-            How It Works
-          </a>
-          <a href="#categories" className="antigravity-nav-link">
-            Categories <ChevronDown size={14} className="chevron-icon" />
-          </a>
-        </div>
+        {/* Center: Google Antigravity Style Navigation Links (Only shown when logged out) */}
+        {!isAuth && (
+          <div className="navbar-center landing-nav-center">
+            <Link to="/explore" className="antigravity-nav-link">
+              Explore Marketplace <ChevronDown size={14} className="chevron-icon" />
+            </Link>
+            <Link to="/freelancers" className="antigravity-nav-link">
+              Find Freelancers <ChevronDown size={14} className="chevron-icon" />
+            </Link>
+            <a href="#how-it-works" className="antigravity-nav-link">
+              How It Works
+            </a>
+            <a href="#categories" className="antigravity-nav-link">
+              Categories <ChevronDown size={14} className="chevron-icon" />
+            </a>
+          </div>
+        )}
 
         {/* Right: Pill Buttons & Authenticated Actions */}
         <div className="navbar-right">
@@ -186,10 +188,14 @@ const Navbar = () => {
       {isMobileMenuOpen && (
         <div className="mobile-menu animate-fade-in-up">
           <div className="mobile-nav-links">
-            <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore Marketplace</Link>
-            <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Find Freelancers</Link>
-            <a href="#how-it-works" className="nav-link" onClick={closeMobileMenu}>How It Works</a>
-            <a href="#categories" className="nav-link" onClick={closeMobileMenu}>Categories</a>
+            {!isAuth && (
+              <>
+                <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore Marketplace</Link>
+                <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Find Freelancers</Link>
+                <a href="#how-it-works" className="nav-link" onClick={closeMobileMenu}>How It Works</a>
+                <a href="#categories" className="nav-link" onClick={closeMobileMenu}>Categories</a>
+              </>
+            )}
             {isAuth && <Link to={dashboardPath} className="nav-link" onClick={closeMobileMenu}>Dashboard</Link>}
             
             <div className="mobile-auth-buttons">
