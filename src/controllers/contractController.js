@@ -60,7 +60,6 @@ const submitMilestone = async (req, res) => {
   }
 };
 
-module.exports = {
 // Approve a milestone and release escrow payment to freelancer
 const approveMilestone = async (req, res) => {
   try {

@@ -22,6 +22,16 @@ const userSchema = new mongoose.Schema({
   phone: { type: String },
   location: { type: String },
   language: { type: String, default: 'English' },
+  avatar: { type: String },
+  profilePhoto: { type: String },
+  companyName: { type: String },
+  industry: { type: String },
+  companySize: { type: String },
+  website: { type: String },
+  companyDesc: { type: String },
+  gstin: { type: String },
+  state: { type: String },
+  country: { type: String },
   preferences: {
     notifications: {
       email: { type: Boolean, default: true },

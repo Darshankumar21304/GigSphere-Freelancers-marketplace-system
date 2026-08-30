@@ -48,10 +48,14 @@ const updateSettings = async (req, res) => {
     const userId = req.user.id;
     const { 
       name, phone, location, language, preferences, avatar, profilePhoto,
+      companyName, industry, companySize, website, companyDesc, gstin, state, country,
       title, bio, skills, experience, availability, hourlyRate 
     } = req.body;
 
-    const updateFields = { name, phone, location, language, preferences };
+    const updateFields = { 
+      name, phone, location, language, preferences,
+      companyName, industry, companySize, website, companyDesc, gstin, state, country
+    };
     if (avatar || profilePhoto) {
       updateFields.avatar = avatar || profilePhoto;
       updateFields.profilePhoto = avatar || profilePhoto;

@@ -79,12 +79,48 @@ export default function Profile() {
 
   const fetchLiveStats = async () => {
     try {
-      const data = await apiFetch('/wallet');
-      setWalletStats(prev => ({
-        ...prev,
-        walletBalance: data.walletBalance || 0,
-        escrowBalance: data.escrowBalance || 0
-      }));
+      const walletData = await apiFetch('/wallet').catch(() => ({ walletBalance: 0, escrowBalance: 0 }));
+      const projects = await apiFetch('/projects').catch(() => []);
+      const totalProjects = projects.length;
+      const activeProjects = projects.filter(p => p.status === 'Open' || p.status === 'In Progress').length;
+      const contracts = await apiFetch('/contracts/active').catch(() => []);
+      const hiredCount = contracts.length;
+
+      setWalletStats({
+        walletBalance: walletData.walletBalance || 0,
+        escrowBalance: walletData.escrowBalance || 0,
+        totalProjects,
+        activeProjects,
+        hiredCount
+      });
+
+      // Fetch user profile and company settings
+      const settingsData = await apiFetch('/users/settings').catch(() => null);
+      if (settingsData && settingsData.user) {
+        const u = settingsData.user;
+        const nameParts = (u.name || '').trim().split(' ');
+        const fName = nameParts[0] || '';
+        const lName = nameParts.slice(1).join(' ') || '';
+
+        setProfileData({
+          firstName: fName || u.name || '',
+          lastName: lName || '',
+          email: u.email || '',
+          phone: u.phone || '',
+          location: u.location || '',
+          state: u.state || '',
+          country: u.country || 'India',
+          companyName: u.companyName || u.name || '',
+          industry: u.industry || 'Technology',
+          companySize: u.companySize || '1-10 employees',
+          website: u.website || '',
+          companyDesc: u.companyDesc || '',
+          gstin: u.gstin || '',
+          title: u.title || (settingsData.profile?.title) || '',
+          bio: u.bio || (settingsData.profile?.bio) || '',
+          avatar: u.avatar || u.profilePhoto || ''
+        });
+      }
     } catch (err) {
       console.error('Failed to load live profile stats:', err);
     }
@@ -159,22 +195,45 @@ export default function Profile() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!profileData.firstName || !profileData.email) return;
-    setIsEditing(false);
-    setHasChanges(false);
-    const updated = { 
-      ...savedProfile, 
-      ...profileData, 
-      name: `${profileData.firstName} ${profileData.lastName}` 
-    };
-    saveUserProfile(updated);
-    setToastMessage('Profile updated successfully.');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    try {
+      const payload = {
+        name: `${profileData.firstName} ${profileData.lastName}`,
+        phone: profileData.phone,
+        location: profileData.location,
+        state: profileData.state,
+        country: profileData.country,
+        companyName: profileData.companyName,
+        industry: profileData.industry,
+        companySize: profileData.companySize,
+        website: profileData.website,
+        companyDesc: profileData.companyDesc,
+        gstin: profileData.gstin,
+        avatar: profileData.avatar,
+        profilePhoto: profileData.avatar
+      };
+
+      const response = await apiFetch('/users/settings', {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+
+      if (response && response.user) {
+        saveUserProfile(response.user);
+      }
+
+      setIsEditing(false);
+      setHasChanges(false);
+      setToastMessage('Profile and Company details saved successfully.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (error) {
+      alert(error.message || 'Failed to save profile changes');
+    }
   };
 
-  const handlePasswordSave = () => {
+  const handlePasswordSave = async () => {
     if (!passwords.current || !passwords.new || !passwords.confirm) {
       setPasswordError('All fields are required.');
       return;
@@ -188,12 +247,24 @@ export default function Profile() {
       return;
     }
     
-    setIsChangingPassword(false);
-    setPasswords({ current: '', new: '', confirm: '' });
-    setPasswordError('');
-    setToastMessage('Password updated successfully.');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    try {
+      await apiFetch('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.new
+        })
+      });
+
+      setIsChangingPassword(false);
+      setPasswords({ current: '', new: '', confirm: '' });
+      setPasswordError('');
+      setToastMessage('Password updated successfully.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      setPasswordError(err.message || 'Failed to update password.');
+    }
   };
 
   const cancelEdit = () => {
@@ -201,7 +272,7 @@ export default function Profile() {
     setHasChanges(false);
   };
 
-  const tabs = ['Overview', 'Personal Information', ...(role === 'client' ? ['Company Details'] : []), 'Security', 'Preferences'];
+  const tabs = ['Overview', 'Personal Information', ...(role === 'client' ? ['Company Details'] : []), 'Security'];
 
   return (
     <div className="gigsphere-client-profile">
@@ -531,31 +602,6 @@ export default function Profile() {
                   </div>
                 )}
               </div>
-
-              <div className="gcp-about-card">
-                <h3 className="gcp-card-header gcp-mb-16">Two-Factor Authentication</h3>
-                <div className="gcp-status-row">
-                  <div className="gcp-status-content-left">
-                    <Shield size={20} className="gcp-icon-brand" />
-                    <div>
-                      <p className="gcp-row-title">Protect your account with 2FA</p>
-                      <p className="gcp-row-desc">Add an extra layer of security to your account by requiring a code upon login.</p>
-                    </div>
-                  </div>
-                  <button className="gcp-btn-brand-light">Enable 2FA</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'Preferences' && (
-            <div className="gcp-about-card">
-               <div className="gcp-empty-state">
-                  <Settings size={48} className="gcp-empty-icon" />
-                  <h3 className="gcp-empty-title">Notification Preferences</h3>
-                  <p className="gcp-empty-desc">Configure how you receive alerts and emails.</p>
-                  <button className="gcp-btn-secondary gcp-mt-16">Manage Settings</button>
-               </div>
             </div>
           )}
 
