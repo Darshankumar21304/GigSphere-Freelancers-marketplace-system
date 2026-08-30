@@ -74,7 +74,9 @@ function App() {
               <Route path="proposals" element={<ReceivedProposals />} />
               <Route path="wallet" element={<ClientSpending />} />
               <Route path="create-project" element={<CreateGig />} />
+              <Route path="post-project" element={<CreateGig />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="settings" element={<Profile />} />
               <Route path="hired" element={<HiredFreelancers />} />
               <Route path="reviews" element={<ClientReviews />} />
               <Route path="notifications" element={<Notifications />} />

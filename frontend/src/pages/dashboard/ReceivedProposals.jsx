@@ -1,461 +1,262 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Download, Search, Filter, Briefcase, ChevronDown, CheckCircle,
   MoreVertical, Eye, MessageSquare, User, Check, X, ShieldCheck,
-  Star, MapPin, Clock, Calendar, FileText
+  Star, MapPin, Clock, Calendar, FileText, FolderPlus, Sparkles
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
+import { apiFetch } from '../../utils/api';
 import './ReceivedProposals.css';
-
-// Mock Data
-const MOCK_PROJECTS = [
-  { id: 'all', title: 'All Projects' },
-  { id: 'prj-1', title: 'Modern E-commerce Website Design', status: 'Open', budget: 85000 },
-  { id: 'prj-2', title: 'SEO Content Writing for Tech Blog', status: 'In Progress', budget: 15000 }
-];
-
-const MOCK_PROPOSALS = [
-  {
-    id: 'prop-1',
-    projectId: 'prj-1',
-    projectTitle: 'Modern E-commerce Website Design',
-    freelancer: {
-      name: 'Alex Rivera',
-      title: 'Senior UI/UX Designer',
-      avatar: 'https://i.pravatar.cc/150?img=11',
-      verified: true,
-      rating: 4.9,
-      reviews: 124,
-      location: 'New Delhi, India',
-      completedProjects: 85
-    },
-    status: 'New',
-    bidAmount: 75000,
-    deliveryTime: '3 Weeks',
-    submittedDate: 'Oct 25, 2023',
-    coverLetter: 'Hi there, I specialize in e-commerce UI/UX and have successfully redesigned 3 Shopify stores in the last quarter, increasing their conversion rates by an average of 22%. I have reviewed your requirements and I am confident in delivering a modern, glassmorphism aesthetic that perfectly suits your brand vision.',
-    skills: ['Figma', 'UI/UX', 'Prototyping', 'E-commerce']
-  },
-  {
-    id: 'prop-2',
-    projectId: 'prj-1',
-    projectTitle: 'Modern E-commerce Website Design',
-    freelancer: {
-      name: 'Sarah Chen',
-      title: 'Product Designer',
-      avatar: 'https://i.pravatar.cc/150?img=5',
-      verified: true,
-      rating: 4.7,
-      reviews: 42,
-      location: 'Mumbai, India',
-      completedProjects: 31
-    },
-    status: 'Shortlisted',
-    bidAmount: 90000,
-    deliveryTime: '4 Weeks',
-    submittedDate: 'Oct 23, 2023',
-    coverLetter: 'I would love to help you overhaul your Shopify store. My approach is user-centric, starting with wireframes and usability testing before moving to high-fidelity designs.',
-    skills: ['UI Design', 'Figma', 'Web Design']
-  },
-  {
-    id: 'prop-3',
-    projectId: 'prj-2',
-    projectTitle: 'SEO Content Writing for Tech Blog',
-    freelancer: {
-      name: 'Priya Sharma',
-      title: 'Technical Writer & SEO Expert',
-      avatar: 'https://i.pravatar.cc/150?img=44',
-      verified: true,
-      rating: 5.0,
-      reviews: 89,
-      location: 'Bangalore, India',
-      completedProjects: 120
-    },
-    status: 'Hired',
-    bidAmount: 14000,
-    deliveryTime: 'Ongoing',
-    submittedDate: 'Oct 20, 2023',
-    coverLetter: 'I am a specialized technical writer focusing on React and Node.js ecosystems. I can deliver 4 high-quality, long-form articles per month tailored to your specific audience.',
-    skills: ['SEO', 'Technical Writing', 'React', 'Content Strategy']
-  }
-];
 
 export default function ReceivedProposals() {
   const navigate = useNavigate();
-  const [proposals, setProposals] = useState(MOCK_PROPOSALS);
+  const [proposals, setProposals] = useState([]);
+  const [projectsList, setProjectsList] = useState([{ id: 'all', title: 'All Projects' }]);
   const [selectedProject, setSelectedProject] = useState('all');
   const [activeTab, setActiveTab] = useState('All Proposals');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState('Newest First');
-  const [menuOpen, setMenuOpen] = useState(null);
-  const [selectedProposals, setSelectedProposals] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const tabs = ['All Proposals', 'New', 'Under Review', 'Shortlisted', 'Hired', 'Rejected', 'Withdrawn'];
 
-  const handleUpdateStatus = (proposalId, newStatus) => {
-    setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: newStatus } : p));
-    setMenuOpen(null);
-    if (newStatus === 'Hired') {
-      alert('Freelancer hired successfully! Navigating to Hired Freelancers...');
-      navigate('/client/dashboard/hired');
+  useEffect(() => {
+    fetchProposalsAndProjects();
+  }, []);
+
+  const fetchProposalsAndProjects = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch client projects & proposals safely
+      const fetchedProjects = await apiFetch('/projects').catch(() => []);
+      if (Array.isArray(fetchedProjects) && fetchedProjects.length > 0) {
+        setProjectsList([
+          { id: 'all', title: 'All Projects' },
+          ...fetchedProjects.map(p => ({ id: p._id || p.id, title: p.title, budget: p.budget || p.maxBudget }))
+        ]);
+      }
+
+      const fetchedProposals = await apiFetch('/proposals/received').catch(() => []);
+      if (Array.isArray(fetchedProposals)) {
+        setProposals(fetchedProposals);
+      } else {
+        setProposals([]);
+      }
+    } catch (err) {
+      console.error('Error fetching received proposals:', err);
+      setProposals([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Filtering Logic
+  const handleUpdateStatus = async (proposalId, newStatus) => {
+    try {
+      await apiFetch(`/proposals/${proposalId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      }).catch(() => null);
+
+      setProposals(prev => prev.map(p => (p._id === proposalId || p.id === proposalId) ? { ...p, status: newStatus } : p));
+      
+      if (newStatus === 'Hired') {
+        alert('Freelancer hired successfully!');
+        navigate('/client/dashboard/hired');
+      }
+    } catch (err) {
+      console.error('Status update error:', err);
+    }
+  };
+
+  // Filter proposals dynamically
   const filteredProposals = proposals.filter(p => {
-    const matchesProject = selectedProject === 'all' || p.projectId === selectedProject;
-    const matchesTab = activeTab === 'All Proposals' || p.status === activeTab;
-    const matchesSearch = p.freelancer.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.projectTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesProject = selectedProject === 'all' || p.projectId === selectedProject || p.project_id === selectedProject;
+    
+    let matchesTab = true;
+    if (activeTab !== 'All Proposals') {
+      matchesTab = (p.status || 'New').toLowerCase() === activeTab.toLowerCase();
+    }
+
+    const freelancerName = p.freelancer?.name || p.freelancerName || '';
+    const projectTitle = p.projectTitle || p.project?.title || '';
+    const coverText = p.coverLetter || p.proposalText || '';
+
+    const matchesSearch = freelancerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          projectTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          coverText.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesProject && matchesTab && matchesSearch;
-  }).sort((a, b) => {
-    if (sortOption === 'Lowest Bid') return a.bidAmount - b.bidAmount;
-    if (sortOption === 'Highest Bid') return b.bidAmount - a.bidAmount;
-    if (sortOption === 'Best Rated') return b.freelancer.rating - a.freelancer.rating;
-    return 0; // default Newest First
   });
 
-  // Project Info for Selector
-  const currentProjectInfo = MOCK_PROJECTS.find(p => p.id === selectedProject);
-  
-  // KPI Stats based on selected project
-  const projectProposals = selectedProject === 'all' ? proposals : proposals.filter(p => p.projectId === selectedProject);
-  const stats = {
-    total: projectProposals.length,
-    new: projectProposals.filter(p => p.status === 'New').length,
-    shortlisted: projectProposals.filter(p => p.status === 'Shortlisted').length,
-    hired: projectProposals.filter(p => p.status === 'Hired').length,
-  };
-
-  const getStatusClass = (status) => {
-    return status.toLowerCase().replace(/\s+/g, '-');
-  };
-
-  const toggleProposalSelection = (id) => {
-    if (selectedProposals.includes(id)) {
-      setSelectedProposals(selectedProposals.filter(pid => pid !== id));
-    } else {
-      if (selectedProposals.length < 3) {
-        setSelectedProposals([...selectedProposals, id]);
-      } else {
-        alert('You can only compare up to 3 proposals at a time.');
-      }
-    }
-  };
-
-  const getEmptyStateContent = () => {
-    if (searchQuery) return { title: 'No Search Results', desc: 'No proposals match your search terms. Try adjusting your keywords.' };
-    if (activeTab !== 'All Proposals') return { title: `No ${activeTab} Proposals`, desc: `There are currently no proposals in the ${activeTab} stage.` };
-    return { title: 'No Proposals Received Yet', desc: 'Once freelancers submit proposals for your projects, they will appear here.' };
+  const getTabCount = (tabName) => {
+    if (tabName === 'All Proposals') return proposals.length;
+    return proposals.filter(p => (p.status || 'New').toLowerCase() === tabName.toLowerCase()).length;
   };
 
   return (
-    <div className="gigsphere-client-received-proposals">
-      
+    <div className="received-proposals-container">
       {/* Header */}
-      <div className="gcrp-header-wrapper">
+      <div className="rp-header">
         <div>
-          <div className="gcrp-breadcrumb">Dashboard / Received Proposals</div>
-          <h1 className="gcrp-title">Received Proposals</h1>
-          <p className="gcrp-subtitle">Review proposals, compare freelancers, and hire the right talent for your projects.</p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.85rem', background: '#e8f0fe', color: '#1a73e8', borderRadius: '30px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+            <Sparkles size={13} /> Project Talent Review
+          </div>
+          <h1 className="rp-title">Received Proposals</h1>
+          <p className="rp-subtitle">Review proposals, compare freelancer bids, and hire talent for your projects.</p>
         </div>
-        <button className="gcrp-export-btn">
-          <Download size={16} /> Export
-        </button>
       </div>
 
       {/* KPI Cards */}
-      <div className="gcrp-kpi-grid">
-        <div className="gcrp-kpi-card">
-          <div className="gcrp-kpi-header">
-            <h3 className="gcrp-kpi-label">Total Proposals</h3>
-            <div className="gcrp-kpi-icon" style={{ background: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary, #2563eb)' }}>
-              <FileText size={20} />
-            </div>
+      <div className="rp-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Total Proposals</span>
+            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginTop: '4px' }}>{proposals.length}</div>
           </div>
-          <p className="gcrp-kpi-value">{stats.total}</p>
+          <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#e8f0fe', color: '#1a73e8', display: 'flex', alignItems: 'center', justify: 'center' }}>
+            <FileText size={20} />
+          </div>
         </div>
-        <div className="gcrp-kpi-card">
-          <div className="gcrp-kpi-header">
-            <h3 className="gcrp-kpi-label">New Proposals</h3>
-            <div className="gcrp-kpi-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#d97706' }}>
-              <CheckCircle size={20} />
-            </div>
+
+        <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>New Bids</span>
+            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginTop: '4px' }}>{getTabCount('New')}</div>
           </div>
-          <p className="gcrp-kpi-value">{stats.new}</p>
+          <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justify: 'center' }}>
+            <Clock size={20} />
+          </div>
         </div>
-        <div className="gcrp-kpi-card">
-          <div className="gcrp-kpi-header">
-            <h3 className="gcrp-kpi-label">Shortlisted</h3>
-            <div className="gcrp-kpi-icon" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
-              <Star size={20} />
-            </div>
+
+        <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Shortlisted</span>
+            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginTop: '4px' }}>{getTabCount('Shortlisted')}</div>
           </div>
-          <p className="gcrp-kpi-value">{stats.shortlisted}</p>
+          <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#f3e8fd', color: '#a142f4', display: 'flex', alignItems: 'center', justify: 'center' }}>
+            <Star size={20} />
+          </div>
         </div>
-        <div className="gcrp-kpi-card">
-          <div className="gcrp-kpi-header">
-            <h3 className="gcrp-kpi-label">Hired</h3>
-            <div className="gcrp-kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success, #10b981)' }}>
-              <Briefcase size={20} />
-            </div>
+
+        <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Hired</span>
+            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', marginTop: '4px' }}>{getTabCount('Hired')}</div>
           </div>
-          <p className="gcrp-kpi-value">{stats.hired}</p>
+          <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#dcfce7', color: '#10b981', display: 'flex', alignItems: 'center', justify: 'center' }}>
+            <CheckCircle size={20} />
+          </div>
         </div>
       </div>
 
-      {/* Project Selector */}
-      <div className="gcrp-project-selector-container">
-        <span className="gcrp-selector-label">Viewing Proposals For:</span>
-        <select 
-          className="gcrp-selector-select"
-          value={selectedProject}
-          onChange={(e) => setSelectedProject(e.target.value)}
-        >
-          {MOCK_PROJECTS.map(p => (
-            <option key={p.id} value={p.id}>{p.title}</option>
-          ))}
-        </select>
-        
-        {selectedProject !== 'all' && currentProjectInfo && (
-          <div className="gcrp-project-meta">
-            <div className="gcrp-meta-item">
-              Status: <strong>{currentProjectInfo.status}</strong>
-            </div>
-            <div className="gcrp-meta-item">
-              Budget: <strong>{formatINR(currentProjectInfo.budget)}</strong>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div className="gcrp-tabs-container">
-        {tabs.map(tab => {
-          const count = tab === 'All Proposals' ? stats.total : projectProposals.filter(p => p.status === tab).length;
-          return (
-            <button 
-              key={tab}
-              className={`gcrp-tab-btn ${activeTab === tab ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab)}
+      {/* Project Selector & Search Filter Bar */}
+      <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Viewing Proposals For:</label>
+            <select 
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              style={{ padding: '8px 16px', borderRadius: '30px', border: '1px solid #cbd5e1', fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', cursor: 'pointer' }}
             >
-              {tab} <span className="gcrp-tab-badge">{count}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Toolbar */}
-      <div className="gcrp-toolbar">
-        <div className="gcrp-search-box">
-          <Search className="gcrp-search-icon" size={18} />
-          <input 
-            type="text" 
-            className="gcrp-search-input" 
-            placeholder="Search by freelancer name, skill, or proposal..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        
-        <div className="gcrp-toolbar-actions">
-          {selectedProposals.length > 0 && (
-            <button className="gcrp-btn-primary">
-              Compare Selected ({selectedProposals.length})
-            </button>
-          )}
-          <button className="gcrp-btn-outline">
-            <Filter size={16} /> Filters
-          </button>
-          <select 
-            className="gcrp-sort-select"
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value)}
-          >
-            <option>Newest First</option>
-            <option>Oldest First</option>
-            <option>Lowest Bid</option>
-            <option>Highest Bid</option>
-            <option>Best Rated</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Proposals List */}
-      <div className="gcrp-proposals-list">
-        {filteredProposals.length > 0 ? (
-          filteredProposals.map(proposal => (
-            <div key={proposal.id} className="gcrp-proposal-card">
-              <div className="gcrp-card-top">
-                
-                {/* Freelancer Column */}
-                <div className="gcrp-freelancer-col">
-                  <div className="gcrp-freelancer-info">
-                    <div className="gcrp-avatar-wrapper">
-                      <img src={proposal.freelancer.avatar} alt="Avatar" className="gcrp-avatar" />
-                      {proposal.freelancer.verified && (
-                        <div className="gcrp-verified-badge" title="Verified Freelancer">
-                          <ShieldCheck size={12} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="gcrp-freelancer-details">
-                      <h3>{proposal.freelancer.name}</h3>
-                      <p className="gcrp-freelancer-title">{proposal.freelancer.title}</p>
-                      <div className="gcrp-freelancer-meta">
-                        <div className="gcrp-meta-icon rating">
-                          <Star size={14} fill="currentColor" /> {proposal.freelancer.rating}
-                        </div>
-                        <div className="gcrp-meta-icon">
-                          <MapPin size={14} /> {proposal.freelancer.location}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="gcrp-freelancer-stats">
-                    <div className="gcrp-stat-box">
-                      <span>Projects</span>
-                      <span>{proposal.freelancer.completedProjects}</span>
-                    </div>
-                    <div className="gcrp-stat-box">
-                      <span>Reviews</span>
-                      <span>{proposal.freelancer.reviews}</span>
-                    </div>
-                  </div>
-                  
-                  <label style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', marginTop: 'auto'}}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedProposals.includes(proposal.id)}
-                      onChange={() => toggleProposalSelection(proposal.id)}
-                      style={{width: '16px', height: '16px', accentColor: 'var(--primary)'}}
-                    />
-                    Select to Compare
-                  </label>
-                </div>
-                
-                {/* Proposal Content */}
-                <div className="gcrp-proposal-content">
-                  <div className="gcrp-proposal-header">
-                    <div className="gcrp-proposal-title-area">
-                      <h4>{proposal.projectTitle}</h4>
-                      <div className="gcrp-proposal-subtitle">
-                        <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                          <Calendar size={14} /> Submitted: {proposal.submittedDate}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <span className={`gcrp-status-badge gcrp-status-${getStatusClass(proposal.status)}`}>
-                        {proposal.status}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <p className="gcrp-cover-letter">
-                    "{proposal.coverLetter}"
-                  </p>
-                  
-                  <div className="gcrp-skills-list">
-                    {proposal.skills.map(skill => (
-                      <span key={skill} className="gcrp-skill-chip">{skill}</span>
-                    ))}
-                  </div>
-                </div>
-                
-              </div>
-              
-              {/* Card Bottom / Actions */}
-              <div className="gcrp-card-bottom">
-                <div className="gcrp-bid-details">
-                  <div className="gcrp-bid-item amount">
-                    <span>Bid Amount</span>
-                    <span>{formatINR(proposal.bidAmount)}</span>
-                  </div>
-                  <div className="gcrp-bid-item">
-                    <span>Delivery Time</span>
-                    <span>{proposal.deliveryTime}</span>
-                  </div>
-                </div>
-                
-                <div className="gcrp-actions">
-                  <button className="gcrp-btn-primary">View Proposal</button>
-                  
-                  <div className="gcrp-menu-wrapper">
-                    <button 
-                      className="gcrp-btn-icon"
-                      onClick={() => setMenuOpen(menuOpen === proposal.id ? null : proposal.id)}
-                    >
-                      <MoreVertical size={18} />
-                    </button>
-                    
-                    {menuOpen === proposal.id && (
-                      <div className="gcrp-dropdown-menu">
-                         <button className="gcrp-dropdown-item" onClick={() => navigate('/freelancers')}>
-                          <User size={16} /> View Profile
-                        </button>
-                        
-                        {(proposal.status === 'New' || proposal.status === 'Under Review') && (
-                          <button className="gcrp-dropdown-item" onClick={() => handleUpdateStatus(proposal.id, 'Shortlisted')}>
-                            <Star size={16} /> Shortlist
-                          </button>
-                        )}
-                        
-                        {proposal.status === 'Shortlisted' && (
-                          <button className="gcrp-dropdown-item" onClick={() => handleUpdateStatus(proposal.id, 'Under Review')}>
-                            <Star size={16} fill="currentColor" style={{color: '#8b5cf6'}} /> Remove from Shortlist
-                          </button>
-                        )}
-                        
-                        {(proposal.status === 'New' || proposal.status === 'Shortlisted' || proposal.status === 'Under Review') && (
-                          <button className="gcrp-dropdown-item" onClick={() => navigate('/client/dashboard/chat')}>
-                            <MessageSquare size={16} /> Message Freelancer
-                          </button>
-                        )}
-                        
-                        {(proposal.status === 'New' || proposal.status === 'Shortlisted') && (
-                          <button className="gcrp-dropdown-item" style={{color: 'var(--success)'}} onClick={() => handleUpdateStatus(proposal.id, 'Hired')}>
-                            <Check size={16} /> Hire Freelancer
-                          </button>
-                        )}
-
-                        {proposal.status === 'Hired' && (
-                          <button className="gcrp-dropdown-item" onClick={() => navigate('/client/dashboard/chat')}>
-                            <MessageSquare size={16} /> Messages
-                          </button>
-                        )}
-                        
-                        {(proposal.status === 'New' || proposal.status === 'Shortlisted') && (
-                          <button className="gcrp-dropdown-item danger" onClick={() => handleUpdateStatus(proposal.id, 'Rejected')}>
-                            <X size={16} /> Reject Proposal
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="gcrp-empty-state">
-            <div className="gcrp-empty-icon">
-              <FileText size={32} />
-            </div>
-            <h3 className="gcrp-empty-title">{getEmptyStateContent().title}</h3>
-            <p className="gcrp-empty-desc">{getEmptyStateContent().desc}</p>
-            {searchQuery && (
-              <button className="gcrp-btn-primary outline" onClick={() => setSearchQuery('')}>
-                Clear Search
-              </button>
-            )}
+              {projectsList.map(p => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
           </div>
-        )}
+
+          <div style={{ position: 'relative', width: '300px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input 
+              type="text" 
+              placeholder="Search by freelancer or proposal..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px 8px 36px', border: '1px solid #cbd5e1', borderRadius: '30px', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+        </div>
+
+        {/* Tab Pills */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+          {tabs.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{ padding: '6px 16px', borderRadius: '30px', border: activeTab === tab ? '1px solid #1a73e8' : '1px solid #cbd5e1', background: activeTab === tab ? '#e8f0fe' : '#f8fafc', color: activeTab === tab ? '#1a73e8' : '#475569', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.15s ease' }}
+            >
+              {tab} ({getTabCount(tab)})
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* Proposals List / Clean Zero State */}
+      {filteredProposals.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '50px 20px', background: '#ffffff', border: '1px dashed #cbd5e1', borderRadius: '16px', color: '#64748b' }}>
+          <FolderPlus size={44} color="#1a73e8" style={{ marginBottom: '12px' }} />
+          <h3 style={{ margin: '0 0 6px', color: '#0f172a', fontWeight: 800, fontSize: '1.15rem' }}>No Proposals Received Yet</h3>
+          <p style={{ margin: '0 0 20px', fontSize: '0.875rem', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+            When freelancers browse your open project requirements and submit proposals, they will appear here for your review.
+          </p>
+          <button 
+            onClick={() => navigate('/client/dashboard/post-project')}
+            style={{ padding: '0.65rem 1.4rem', borderRadius: '40px', background: '#0f172a', color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}
+          >
+            Post a New Project Requirement
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {filteredProposals.map(prop => (
+            <div key={prop._id || prop.id} style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <img src={prop.freelancer?.avatar || 'https://i.pravatar.cc/150?img=12'} alt="Freelancer" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <div>
+                    <h4 style={{ margin: '0 0 2px', fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>{prop.freelancer?.name || 'Freelancer'}</h4>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{prop.freelancer?.title || 'Professional'}</span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#10b981' }}>{formatINR(prop.bidAmount || prop.budget)}</div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Bid Amount</span>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '0.875rem', color: '#334155', margin: 0, lineHeight: 1.5 }}>
+                {prop.coverLetter || prop.proposalText}
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    onClick={() => handleUpdateStatus(prop._id || prop.id, 'Hired')}
+                    style={{ padding: '6px 16px', borderRadius: '30px', background: '#10b981', color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                  >
+                    Hire Freelancer
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateStatus(prop._id || prop.id, 'Shortlisted')}
+                    style={{ padding: '6px 16px', borderRadius: '30px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                  >
+                    Shortlist
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => navigate('/client/dashboard/chat')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 16px', borderRadius: '30px', background: '#e8f0fe', color: '#1a73e8', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  <MessageSquare size={14} /> Send Message
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

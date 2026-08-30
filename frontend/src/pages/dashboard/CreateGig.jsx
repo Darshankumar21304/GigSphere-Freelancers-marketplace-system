@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { uploadFileToCloudinary } from '../../utils/fileUpload';
+import { apiFetch } from '../../utils/api';
 import './CreateProject.css';
 
 const steps = [
@@ -109,7 +110,10 @@ export default function CreateGig() {
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        return formData.title.trim().length > 0 && formData.category && formData.description.trim().length > 0;
+        const isCategoryValid = formData.category !== 'Other' 
+          ? Boolean(formData.category) 
+          : Boolean(formData.customCategory && formData.customCategory.trim());
+        return formData.title.trim().length > 0 && isCategoryValid && formData.description.trim().length > 0;
       case 2:
         return formData.skills.length > 0 || skillInput.trim().length > 0;
       case 3:
@@ -153,25 +157,26 @@ export default function CreateGig() {
         const payload = {
           title: formData.title,
           description: formData.description,
-          category: formData.category,
+          category: formData.category === 'Other' ? (formData.customCategory || 'Other') : formData.category,
           skills: formData.skills,
           experienceLevel: formData.experienceLevel,
           budgetType: formData.budgetType,
           budget: formData.budgetType === 'Fixed Price' ? formData.maxBudget : formData.maxRate,
-          duration: formData.duration
+          duration: formData.duration,
+          deadline: formData.deadline || formData.duration || '',
+          attachments: files.map(f => f.url || f.name)
         };
         
-        // In a real app we'd pass headers with auth token. 
-        // For now, we mock client_id in backend if auth is disabled, or rely on it.
-        // Assuming the backend handles lack of token gracefully for demo purposes or we pass a dummy user.
-        // We'll post it directly.
-        await axios.post('http://localhost:5001/api/projects', payload);
+        await apiFetch('/projects', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
         
         setIsSubmitting(false);
         setShowSuccess(true);
       } catch (error) {
         console.error('Error creating project:', error);
-        alert('Failed to create project. Check server console.');
+        alert(`Failed to create project: ${error.message || 'Server error'}`);
         setIsSubmitting(false);
       }
     }
@@ -310,9 +315,31 @@ export default function CreateGig() {
                         <option value="Web Development">Web Development</option>
                         <option value="Mobile Apps">Mobile Apps</option>
                         <option value="Design & Creative">Design & Creative</option>
-                        <option value="Writing">Writing</option>
+                        <option value="Writing & Translation">Writing & Translation</option>
+                        <option value="AI & Machine Learning">AI & Machine Learning</option>
+                        <option value="Data & Analytics">Data & Analytics</option>
+                        <option value="Video & Animation">Video & Animation</option>
+                        <option value="Digital Marketing">Digital Marketing</option>
+                        <option value="Other">Other (Specify custom category)</option>
                       </select>
                     </div>
+
+                    {formData.category === 'Other' && (
+                      <div className="gcpj-field-group">
+                        <label className="gcpj-label">Specify Custom Category <span className="gcpj-required">*</span></label>
+                        <input 
+                          type="text" 
+                          name="customCategory" 
+                          value={formData.customCategory || ''} 
+                          onChange={handleChange}
+                          placeholder="e.g. Blockchain Development, Game Design, Cloud DevOps..."
+                          className="gcpj-input"
+                        />
+                        <div className="gcpj-helper-row">
+                          <span className="gcpj-helper-text">Mention your exact project category so freelancers can find your post.</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="gcpj-field-group">
                       <label className="gcpj-label">Project Description <span className="gcpj-required">*</span></label>
@@ -702,17 +729,6 @@ export default function CreateGig() {
 
                 <div className="gcpj-preview-section" style={{borderBottom: 'none'}}>
                   <div className="gcpj-preview-label">Timeline</div>
-                  <div className="gcpj-preview-value">{formData.deadline || <span className="gcpj-preview-empty">Timeline not set.</span>}</div>
-                </div>
-
-                <div className="gcpj-completion-row">
-                  <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px'}}>
-                    <span>Completion</span>
-                    <span>{calculateCompletion()}%</span>
-                  </div>
-                  <div className="gcpj-completion-track">
-                    <div className="gcpj-completion-fill" style={{width: `${calculateCompletion()}%`}}></div>
-                  </div>
                 </div>
               </div>
 

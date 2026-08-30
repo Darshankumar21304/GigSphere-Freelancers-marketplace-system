@@ -96,6 +96,9 @@ export default function Settings() {
           }
           setFormData(newFormData);
           setInitialData(newFormData);
+          if (data.user.avatar || data.user.profilePhoto) {
+            setAvatarUrl(data.user.avatar || data.user.profilePhoto);
+          }
         }
       } catch (error) {
         showToast('error', error.message || 'Failed to load settings');
@@ -124,6 +127,8 @@ export default function Settings() {
         phone: formData.phone,
         location: formData.location,
         language: formData.language,
+        avatar: avatarUrl,
+        profilePhoto: avatarUrl,
         preferences: {
           notifications: {
             email: formData.notifEmail,
@@ -155,10 +160,14 @@ export default function Settings() {
         hourlyRate: formData.hourlyRate
       };
 
-      await apiFetch('/users/settings', {
+      const response = await apiFetch('/users/settings', {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
+
+      if (response && response.user) {
+        saveUserProfile(response.user);
+      }
 
       setInitialData({ ...formData });
       showToast('success', 'Settings saved successfully');

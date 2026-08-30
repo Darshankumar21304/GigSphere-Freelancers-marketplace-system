@@ -16,4 +16,9 @@ router.post('/', projectController.createProject);
 // Submit a proposal to a project
 router.post('/:projectId/proposals', projectController.submitProposal);
 
+// Update project details, status & Delete project
+router.put('/:id', projectController.updateProject);
+router.patch('/:id/status', projectController.updateProjectStatus);
+router.delete('/:id', projectController.deleteProject);
+
 module.exports = router;

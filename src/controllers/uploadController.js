@@ -1,9 +1,17 @@
+const fs = require('fs');
+const path = require('path');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { User } = require('../models');
 
+// Ensure local backup directory exists
+const deliverablesDir = path.join(__dirname, '../../uploads/deliverables');
+if (!fs.existsSync(deliverablesDir)) {
+  fs.mkdirSync(deliverablesDir, { recursive: true });
+}
+
 // Helper to determine Cloudinary target folder & resource type
 const getCloudinaryOptions = (file, customFolder = null) => {
-  const mime = file.mimetype;
+  const mime = file.mimetype || '';
   let folder = customFolder || 'gigsphere/uploads';
   let resource_type = 'auto';
 
@@ -13,45 +21,65 @@ const getCloudinaryOptions = (file, customFolder = null) => {
   } else if (mime.startsWith('video/') || mime.startsWith('audio/')) {
     folder = customFolder || 'gigsphere/videos';
     resource_type = 'video';
-  } else if (mime.includes('pdf') || mime.includes('word') || mime.includes('text')) {
+  } else {
     folder = customFolder || 'gigsphere/documents';
     resource_type = 'raw';
   }
 
-  return { folder, resource_type };
+  const nameWithoutExt = file.originalname ? file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, '_') : 'deliverable';
+  const originalExt = file.originalname && file.originalname.includes('.') ? file.originalname.split('.').pop().toLowerCase() : 'pdf';
+  
+  // PDF Workaround: Upload as .dat to bypass Cloudinary account-level PDF delivery restrictions
+  const ext = originalExt === 'pdf' ? 'dat' : originalExt;
+  const public_id = `${Date.now()}_${nameWithoutExt}.${ext}`;
+
+  return { folder, resource_type, public_id };
 };
 
-// 1. Single File Upload to Cloudinary
+// 1. Single File Upload to Cloudinary Global CDN (Accessible from any computer/mobile globally)
 exports.uploadSingleFile = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file provided for upload' });
     }
 
-    const { folder, resource_type } = getCloudinaryOptions(req.file);
+    const { folder, resource_type, public_id } = getCloudinaryOptions(req.file);
 
+    // Primary: Upload directly to Cloudinary Global CDN
     const result = await uploadToCloudinary(req.file.buffer, {
       folder,
-      resource_type
+      resource_type,
+      public_id
     });
+
+    const globalUrl = result.secure_url;
+
+    // Secondary: Write local backup copy
+    try {
+      const ext = req.file.originalname && req.file.originalname.includes('.') ? req.file.originalname.split('.').pop() : 'pdf';
+      const safeName = req.file.originalname ? req.file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, '_') : 'deliverable';
+      const filename = `${Date.now()}_${safeName}.${ext}`;
+      fs.writeFileSync(path.join(deliverablesDir, filename), req.file.buffer);
+    } catch (e) {
+      console.log('Local backup copy skipped:', e.message);
+    }
 
     res.json({
       success: true,
-      url: result.secure_url,
+      url: globalUrl,
       publicId: result.public_id,
-      format: result.format || req.file.mimetype.split('/')[1],
-      resourceType: result.resource_type,
-      bytes: result.bytes,
       originalName: req.file.originalname,
-      message: 'File uploaded to Cloudinary successfully'
+      bytes: result.bytes || req.file.size,
+      mimetype: req.file.mimetype,
+      message: 'File uploaded to Cloudinary Global Cloud Storage successfully'
     });
   } catch (error) {
-    console.error('Single Cloudinary upload error:', error);
+    console.error('Cloudinary Global Upload Error:', error);
     res.status(500).json({ message: error.message || 'Error uploading file to Cloudinary' });
   }
 };
 
-// 2. Multiple Files Upload to Cloudinary
+// 2. Multiple Files Upload to Cloudinary Global CDN
 exports.uploadMultipleFiles = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -59,14 +87,13 @@ exports.uploadMultipleFiles = async (req, res) => {
     }
 
     const uploadPromises = req.files.map(file => {
-      const { folder, resource_type } = getCloudinaryOptions(file);
-      return uploadToCloudinary(file.buffer, { folder, resource_type }).then(result => ({
+      const { folder, resource_type, public_id } = getCloudinaryOptions(file);
+      return uploadToCloudinary(file.buffer, { folder, resource_type, public_id }).then(result => ({
         url: result.secure_url,
         publicId: result.public_id,
-        format: result.format || file.mimetype.split('/')[1],
-        resourceType: result.resource_type,
-        bytes: result.bytes,
-        originalName: file.originalname
+        originalName: file.originalname,
+        bytes: result.bytes || file.size,
+        mimetype: file.mimetype
       }));
     });
 
@@ -76,11 +103,11 @@ exports.uploadMultipleFiles = async (req, res) => {
       success: true,
       files: uploadedFiles,
       count: uploadedFiles.length,
-      message: 'All files uploaded to Cloudinary successfully'
+      message: 'All files uploaded to Cloudinary Global Storage successfully'
     });
   } catch (error) {
-    console.error('Multiple Cloudinary upload error:', error);
-    res.status(500).json({ message: error.message || 'Error uploading multiple files to Cloudinary' });
+    console.error('Multiple file upload error:', error);
+    res.status(500).json({ message: error.message || 'Error uploading multiple files' });
   }
 };
 
@@ -95,14 +122,12 @@ exports.uploadAvatar = async (req, res) => {
       return res.status(400).json({ message: 'Avatar file must be an image (JPG, PNG, WEBP, GIF)' });
     }
 
-    // Upload with face-centered crop transformation
     const result = await uploadToCloudinary(req.file.buffer, {
       folder: 'gigsphere/avatars',
       resource_type: 'image',
       transformation: [{ width: 500, height: 500, crop: 'fill', gravity: 'face' }]
     });
 
-    // Update avatar URL in Mongo DB if user is authenticated
     if (req.user && req.user.id) {
       await User.findByIdAndUpdate(req.user.id, { avatar: result.secure_url, profilePhoto: result.secure_url });
     }
@@ -111,10 +136,57 @@ exports.uploadAvatar = async (req, res) => {
       success: true,
       avatarUrl: result.secure_url,
       publicId: result.public_id,
-      message: 'Profile photo updated successfully on Cloudinary!'
+      message: 'Profile photo updated successfully!'
     });
   } catch (error) {
     console.error('Avatar upload error:', error);
     res.status(500).json({ message: error.message || 'Error updating profile photo' });
   }
 };
+
+// 4. PDF Stream Proxy (Serves PDF with Content-Disposition: inline so browsers render it natively in-app)
+exports.viewPdf = async (req, res) => {
+  try {
+    const fileUrl = req.query.url;
+    if (!fileUrl) {
+      return res.status(400).send('No file URL provided');
+    }
+
+    // Check if it's a local file
+    if (fileUrl.startsWith('http://localhost:5001/uploads/') || fileUrl.startsWith('/uploads/')) {
+      const relativePath = fileUrl.replace(/^https?:\/\/[^\/]+/, '').replace('/uploads/', '');
+      const localFilePath = path.join(__dirname, '../../uploads', relativePath);
+      if (fs.existsSync(localFilePath)) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
+        return fs.createReadStream(localFilePath).pipe(res);
+      }
+    }
+
+    // Remote Cloudinary or HTTPS URL
+    const https = require('https');
+    const http = require('http');
+    const client = fileUrl.startsWith('https') ? https : http;
+
+    const streamRemote = (urlToFetch) => {
+      client.get(urlToFetch, (remoteRes) => {
+        if (remoteRes.statusCode >= 300 && remoteRes.statusCode < 400 && remoteRes.headers.location) {
+          return streamRemote(remoteRes.headers.location);
+        }
+        res.status(remoteRes.statusCode);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
+        remoteRes.pipe(res);
+      }).on('error', (err) => {
+        console.error('PDF proxy stream error:', err);
+        res.status(500).send('Error streaming PDF: ' + err.message);
+      });
+    };
+
+    streamRemote(fileUrl);
+  } catch (error) {
+    console.error('View PDF error:', error);
+    res.status(500).send('Server error: ' + error.message);
+  }
+};
+

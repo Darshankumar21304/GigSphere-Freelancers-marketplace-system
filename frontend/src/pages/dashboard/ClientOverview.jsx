@@ -1,24 +1,86 @@
-import React from 'react';
-import { CreditCard, Clock, Briefcase, CheckCircle, ShieldCheck, Plus, Sparkles, TrendingUp, FolderPlus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Clock, Briefcase, CheckCircle, ShieldCheck, Plus, Sparkles, TrendingUp, FolderPlus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
 import { getUserProfile } from '../../utils/authUtils';
+import { apiFetch } from '../../utils/api';
 import './Dashboard.css';
 import './ClientDashboard.css';
 
 export default function ClientOverview() {
+  const [profileData, setProfileData] = useState({
+    walletBalance: 0,
+    escrowBalance: 0,
+    activeProjectsCount: 0,
+    completedProjectsCount: 0,
+    payments: [],
+    chartData: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
   const userProfile = getUserProfile();
   const userName = userProfile?.name || 'Valued Client';
 
-  // Real user data only (0 hardcoded bogus payments or fake projects)
-  const userPayments = userProfile?.payments || [];
-  const chartData = userProfile?.chartData || [];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        // 1. Fetch wallet details (balances & transactions)
+        const wallet = await apiFetch('/wallet').catch(() => ({ walletBalance: 0, escrowBalance: 0, transactions: [] }));
+        
+        // 2. Fetch projects count
+        const projects = await apiFetch('/projects').catch(() => []);
+        const activeCount = projects.filter(p => p.status === 'Open' || p.status === 'In Progress').length;
+        const completedCount = projects.filter(p => p.status === 'Completed').length;
+
+        // 3. Generate chart data from last 6 months transaction history
+        const monthlyData = {};
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        const currentMonthIdx = new Date().getMonth();
+        for (let i = 5; i >= 0; i--) {
+          const mIdx = (currentMonthIdx - i + 12) % 12;
+          monthlyData[months[mIdx]] = { name: months[mIdx], projectSpending: 0, milestonePayments: 0 };
+        }
+
+        if (wallet.transactions && Array.isArray(wallet.transactions)) {
+          wallet.transactions.forEach(t => {
+            const date = new Date(t.createdAt);
+            const mName = months[date.getMonth()];
+            if (monthlyData[mName]) {
+              const amount = Math.abs(t.amount || 0);
+              if (t.type === 'deposit') {
+                monthlyData[mName].projectSpending += amount;
+              } else if (t.type === 'escrow_fund' || t.type === 'escrow_release') {
+                monthlyData[mName].milestonePayments += amount;
+              }
+            }
+          });
+        }
+
+        setProfileData({
+          walletBalance: wallet.walletBalance || 0,
+          escrowBalance: wallet.escrowBalance || 0,
+          activeProjectsCount: activeCount,
+          completedProjectsCount: completedCount,
+          payments: wallet.transactions || [],
+          chartData: Object.values(monthlyData)
+        });
+      } catch (err) {
+        console.error('Error fetching dashboard statistics:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const kpiCards = [
     {
       title: 'Total Wallet Balance',
-      value: formatINR(userProfile?.walletBalance || 0),
+      value: formatINR(profileData.walletBalance),
       desc: 'Available for instant escrow funding.',
       icon: CreditCard,
       color: '#1a73e8',
@@ -26,7 +88,7 @@ export default function ClientOverview() {
     },
     {
       title: 'Escrow Vault Locked',
-      value: formatINR(userProfile?.escrowBalance || 0),
+      value: formatINR(profileData.escrowBalance),
       desc: 'Secured funds locked for active milestones.',
       icon: ShieldCheck,
       color: '#10b981',
@@ -34,7 +96,7 @@ export default function ClientOverview() {
     },
     {
       title: 'Active Projects',
-      value: String(userProfile?.activeProjectsCount || 0),
+      value: String(profileData.activeProjectsCount),
       desc: 'Projects currently accepting freelancer bids.',
       icon: Briefcase,
       color: '#a142f4',
@@ -42,7 +104,7 @@ export default function ClientOverview() {
     },
     {
       title: 'Completed Hirings',
-      value: String(userProfile?.completedProjectsCount || 0),
+      value: String(profileData.completedProjectsCount),
       desc: 'Successfully delivered client projects.',
       icon: CheckCircle,
       color: '#f59e0b',
@@ -110,7 +172,7 @@ export default function ClientOverview() {
           </div>
 
           <div style={{ width: '100%', height: '280px', minWidth: 0, minHeight: '280px' }}>
-            {chartData.length === 0 ? (
+            {profileData.chartData.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc', color: '#64748b' }}>
                 <TrendingUp size={36} color="#1a73e8" style={{ marginBottom: '8px' }} />
                 <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontWeight: 800 }}>No Analytics Data Recorded</h4>
@@ -118,7 +180,7 @@ export default function ClientOverview() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
-                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={profileData.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSpending" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#1a73e8" stopOpacity={0.7}/>
@@ -162,7 +224,7 @@ export default function ClientOverview() {
           </div>
 
           <div className="payments-table-container">
-            {userPayments.length === 0 ? (
+            {profileData.payments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc' }}>
                 <FolderPlus size={38} color="#1a73e8" style={{ marginBottom: '10px' }} />
                 <h4 style={{ margin: '0 0 6px', color: '#0f172a', fontWeight: 800, fontSize: '1.05rem' }}>No Transactions Yet</h4>
@@ -175,35 +237,59 @@ export default function ClientOverview() {
               <table className="payments-table">
                 <thead>
                   <tr>
-                    <th>Freelancer Name</th>
-                    <th>Project Name</th>
-                    <th>Milestone Name</th>
-                    <th>Payment Amount</th>
-                    <th>Payment Date</th>
-                    <th>Payment Status</th>
+                    <th>Transaction Details</th>
+                    <th>Type</th>
+                    <th>Reference / Method</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {userPayments.map((pay) => (
-                    <tr key={pay.id}>
+                  {profileData.payments.map((pay) => (
+                    <tr key={pay._id || pay.id}>
                       <td>
-                        <div className="freelancer-cell">
-                          <img src={pay.avatar} alt={pay.freelancer} className="freelancer-avatar-small" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            borderRadius: '50%', 
+                            background: pay.type === 'deposit' ? '#e2fbe8' : pay.type === 'withdrawal' ? '#ffebe8' : '#e8f0fe',
+                            color: pay.type === 'deposit' ? '#15803d' : pay.type === 'withdrawal' ? '#d92727' : '#1a73e8',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center' 
+                          }}>
+                            {pay.type === 'deposit' ? <ArrowDownLeft size={16} /> : pay.type === 'withdrawal' ? <ArrowUpRight size={16} /> : <Briefcase size={16} />}
+                          </div>
                           <div>
-                            <div className="freelancer-info-name">{pay.freelancer}</div>
-                            <div className="freelancer-info-role">{pay.role}</div>
+                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.85rem' }}>{pay.title}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Ref: {pay.razorpayPaymentId || pay.razorpayOrderId || pay._id || 'N/A'}</div>
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontWeight: '600', color: '#0f172a' }}>{pay.project}</td>
-                      <td style={{ color: '#64748b' }}>{pay.milestone}</td>
-                      <td className="payment-amount">{formatINR(pay.amount)}</td>
-                      <td style={{ color: '#64748b' }}>{pay.date}</td>
+                      <td style={{ fontWeight: '700', color: '#475569', fontSize: '0.825rem', textTransform: 'capitalize' }}>{pay.type || 'payment'}</td>
+                      <td style={{ color: '#64748b', fontSize: '0.825rem' }}>{pay.paymentMethod || 'Wallet Transfer'}</td>
+                      <td style={{ 
+                        fontWeight: '800', 
+                        fontSize: '0.85rem',
+                        color: pay.amount > 0 ? '#10b981' : '#f87171' 
+                      }}>
+                        {pay.amount > 0 ? '+' : ''}{formatINR(pay.amount)}
+                      </td>
+                      <td style={{ color: '#64748b', fontSize: '0.825rem' }}>
+                        {new Date(pay.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
                       <td>
-                        <span className={`payment-status-badge ${pay.statusClass}`}>
-                          {pay.status === 'Released' && <CheckCircle size={14} />}
-                          {pay.status === 'Pending Approval' && <Clock size={14} />}
-                          {pay.status === 'Escrow Funded' && <ShieldCheck size={14} />}
+                        <span style={{ 
+                          fontSize: '10px', 
+                          fontWeight: 800, 
+                          padding: '3px 8px', 
+                          borderRadius: '12px',
+                          textTransform: 'uppercase',
+                          background: pay.status === 'completed' ? '#dcfce7' : pay.status === 'pending' ? '#fef3c7' : '#f1f5f9',
+                          color: pay.status === 'completed' ? '#15803d' : pay.status === 'pending' ? '#b45309' : '#64748b'
+                        }}>
                           {pay.status}
                         </span>
                       </td>

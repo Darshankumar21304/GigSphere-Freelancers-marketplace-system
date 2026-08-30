@@ -19,6 +19,14 @@ const uploadToCloudinary = (buffer, options = {}) => {
       resource_type: options.resource_type || 'auto'
     };
 
+    if (options.public_id) {
+      defaultOptions.public_id = options.public_id;
+    }
+
+    if (options.format) {
+      defaultOptions.format = options.format;
+    }
+
     if (options.transformation) {
       defaultOptions.transformation = options.transformation;
     }

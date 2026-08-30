@@ -23,12 +23,10 @@ const getProjectById = async (req, res) => {
 
 const createProject = async (req, res) => {
   try {
-    const { title, description, budget, budgetType, skills, category, duration, experienceLevel } = req.body;
+    const { title, description, budget, budgetType, skills, category, duration, deadline, experienceLevel, attachments } = req.body;
     
-    // In a real app, client_id comes from req.user._id (from auth middleware)
-    // For demo purposes, we will find an existing client or create a dummy one if none provided
     const { User } = require('../models');
-    let client_id = req.user ? req.user.id : null;
+    let client_id = req.user ? (req.user.id || req.user._id) : null;
     
     if (!client_id) {
        let dummyClient = await User.findOne({ role: 'client' });
@@ -45,20 +43,23 @@ const createProject = async (req, res) => {
 
     const newProject = await Project.create({
       client_id,
-      title,
-      description,
-      budget,
-      budgetType,
-      skills,
-      category,
-      duration,
-      experienceLevel
+      title: title || 'Untitled Project',
+      description: description || 'No description provided.',
+      budget: String(budget || '0'),
+      budgetType: budgetType || 'Fixed Price',
+      skills: Array.isArray(skills) ? skills : [],
+      category: category || 'General',
+      duration: duration || '1 to 3 months',
+      deadline: deadline || duration || '',
+      experienceLevel: experienceLevel || 'Intermediate',
+      attachments: Array.isArray(attachments) ? attachments : []
     });
 
+    console.log('✅ Project Created Successfully:', newProject._id);
     res.status(201).json(newProject);
   } catch (error) {
-    console.error('Error creating project:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Error creating project:', error);
+    res.status(500).json({ message: error.message || 'Server error creating project' });
   }
 };
 
@@ -89,9 +90,49 @@ const submitProposal = async (req, res) => {
   }
 };
 
+const updateProjectStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const project = await Project.findByIdAndUpdate(id, { status }, { new: true });
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    res.json({ message: 'Project status updated', project });
+  } catch (error) {
+    console.error('Error updating project status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const project = await Project.findByIdAndDelete(id);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    res.json({ message: 'Project deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const project = await Project.findByIdAndUpdate(id, req.body, { new: true });
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    res.json({ message: 'Project updated successfully', project });
+  } catch (error) {
+    console.error('Error updating project:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllProjects,
   getProjectById,
   createProject,
-  submitProposal
+  submitProposal,
+  updateProjectStatus,
+  deleteProject,
+  updateProject
 };
