@@ -4,6 +4,7 @@ import { MessageSquare, Search, User, Bell, LogOut, Menu, X, ChevronDown, Rocket
 import { getUserRole, isAuthenticated, logoutUser, getUserProfile } from '../utils/authUtils';
 import { apiFetch } from '../utils/api';
 import AuthModal from './AuthModal';
+import HowItWorksModal from './HowItWorksModal';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -46,6 +47,7 @@ const Navbar = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authTab, setAuthTab] = useState('login');
   const [authRole, setAuthRole] = useState('client');
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const openLoginModal = () => {
     setAuthTab('login');
@@ -122,11 +124,8 @@ const Navbar = () => {
             <Link to="/freelancers" className="antigravity-nav-link">
               Find Freelancers <ChevronDown size={14} className="chevron-icon" />
             </Link>
-            <a href="#how-it-works" className="antigravity-nav-link">
+            <a href="#how-it-works" className="antigravity-nav-link" onClick={(e) => { e.preventDefault(); setShowHowItWorks(true); }}>
               How It Works
-            </a>
-            <a href="#categories" className="antigravity-nav-link">
-              Categories <ChevronDown size={14} className="chevron-icon" />
             </a>
           </div>
         )}
@@ -192,8 +191,7 @@ const Navbar = () => {
               <>
                 <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore Marketplace</Link>
                 <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Find Freelancers</Link>
-                <a href="#how-it-works" className="nav-link" onClick={closeMobileMenu}>How It Works</a>
-                <a href="#categories" className="nav-link" onClick={closeMobileMenu}>Categories</a>
+                <a href="#how-it-works" className="nav-link" onClick={(e) => { e.preventDefault(); closeMobileMenu(); setShowHowItWorks(true); }}>How It Works</a>
               </>
             )}
             {isAuth && <Link to={dashboardPath} className="nav-link" onClick={closeMobileMenu}>Dashboard</Link>}
@@ -246,6 +244,9 @@ const Navbar = () => {
           </div>
         </div>
       )}
+
+      {/* How It Works Modal */}
+      <HowItWorksModal isOpen={showHowItWorks} onClose={() => setShowHowItWorks(false)} />
     </nav>
   );
 };

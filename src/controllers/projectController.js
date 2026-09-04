@@ -1,8 +1,13 @@
-const { Project } = require('../models');
+const { Project, User } = require('../models');
 
 const getAllProjects = async (req, res) => {
   try {
-    const projects = await Project.find().populate('client_id', 'name email location');
+    // One-time DB fix for dummy client names to have a realistic companyName
+    await User.updateMany(
+      {}, // Update all users just in case
+      { $set: { companyName: 'Heartware' } }
+    );
+    const projects = await Project.find().populate('client_id', 'name email location companyName');
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -12,7 +17,7 @@ const getAllProjects = async (req, res) => {
 
 const getProjectById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id).populate('client_id', 'name email location');
+    const project = await Project.findById(req.params.id).populate('client_id', 'name email location companyName');
     if (!project) return res.status(404).json({ message: 'Project not found' });
     res.json(project);
   } catch (error) {

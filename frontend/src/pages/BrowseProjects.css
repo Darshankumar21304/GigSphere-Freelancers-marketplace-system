@@ -1,33 +1,33 @@
 .gigsphere-freelancer-browse-projects {
-  --primary-color: var(--primary, #2563eb);
-  --primary-hover: var(--secondary, #1d4ed8);
-  --bg-surface: var(--white, #ffffff);
-  --text-main: var(--text-primary, #111827);
-  --text-muted: var(--text-secondary, #6b7280);
-  --border-color: var(--border, #e5e7eb);
-  --bg-body: var(--bg-light, #f3f4f6);
-  --chip-bg: #f3f4f6;
-  --chip-text: #374151;
-  --chip-active-bg: var(--primary, #2563eb);
+  --primary-color: #1A73E8;
+  --primary-hover: #1557b0;
+  --bg-surface: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --bg-body: #ffffff;
+  --chip-bg: #f8fafc;
+  --chip-text: #475569;
+  --chip-active-bg: #1A73E8;
   --chip-active-text: #ffffff;
   
-  background-color: var(--bg-body);
+  background: radial-gradient(circle at 50% 20%, rgba(232, 240, 254, 0.6) 0%, rgba(255, 255, 255, 1) 70%);
   min-height: 100vh;
-  padding: 32px 16px;
-  font-family: var(--font-family, 'Inter', sans-serif);
+  padding: 16px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--text-main);
 }
 
 /* Dark mode support if the app has a .dark class */
 :root.dark .gigsphere-freelancer-browse-projects,
 .dark .gigsphere-freelancer-browse-projects {
-  --bg-surface: #1f2937;
-  --text-main: #f9fafb;
-  --text-muted: #9ca3af;
-  --border-color: #374151;
-  --bg-body: #111827;
-  --chip-bg: #374151;
-  --chip-text: #e5e7eb;
+  --bg-surface: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --bg-body: #0f172a;
+  --chip-bg: #334155;
+  --chip-text: #cbd5e1;
 }
 
 .gigsphere-freelancer-browse-projects * {
@@ -44,8 +44,8 @@
 .gigsphere-freelancer-browse-projects .page-header {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 @media (min-width: 768px) {
@@ -98,11 +98,16 @@
 /* SEARCH SECTION */
 .gigsphere-freelancer-browse-projects .search-section {
   background-color: var(--bg-surface);
-  border-radius: 16px;
-  padding: 24px;
+  border-radius: 20px;
+  padding: 16px 20px;
   border: 1px solid var(--border-color);
-  margin-bottom: 24px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px -10px rgba(26, 115, 232, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.gigsphere-freelancer-browse-projects .search-section:hover {
+  box-shadow: 0 15px 40px -10px rgba(26, 115, 232, 0.15);
 }
 
 .gigsphere-freelancer-browse-projects .search-input-group {
@@ -133,32 +138,33 @@
 
 .gigsphere-freelancer-browse-projects .search-input {
   width: 100%;
-  padding: 16px 16px 16px 48px;
+  padding: 14px 16px 14px 48px;
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  font-size: 16px;
-  background-color: transparent;
+  border-radius: 999px;
+  font-size: 15px;
+  background-color: #f8fafc;
   color: var(--text-main);
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
 }
 
 .gigsphere-freelancer-browse-projects .search-input:focus {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.15);
 }
 
 .gigsphere-freelancer-browse-projects .search-btn {
   background-color: var(--primary-color);
   color: #fff;
   border: none;
-  border-radius: 12px;
+  border-radius: 999px;
   padding: 0 32px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
-  height: 54px; /* matches input height roughly */
+  transition: all 0.3s ease;
+  height: 50px;
 }
 
 .gigsphere-freelancer-browse-projects .search-btn:hover {
@@ -514,13 +520,13 @@
 /* PROJECT CARDS */
 .gigsphere-freelancer-browse-projects .projects-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 24px;
 }
 
-@media (min-width: 1280px) {
-  .gigsphere-freelancer-browse-projects .projects-grid:not(.list-view) {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 640px) {
+  .gigsphere-freelancer-browse-projects .projects-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -528,17 +534,18 @@
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease, border-color 0.4s ease;
   position: relative;
+  background-clip: padding-box;
 }
 
 .gigsphere-freelancer-browse-projects .project-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-  border-color: var(--primary-color);
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 20px 40px -10px rgba(26, 115, 232, 0.15), 0 10px 20px -10px rgba(26, 115, 232, 0.1);
+  border-color: rgba(26, 115, 232, 0.4);
 }
 
 .gigsphere-freelancer-browse-projects .card-header {

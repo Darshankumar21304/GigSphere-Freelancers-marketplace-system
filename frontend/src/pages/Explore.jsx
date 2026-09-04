@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { getUserRole, isAuthenticated } from '../utils/authUtils';
+import AuthModal from '../components/AuthModal';
 import { apiFetch } from '../utils/api';
 import { 
   Filter, 
@@ -33,12 +35,18 @@ const MOCK_CATEGORIES = [
 ];
 
 export default function Explore() {
+  const navigate = useNavigate();
+  const role = getUserRole();
+  const isAuth = isAuthenticated();
+
   const [projects, setProjects] = useState([]);
   const [activeCategory, setActiveCategory] = useState('All Projects');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [sortBy, setSortBy] = useState('Best Match');
   
   const [filters, setFilters] = useState({
     skill: '',
@@ -90,7 +98,23 @@ export default function Explore() {
 
   const toggleSave = (e, id) => {
     e.preventDefault();
-    setProjects(projects.map(p => p.id === id ? { ...p, saved: !p.saved } : p));
+    if (!isAuth) {
+      setShowAuthModal(true);
+      return;
+    }
+    setProjects(projects.map(p => p._id === id ? { ...p, saved: !p.saved } : p));
+  };
+
+  const handleProposeClick = (project) => {
+    if (!isAuth) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (role === 'client') {
+      alert('Clients cannot submit proposals. Please log in as a freelancer.');
+      return;
+    }
+    setProposalProject(project);
   };
 
   const handleFilterChange = (key, value) => {
@@ -144,7 +168,21 @@ export default function Explore() {
     if (filters.clientRating === '4.5 & up' && rating < 4.5) return false;
     if (filters.clientRating === '4.0 & up' && rating < 4.0) return false;
 
+    if (filters.budgetRange !== 'Any Budget') {
+      const budgetNum = parseInt(p.budget, 10) || 0;
+      if (filters.budgetRange === 'Under ₹10,000' && budgetNum >= 10000) return false;
+      if (filters.budgetRange === '₹10,000 - ₹50,000' && (budgetNum < 10000 || budgetNum > 50000)) return false;
+      if (filters.budgetRange === '₹50,000 - ₹1,00,000' && (budgetNum < 50000 || budgetNum > 100000)) return false;
+      if (filters.budgetRange === 'Over ₹1,00,000' && budgetNum <= 100000) return false;
+    }
+
     return true;
+  });
+
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    if (sortBy === 'Newest') return new Date(b.createdAt) - new Date(a.createdAt);
+    if (sortBy === 'Highest Budget') return (parseInt(b.budget) || 0) - (parseInt(a.budget) || 0);
+    return 0;
   });
 
   const SidebarContent = () => (
@@ -262,7 +300,13 @@ export default function Explore() {
             <h1 className="page-title">Browse Projects</h1>
             <p className="page-description">Discover projects that match your skills and experience.</p>
           </div>
-          <button className="saved-projects-btn">
+          <button className="saved-projects-btn" onClick={() => {
+            if (!isAuth) {
+              setShowAuthModal(true);
+            } else {
+              // Handle saved projects view (not implemented yet but auth check works)
+            }
+          }}>
             <Bookmark size={18} />
             Saved Projects
           </button>
@@ -328,7 +372,7 @@ export default function Explore() {
                 <div className="sort-dropdown">
                   Sort By: 
                   <div className="custom-select-wrapper" style={{display: 'inline-block', width: '160px'}}>
-                    <select className="custom-select" style={{padding: '8px 12px'}}>
+                    <select className="custom-select" style={{padding: '8px 12px'}} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                       <option>Best Match</option>
                       <option>Newest</option>
                       <option>Highest Budget</option>
@@ -364,28 +408,24 @@ export default function Explore() {
                   </div>
                 ))}
               </div>
-            ) : filteredProjects.length > 0 ? (
+            ) : sortedProjects.length > 0 ? (
               <>
                 <div className={`projects-grid ${viewMode === 'list' ? 'list-view' : ''}`}>
-                  {filteredProjects.map(project => (
-                    <div key={project.id} className="project-card">
+                  {sortedProjects.map(project => (
+                    <div key={project.id || project._id} className="project-card">
                       
                       <div className="card-header">
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <Link to={`/gig/${project._id}`} style={{textDecoration: 'none'}}>
                             <h3 className="project-title">{project.title}</h3>
                           </Link>
                           
                           <div className="client-info">
-                            <span style={{fontWeight: 500, color: 'var(--text-main)'}}>{project.client_id ? project.client_id.name : 'Unknown Client'}</span>
-                            <span className="verified-badge">
-                              <CheckCircle size={14} /> Verified Client
+                            <span style={{fontWeight: 600, color: 'var(--text-main)'}}>
+                              {project.client_id ? (project.client_id.companyName || project.client_id.name) : 'Unknown Client'}
                             </span>
-                            <span className="client-rating">
-                              <Star size={14} fill="currentColor" /> {(project.client_id && project.client_id.rating) || '5.0'}
-                            </span>
-                            <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                              <MapPin size={14} /> Remote
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 500, fontSize: '13px' }}>
+                              <CheckCircle size={14} /> Verified
                             </span>
                           </div>
                         </div>
@@ -397,10 +437,12 @@ export default function Explore() {
                         </button>
                       </div>
 
-                      <div className="project-meta-grid">
+                      <div className="project-meta-grid" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', margin: '16px 0' }}>
                         <div className="meta-item">
                           <span className="meta-label">{project.budgetType || 'Fixed Price'}</span>
-                          <span className="meta-value">{project.budget || 'N/A'}</span>
+                          <span className="meta-value" style={{ color: '#10b981', fontSize: '16px' }}>
+                            {project.budget ? formatINR(project.budget) : 'Open Budget'}
+                          </span>
                         </div>
                         <div className="meta-item">
                           <span className="meta-label">Experience</span>
@@ -416,7 +458,7 @@ export default function Explore() {
                         </div>
                       </div>
 
-                      <p className="project-desc">{project.description}</p>
+                      <p className="project-desc" style={{ color: '#475569', fontSize: '15px' }}>{project.description}</p>
                       
                       <div className="skills-container">
                         {project.skills && project.skills.map(skill => (
@@ -424,17 +466,29 @@ export default function Explore() {
                         ))}
                       </div>
 
-                      <div className="card-footer">
+                      <div className="card-footer" style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                         <div className="footer-stats">
-                          <div className="stat-item">
-                            <Users size={16} /> 0 Proposals
+                          <div className="stat-item" style={{ fontSize: '14px', color: '#64748b' }}>
+                            <Users size={16} /> {project.proposals ? project.proposals.length : 0} Proposals
                           </div>
                         </div>
                         <div className="card-actions">
-                          <Link to={`/gig/${project._id}`} style={{textDecoration: 'none'}}>
-                            <button className="btn-secondary">View Project</button>
-                          </Link>
-                          <button className="btn-primary" onClick={() => setProposalProject(project)}>Submit Proposal</button>
+                          <button 
+                            className="btn-secondary" 
+                            onClick={(e) => {
+                              if (!isAuth) {
+                                e.preventDefault();
+                                setShowAuthModal(true);
+                              } else {
+                                navigate(`/gig/${project._id}`);
+                              }
+                            }}
+                          >
+                            View Project
+                          </button>
+                          {role !== 'client' && (
+                            <button className="btn-primary" onClick={() => handleProposeClick(project)}>Submit Proposal</button>
+                          )}
                         </div>
                       </div>
                       
@@ -537,6 +591,11 @@ export default function Explore() {
           </div>
         </div>
       )}
+      {/* Login Popup Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </div>
   );
 }
