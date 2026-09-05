@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, User, Briefcase, Clock, IndianRupee } from 'lucide-react';
+import { CheckCircle2, User, Briefcase, Clock, Tag } from 'lucide-react';
 import { loginUser } from '../../../utils/authUtils';
 
-export default function ReviewSubmitStep({ formData, prevStep }) {
+export default function ReviewSubmitStep({ formData, prevStep, goToStep }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
@@ -23,7 +23,10 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
           country: formData.country,
           location: formData.location || formData.country,
           title: formData.title,
-          hourlyRate: formData.hourlyRate
+          experience: formData.experience,
+          availability: formData.availability,
+          category: formData.category,
+          portfolio: formData.portfolio || []
         })
       });
 
@@ -61,7 +64,7 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
         <div className="review-card glass">
           <div className="review-header">
             <h3>Personal Information</h3>
-            <button className="btn-text">Edit</button>
+            <button type="button" className="btn-text" onClick={() => goToStep && goToStep(1)}>Edit</button>
           </div>
           <div className="review-grid">
             <div className="review-item">
@@ -86,7 +89,7 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
         <div className="review-card glass mt-4">
           <div className="review-header">
             <h3>Professional Profile</h3>
-            <button className="btn-text">Edit</button>
+            <button type="button" className="btn-text" onClick={() => goToStep && goToStep(2)}>Edit</button>
           </div>
           <div className="review-grid">
             <div className="review-item">
@@ -94,12 +97,12 @@ export default function ReviewSubmitStep({ formData, prevStep }) {
               <span className="review-value">{formData.title || '-'}</span>
             </div>
             <div className="review-item">
-              <span className="review-label"><Clock size={14}/> Availability</span>
-              <span className="review-value">{formData.availability ? formData.availability.replace('-', ' ') : '-'}</span>
+              <span className="review-label"><Tag size={14}/> Category</span>
+              <span className="review-value">{formData.category || '-'}</span>
             </div>
             <div className="review-item">
-              <span className="review-label"><IndianRupee size={14}/> Fixed Rate</span>
-              <span className="review-value">₹{formData.hourlyRate || '0'}</span>
+              <span className="review-label"><Clock size={14}/> Availability</span>
+              <span className="review-value">{formData.availability ? formData.availability.replace('-', ' ') : '-'}</span>
             </div>
           </div>
           <div className="review-skills mt-2">

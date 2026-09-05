@@ -12,7 +12,7 @@ router.post('/single', optionalAuth, upload.single('file'), validateFileSize, up
 router.post('/multiple', optionalAuth, upload.array('files', 5), validateFileSize, uploadController.uploadMultipleFiles);
 
 // User Profile Avatar Upload
-router.post('/avatar', optionalAuth, upload.single('avatar'), validateFileSize, uploadController.uploadAvatar);
+router.post('/avatar', authenticateToken, upload.single('avatar'), validateFileSize, uploadController.uploadAvatar);
 
 // PDF In-App Stream Viewer Proxy
 router.get('/view-pdf', uploadController.viewPdf);

@@ -2,11 +2,6 @@ const { Project, User } = require('../models');
 
 const getAllProjects = async (req, res) => {
   try {
-    // One-time DB fix for dummy client names to have a realistic companyName
-    await User.updateMany(
-      {}, // Update all users just in case
-      { $set: { companyName: 'Heartware' } }
-    );
     const projects = await Project.find().populate('client_id', 'name email location companyName');
     res.json(projects);
   } catch (error) {
@@ -29,21 +24,20 @@ const getProjectById = async (req, res) => {
 const createProject = async (req, res) => {
   try {
     const { title, description, budget, budgetType, skills, category, duration, deadline, experienceLevel, attachments } = req.body;
-    
-    const { User } = require('../models');
+
     let client_id = req.user ? (req.user.id || req.user._id) : null;
-    
+
     if (!client_id) {
-       let dummyClient = await User.findOne({ role: 'client' });
-       if (!dummyClient) {
-         dummyClient = await User.create({
-           name: 'Demo Client',
-           email: 'client@demo.com',
-           password_hash: 'dummy',
-           role: 'client'
-         });
-       }
-       client_id = dummyClient._id;
+      let dummyClient = await User.findOne({ role: 'client' });
+      if (!dummyClient) {
+        dummyClient = await User.create({
+          name: 'Demo Client',
+          email: 'client@demo.com',
+          password_hash: 'dummy',
+          role: 'client'
+        });
+      }
+      client_id = dummyClient._id;
     }
 
     const newProject = await Project.create({
@@ -60,10 +54,10 @@ const createProject = async (req, res) => {
       attachments: Array.isArray(attachments) ? attachments : []
     });
 
-    console.log('✅ Project Created Successfully:', newProject._id);
+    console.log('Project Created:', newProject._id);
     res.status(201).json(newProject);
   } catch (error) {
-    console.error('❌ Error creating project:', error);
+    console.error('Error creating project:', error);
     res.status(500).json({ message: error.message || 'Server error creating project' });
   }
 };
@@ -76,27 +70,38 @@ const submitProposal = async (req, res) => {
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
+    let freelancerId = req.user ? (req.user.id || req.user._id) : null;
+    let nameVal = freelancerName || (req.user ? req.user.name : null);
+
+    if (!freelancerId) {
+      const defaultFreelancer = await User.findOne({ role: 'freelancer' });
+      if (defaultFreelancer) {
+        freelancerId = defaultFreelancer._id;
+        nameVal = nameVal || defaultFreelancer.name;
+      }
+    }
+
     const newProposal = {
-      freelancer_id: req.user ? req.user.id : null,
-      freelancer_name: freelancerName || (req.user ? req.user.name : 'Anonymous Freelancer'),
-      bidAmount,
-      coverLetter,
-      deliveryTime,
+      freelancer_id: freelancerId,
+      freelancer_name: nameVal || 'Freelancer Partner',
+      bidAmount: Number(bidAmount || 0),
+      coverLetter: coverLetter || '',
+      deliveryTime: deliveryTime || '1 to 2 weeks',
       status: 'Pending'
     };
 
     project.proposals.push(newProposal);
     await project.save();
 
-    // Trigger Notification to Client (project owner)
-    const { createNotification } = require('./notificationController');
-    const senderName = newProposal.freelancer_name;
-    await createNotification(
-      project.client_id,
-      'proposal',
-      'New Proposal Received',
-      `${senderName} has submitted a proposal of ₹${Number(bidAmount).toLocaleString()} for your project "${project.title}".`
-    );
+    if (project.client_id) {
+      const { createNotification } = require('./notificationController');
+      await createNotification(
+        project.client_id,
+        'proposal',
+        'New Proposal Received',
+        `${newProposal.freelancer_name} submitted a proposal of ₹${Number(bidAmount || 0).toLocaleString()} for "${project.title}".`
+      ).catch(() => null);
+    }
 
     res.status(201).json({ message: 'Proposal submitted successfully', project });
   } catch (error) {
@@ -142,7 +147,6 @@ const updateProject = async (req, res) => {
   }
 };
 
-// Get projects for the logged-in client (with accepted proposal details)
 const getMyProjects = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -156,9 +160,51 @@ const getMyProjects = async (req, res) => {
   }
 };
 
+// Get all contracts for the logged-in freelancer with earnings summary & chart data
+const getMyContracts = async (req, res) => {
+  try {
+    const { Contract } = require('../models');
+    const freelancerId = req.user.id;
+
+    const contracts = await Contract.find({ freelancer_id: freelancerId })
+      .populate('client_id', 'name email companyName avatar profilePhoto')
+      .populate('project_id', 'title category')
+      .sort({ createdAt: -1 });
+
+    const totalEarnings = contracts
+      .filter(c => c.status === 'Completed')
+      .reduce((sum, c) => sum + (c.amountEarned || c.totalValue || 0), 0);
+
+    const activeContracts = contracts.filter(c =>
+      c.status === 'In Progress' || c.status === 'Submitted for Review'
+    ).length;
+    const completedContracts = contracts.filter(c => c.status === 'Completed').length;
+
+    // Group earnings by month for chart (last 6 months)
+    const earningsByMonth = {};
+    contracts
+      .filter(c => c.status === 'Completed')
+      .forEach(c => {
+        const month = new Date(c.updatedAt || c.createdAt)
+          .toLocaleString('default', { month: 'short', year: '2-digit' });
+        earningsByMonth[month] = (earningsByMonth[month] || 0) + (c.amountEarned || c.totalValue || 0);
+      });
+
+    const chartData = Object.entries(earningsByMonth)
+      .slice(-6)
+      .map(([name, earnings]) => ({ name, earnings }));
+
+    res.json({ contracts, totalEarnings, activeContracts, completedContracts, chartData });
+  } catch (error) {
+    console.error('Error fetching freelancer contracts:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllProjects,
   getMyProjects,
+  getMyContracts,
   getProjectById,
   createProject,
   submitProposal,

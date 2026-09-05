@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Briefcase, BookOpen, Layers, X } from 'lucide-react';
+import { Briefcase, BookOpen, Layers, X, Sparkles, Plus } from 'lucide-react';
 
 export default function ProfessionalDetailsStep({ formData, updateFormData, nextStep, prevStep }) {
   const [skillInput, setSkillInput] = useState('');
@@ -93,16 +93,38 @@ export default function ProfessionalDetailsStep({ formData, updateFormData, next
         </div>
 
         <div className="form-group">
-          <label className="standard-label">Skills (Press Enter to add)</label>
-          <div className="skills-input-container">
+          <label className="standard-label">Skills & Expertise (Press Enter or click Add)</label>
+          <div className="input-with-icon join-input no-float" style={{ position: 'relative' }}>
+            <Sparkles className="input-icon" size={20} />
             <input 
               type="text" 
-              placeholder="e.g. React, UI Design, Copywriting"
+              placeholder="e.g. React, Node.js, UI/UX Design"
               value={skillInput}
               onChange={(e) => setSkillInput(e.target.value)}
               onKeyDown={handleSkillAdd}
-              className="skill-input"
+              style={{ paddingRight: '80px' }}
             />
+            <button 
+              type="button" 
+              onClick={() => {
+                if (skillInput.trim()) {
+                  const newSkill = skillInput.trim();
+                  const currentSkills = formData.skills || [];
+                  if (!currentSkills.includes(newSkill)) {
+                    updateFormData({ skills: [...currentSkills, newSkill] });
+                  }
+                  setSkillInput('');
+                }
+              }}
+              style={{
+                position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                padding: '6px 14px', borderRadius: '8px', background: '#1a73e8', color: '#fff',
+                border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px'
+              }}
+            >
+              <Plus size={14} /> Add
+            </button>
           </div>
           <div className="skills-chips">
             {(formData.skills || []).map((skill, index) => (

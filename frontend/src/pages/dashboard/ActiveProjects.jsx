@@ -28,30 +28,45 @@ export default function ActiveProjects() {
 
   const fetchActiveContracts = async () => {
     try {
-      const data = await apiFetch('/contracts/active');
-      // Map backend contract schema to frontend expectations
-      const mapped = data.map(c => {
-        const remaining = new Date(c.deadline).getTime() - new Date().getTime();
-        const daysRemaining = Math.ceil(remaining / (1000 * 3600 * 24));
-        const activeMilestone = c.milestones.find(m => m.status === 'In Progress' || m.status === 'Pending') || c.milestones[c.milestones.length - 1];
+      const data = await apiFetch('/contracts/active').catch(() => []);
+      const mapped = (Array.isArray(data) ? data : []).map(c => {
+        const milestonesArr = c.milestones || [];
+        const completedMilestones = milestonesArr.filter(m => m.status === 'Completed');
+        const earned = completedMilestones.reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+        const totalVal = Number(c.totalValue || 0);
+        const progressPercent = milestonesArr.length > 0 ? Math.round((completedMilestones.length / milestonesArr.length) * 100) : 0;
         
+        const deadlineDate = c.deadline ? new Date(c.deadline) : new Date(Date.now() + 14 * 86400000);
+        const remainingMs = deadlineDate.getTime() - new Date().getTime();
+        const daysRemaining = Math.ceil(remainingMs / (1000 * 3600 * 24));
+        const activeMilestone = milestonesArr.find(m => m.status === 'In Progress' || m.status === 'Under Review' || m.status === 'Pending') || milestonesArr[milestonesArr.length - 1];
+
+        const clientObj = c.client_id || {};
+        const clientName = clientObj.name || clientObj.companyName || 'Client Partner';
+        const clientAvatar = clientObj.avatar || clientObj.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=1a73e8&color=fff`;
+
         return {
           ...c,
           id: c._id,
-          clientName: c.client_id ? c.client_id.name : 'Unknown Client',
-          clientAvatar: `https://ui-avatars.com/api/?name=${c.client_id ? c.client_id.name : 'C'}`,
-          daysRemaining: daysRemaining,
-          milestonesTotal: c.milestones.length,
-          milestonesCompleted: c.milestones.filter(m => m.status === 'Completed').length,
+          title: c.title ? c.title.replace('Contract: ', '') : (c.project_id?.title || 'Active Project'),
+          clientName,
+          clientAvatar,
+          daysRemaining: isNaN(daysRemaining) ? 14 : daysRemaining,
+          totalValue: totalVal,
+          amountEarned: earned,
+          progress: progressPercent,
+          milestonesTotal: milestonesArr.length,
+          milestonesCompleted: completedMilestones.length,
           currentMilestone: activeMilestone ? activeMilestone.title : 'None',
-          nextDeadline: activeMilestone ? new Date(activeMilestone.deadline).toLocaleDateString() : 'N/A',
-          startDate: new Date(c.startDate).toLocaleDateString(),
-          deadline: new Date(c.deadline).toLocaleDateString()
+          nextDeadline: activeMilestone && activeMilestone.deadline ? new Date(activeMilestone.deadline).toLocaleDateString('en-IN') : 'N/A',
+          startDate: new Date(c.startDate || c.createdAt || Date.now()).toLocaleDateString('en-IN'),
+          deadline: deadlineDate.toLocaleDateString('en-IN')
         };
       });
       setProjects(mapped);
     } catch (error) {
       console.error('Failed to fetch contracts:', error);
+      setProjects([]);
     } finally {
       setIsLoading(false);
     }

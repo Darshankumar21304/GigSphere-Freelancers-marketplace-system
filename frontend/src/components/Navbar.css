@@ -38,9 +38,9 @@
 }
 
 .antigravity-logo-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   display: flex;
@@ -55,7 +55,7 @@
 }
 
 .brand-title {
-  font-size: 1.25rem;
+  font-size: 1.55rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #0f172a;

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const projectController = require('../controllers/projectController');
+const { optionalAuth } = require('../middleware/authMiddleware');
 const authenticateToken = require('../middleware/authMiddleware');
 const authorizeRoles = require('../middleware/rbacMiddleware');
 
@@ -10,6 +11,9 @@ router.get('/', projectController.getAllProjects);
 // Get logged-in client's own projects
 router.get('/my', authenticateToken, projectController.getMyProjects);
 
+// Get freelancer's contracts with earnings summary
+router.get('/my-contracts', authenticateToken, projectController.getMyContracts);
+
 // Get single project by ID
 router.get('/:id', projectController.getProjectById);
 
@@ -17,7 +21,7 @@ router.get('/:id', projectController.getProjectById);
 router.post('/', projectController.createProject);
 
 // Submit a proposal to a project
-router.post('/:projectId/proposals', projectController.submitProposal);
+router.post('/:projectId/proposals', optionalAuth, projectController.submitProposal);
 
 // Update project details, status & Delete project
 router.put('/:id', projectController.updateProject);

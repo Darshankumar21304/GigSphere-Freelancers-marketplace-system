@@ -6,6 +6,7 @@ import {
 import { apiFetch } from '../../utils/api';
 import { getUserProfile, saveUserProfile } from '../../utils/authUtils';
 import { uploadFileToCloudinary } from '../../utils/fileUpload';
+import { applyTheme } from '../../utils/themeUtils';
 import './Settings.css';
 
 // Custom Toggle Component
@@ -15,7 +16,11 @@ const Toggle = ({ active, onChange }) => (
   </div>
 );
 
+const generateAvatarUrl = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=1a73e8&color=fff&size=150`;
+
 export default function Settings() {
+  const storedUser = getUserProfile() || {};
+  const userRole = storedUser.role || 'freelancer';
   const [activeTab, setActiveTab] = useState('account');
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -23,18 +28,18 @@ export default function Settings() {
   // Form States
   const [formData, setFormData] = useState({
     // Account
-    fullName: 'Sarah Jenkins',
-    email: 'sarah.jenkins@example.com',
-    phone: '+91 98765 43210',
-    location: 'Mumbai, India',
-    language: 'English',
+    fullName: storedUser.name || '',
+    email: storedUser.email || '',
+    phone: storedUser.phone || '',
+    location: storedUser.location || '',
+    language: storedUser.language || 'English',
     // Professional
-    title: 'Senior Full Stack Developer',
-    bio: 'I build scalable web applications using React, Node.js, and AWS.',
-    skills: 'React, Node.js, Express, MongoDB, AWS',
-    experience: '5+ years',
+    title: '',
+    bio: '',
+    skills: '',
+    experience: 'Entry Level',
     availability: 'Full-time (40 hrs/week)',
-    hourlyRate: '1500',
+    hourlyRate: '',
     // Security
     currentPassword: '',
     newPassword: '',
@@ -47,24 +52,30 @@ export default function Settings() {
     notifPayment: true,
     notifReview: true,
     // Payments
-    bankAccount: '**** **** 4567',
-    upiId: 'sarah@okbank',
+    bankAccount: storedUser.bankDetails?.accountNumber || '',
+    upiId: storedUser.bankDetails?.upiId || '',
     withdrawalPref: 'Weekly',
     // Privacy
     profileVisibility: 'Public',
     onlineStatus: true,
     searchVisibility: true,
     // Appearance
-    theme: 'system'
+    theme: localStorage.getItem('gigsphere_theme') || 'system'
   });
 
   const [initialData, setInitialData] = useState({ ...formData });
+  const [avatarUrl, setAvatarUrl] = useState(storedUser.avatar || storedUser.profilePhoto || generateAvatarUrl(storedUser.name));
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = React.useRef(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const data = await apiFetch('/users/settings');
         if (data.user) {
+          const loadedTheme = data.user.preferences?.appearance?.theme || localStorage.getItem('gigsphere_theme') || 'system';
+          applyTheme(loadedTheme);
+
           const newFormData = {
             ...formData,
             fullName: data.user.name || '',
@@ -78,26 +89,29 @@ export default function Settings() {
             notifProposal: data.user.preferences?.notifications?.proposal ?? true,
             notifPayment: data.user.preferences?.notifications?.payment ?? true,
             notifReview: data.user.preferences?.notifications?.review ?? true,
-            bankAccount: data.user.preferences?.payment?.bankAccount || '',
-            upiId: data.user.preferences?.payment?.upiId || '',
+            bankAccount: data.user.preferences?.payment?.bankAccount || data.user.bankDetails?.accountNumber || '',
+            upiId: data.user.preferences?.payment?.upiId || data.user.bankDetails?.upiId || '',
             withdrawalPref: data.user.preferences?.payment?.withdrawalPref || 'Weekly',
             profileVisibility: data.user.preferences?.privacy?.profileVisibility || 'Public',
             onlineStatus: data.user.preferences?.privacy?.onlineStatus ?? true,
             searchVisibility: data.user.preferences?.privacy?.searchVisibility ?? true,
-            theme: data.user.preferences?.appearance?.theme || 'system'
+            theme: loadedTheme
           };
           if (data.profile) {
             newFormData.title = data.profile.title || '';
             newFormData.bio = data.profile.bio || '';
-            newFormData.skills = data.profile.skills || '';
+            newFormData.skills = Array.isArray(data.profile.skills) ? data.profile.skills.join(', ') : (data.profile.skills || '');
             newFormData.experience = data.profile.experience || 'Entry Level';
             newFormData.availability = data.profile.availability || 'Full-time (40 hrs/week)';
             newFormData.hourlyRate = data.profile.hourlyRate || '';
           }
           setFormData(newFormData);
           setInitialData(newFormData);
+
           if (data.user.avatar || data.user.profilePhoto) {
             setAvatarUrl(data.user.avatar || data.user.profilePhoto);
+          } else {
+            setAvatarUrl(generateAvatarUrl(data.user.name));
           }
         }
       } catch (error) {
@@ -112,6 +126,9 @@ export default function Settings() {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'theme') {
+      applyTheme(value);
+    }
   };
 
   const showToast = (type, message) => {
@@ -120,6 +137,17 @@ export default function Settings() {
   };
 
   const handleSave = async () => {
+    if (formData.newPassword) {
+      if (!formData.currentPassword) {
+        showToast('error', 'Current password is required to set a new password');
+        return;
+      }
+      if (formData.newPassword !== formData.confirmPassword) {
+        showToast('error', 'New passwords do not match');
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const payload = {
@@ -129,6 +157,8 @@ export default function Settings() {
         language: formData.language,
         avatar: avatarUrl,
         profilePhoto: avatarUrl,
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword,
         preferences: {
           notifications: {
             email: formData.notifEmail,
@@ -169,22 +199,10 @@ export default function Settings() {
         saveUserProfile(response.user);
       }
 
-      setInitialData({ ...formData });
-      showToast('success', 'Settings saved successfully');
-      
-      // Update theme if changed
-      if (formData.theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else if (formData.theme === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else {
-        // System preference logic
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      }
+      setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+      setInitialData({ ...formData, currentPassword: '', newPassword: '', confirmPassword: '' });
+      applyTheme(formData.theme);
+      showToast('success', response.message || 'Settings saved successfully');
     } catch (error) {
       showToast('error', error.message || 'Failed to save settings');
     } finally {
@@ -194,6 +212,7 @@ export default function Settings() {
 
   const handleCancel = () => {
     setFormData({ ...initialData });
+    applyTheme(initialData.theme);
   };
 
   const navItems = [
@@ -206,10 +225,6 @@ export default function Settings() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
   ];
 
-  const [avatarUrl, setAvatarUrl] = useState(getUserProfile()?.avatar || 'https://i.pravatar.cc/150?img=5');
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const avatarInputRef = React.useRef(null);
-
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -217,15 +232,31 @@ export default function Settings() {
     setIsUploadingAvatar(true);
     try {
       const res = await uploadFileToCloudinary(file, '/api/upload/avatar');
-      setAvatarUrl(res.avatarUrl);
-      
-      // Update local stored profile
-      const stored = getUserProfile() || {};
-      stored.avatar = res.avatarUrl;
-      stored.profilePhoto = res.avatarUrl;
-      saveUserProfile(stored);
+      if (res && res.avatarUrl) {
+        setAvatarUrl(res.avatarUrl);
+        
+        // Update local stored profile & DB
+        const savedRes = await apiFetch('/users/settings', {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...formData,
+            name: formData.fullName,
+            avatar: res.avatarUrl,
+            profilePhoto: res.avatarUrl
+          })
+        });
 
-      showToast('success', 'Profile photo updated & saved on Cloudinary!');
+        if (savedRes && savedRes.user) {
+          saveUserProfile(savedRes.user);
+        } else {
+          const stored = getUserProfile() || {};
+          stored.avatar = res.avatarUrl;
+          stored.profilePhoto = res.avatarUrl;
+          saveUserProfile(stored);
+        }
+
+        showToast('success', 'Profile photo updated & saved on Cloudinary!');
+      }
     } catch (err) {
       showToast('error', err.message || 'Failed to upload photo to Cloudinary');
     } finally {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUserRole, isAuthenticated } from '../utils/authUtils';
 import AuthModal from '../components/AuthModal';
+import AntigravityCanvas from '../components/AntigravityCanvas';
 import { apiFetch } from '../utils/api';
 import { 
   Filter, 
@@ -36,8 +37,15 @@ const MOCK_CATEGORIES = [
 
 export default function Explore() {
   const navigate = useNavigate();
+  const location = useLocation();
   const role = getUserRole();
   const isAuth = isAuthenticated();
+
+  useEffect(() => {
+    if (isAuth && role && location.pathname === '/explore') {
+      navigate(`/${role}/dashboard/browse-projects`, { replace: true });
+    }
+  }, [isAuth, role, location.pathname, navigate]);
 
   const [projects, setProjects] = useState([]);
   const [activeCategory, setActiveCategory] = useState('All Projects');
@@ -54,7 +62,8 @@ export default function Explore() {
     projectType: 'Any Type',
     experienceLevels: [],
     durations: [],
-    clientRating: 'Any Rating'
+    clientRating: 'Any Rating',
+    postedDate: 'Any Time'
   });
 
   const [proposalProject, setProposalProject] = useState(null);
@@ -141,7 +150,8 @@ export default function Explore() {
       projectType: 'Any Type',
       experienceLevels: [],
       durations: [],
-      clientRating: 'Any Rating'
+      clientRating: 'Any Rating',
+      postedDate: 'Any Time'
     });
   };
 
@@ -170,10 +180,20 @@ export default function Explore() {
 
     if (filters.budgetRange !== 'Any Budget') {
       const budgetNum = parseInt(p.budget, 10) || 0;
-      if (filters.budgetRange === 'Under ₹10,000' && budgetNum >= 10000) return false;
-      if (filters.budgetRange === '₹10,000 - ₹50,000' && (budgetNum < 10000 || budgetNum > 50000)) return false;
-      if (filters.budgetRange === '₹50,000 - ₹1,00,000' && (budgetNum < 50000 || budgetNum > 100000)) return false;
-      if (filters.budgetRange === 'Over ₹1,00,000' && budgetNum <= 100000) return false;
+      if (filters.budgetRange === '₹10k - ₹50k' && (budgetNum < 10000 || budgetNum > 50000)) return false;
+      if (filters.budgetRange === '₹50k - ₹1L' && (budgetNum < 50000 || budgetNum > 100000)) return false;
+      if (filters.budgetRange === '₹1L+' && budgetNum <= 100000) return false;
+    }
+
+    if (filters.postedDate !== 'Any Time') {
+      const now = new Date();
+      const projectDate = new Date(p.createdAt);
+      const diffTime = Math.abs(now - projectDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (filters.postedDate === 'Last 24 Hours' && diffDays > 1) return false;
+      if (filters.postedDate === 'Last 7 Days' && diffDays > 7) return false;
+      if (filters.postedDate === 'Last 14 Days' && diffDays > 14) return false;
     }
 
     return true;
@@ -276,7 +296,7 @@ export default function Explore() {
         <h3 className="filter-title">Posted Date</h3>
         {['Any Time', 'Last 24 Hours', 'Last 7 Days', 'Last 14 Days'].map(time => (
           <label key={time} className="custom-radio">
-            <input type="radio" name="postedDate" defaultChecked={time === 'Any Time'} />
+            <input type="radio" name="postedDate" checked={filters.postedDate === time} onChange={() => handleFilterChange('postedDate', time)} />
             {time}
           </label>
         ))}
@@ -290,13 +310,14 @@ export default function Explore() {
   );
 
   return (
-    <div className="gigsphere-freelancer-browse-projects">
-      <div className="browse-container">
+    <div className="gigsphere-freelancer-browse-projects" style={{ position: 'relative', overflow: 'hidden' }}>
+      <AntigravityCanvas />
+      
+      <div className="browse-container" style={{ position: 'relative', zIndex: 1 }}>
         
         {/* Header */}
         <div className="page-header">
           <div>
-            <div className="breadcrumb">Dashboard / Browse Projects</div>
             <h1 className="page-title">Browse Projects</h1>
             <p className="page-description">Discover projects that match your skills and experience.</p>
           </div>

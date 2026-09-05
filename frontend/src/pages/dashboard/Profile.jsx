@@ -124,8 +124,8 @@ export default function Profile() {
           website: u.website || '',
           companyDesc: u.companyDesc || '',
           gstin: u.gstin || '',
-          title: u.title || (settingsData.profile?.title) || '',
-          bio: u.bio || (settingsData.profile?.bio) || '',
+          title: (settingsData.profile?.title) || u.title || '',
+          bio: (settingsData.profile?.bio) || u.bio || '',
           avatar: u.avatar || u.profilePhoto || ''
         });
 
@@ -250,6 +250,8 @@ export default function Profile() {
         website: profileData.website,
         companyDesc: profileData.companyDesc,
         gstin: profileData.gstin,
+        title: profileData.title,
+        bio: profileData.bio,
         avatar: profileData.avatar,
         profilePhoto: profileData.avatar
       };

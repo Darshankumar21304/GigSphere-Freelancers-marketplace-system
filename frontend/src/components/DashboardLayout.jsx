@@ -35,6 +35,7 @@ export default function DashboardLayout() {
   const clientNavItems = [
     { name: 'Dashboard', path: '/client/dashboard', icon: LayoutDashboard, exact: true },
     { name: 'Profile', path: '/client/dashboard/profile', icon: Users },
+    { name: 'Browse Projects', path: '/client/dashboard/browse-projects', icon: Search },
     { name: 'Create Project', path: '/client/dashboard/create-project', icon: PlusCircle },
     { name: 'My Projects', path: '/client/dashboard/my-projects', icon: Briefcase },
     { name: 'Received Proposals', path: '/client/dashboard/proposals', icon: FileText },
@@ -47,7 +48,7 @@ export default function DashboardLayout() {
   const freelancerNavItems = [
     { name: 'Dashboard', path: '/freelancer/dashboard', icon: LayoutDashboard, exact: true },
     { name: 'Profile', path: '/freelancer/dashboard/profile', icon: Users },
-    { name: 'Browse Projects', path: '/explore', icon: Search },
+    { name: 'Browse Projects', path: '/freelancer/dashboard/browse-projects', icon: Search },
     { name: 'My Proposals', path: '/freelancer/dashboard/my-proposals', icon: FileText },
     { name: 'Active Projects', path: '/freelancer/dashboard/active-projects', icon: Briefcase },
     { name: 'Portfolio', path: '/freelancer/dashboard/portfolio', icon: Folder },

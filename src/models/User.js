@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema({
   aiAuditedAt: { type: Date },
   walletBalance: { type: Number, default: 0 },
   escrowBalance: { type: Number, default: 0 },
+  rating: { type: Number, default: 5.0 },
+  numReviews: { type: Number, default: 0 },
   bankDetails: {
     accountHolder: { type: String },
     accountNumber: { type: String },

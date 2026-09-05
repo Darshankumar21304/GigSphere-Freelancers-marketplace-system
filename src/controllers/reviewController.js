@@ -1,46 +1,105 @@
-const { Review, Contract, User } = require('../models');
+const { Review, Contract, Project, User, FreelancerProfile } = require('../models');
+const { createNotification } = require('./notificationController');
 
-// 1. Submit review on a completed contract
+// Helper to recalculate freelancer rating & review count
+const updateFreelancerRatingStats = async (freelancerId) => {
+  try {
+    const reviews = await Review.find({ freelancer_id: freelancerId });
+    const numReviews = reviews.length;
+    const avgRating = numReviews > 0 
+      ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / numReviews).toFixed(1))
+      : 5.0;
+
+    await FreelancerProfile.findOneAndUpdate(
+      { user_id: freelancerId },
+      { rating: avgRating, numReviews }
+    );
+    await User.findByIdAndUpdate(
+      freelancerId,
+      { rating: avgRating, numReviews }
+    );
+  } catch (err) {
+    console.error('Error updating freelancer rating stats:', err);
+  }
+};
+
+// 1. Submit review on a completed contract, project, or freelancer hire
 exports.createReview = async (req, res) => {
   try {
-    const { contractId, rating, comment } = req.body;
-    const reviewerId = req.user.id; // Must be the client
+    const { contractId, projectId, freelancerId, rating, comment } = req.body;
+    const reviewerId = req.user.id; // Hiring client
 
-    if (!contractId || !rating || !comment) {
-      return res.status(400).json({ message: 'Contract ID, rating, and comment are required.' });
+    if (!rating || !comment || !comment.trim()) {
+      return res.status(400).json({ message: 'Rating (1-5) and comment are required.' });
     }
 
-    const contract = await Contract.findById(contractId);
-    if (!contract) {
-      return res.status(404).json({ message: 'Contract not found.' });
+    let targetFreelancerId = freelancerId;
+    let title = 'Project Delivery';
+    let contractObj = null;
+    let projectObj = null;
+
+    if (contractId) {
+      contractObj = await Contract.findById(contractId);
+      if (contractObj) {
+        targetFreelancerId = contractObj.freelancer_id;
+        title = contractObj.title || title;
+      }
     }
 
-    // Verify current user is the client for this contract
-    if (contract.client_id.toString() !== reviewerId) {
-      return res.status(403).json({ message: 'Only the hiring client can review this contract.' });
+    if (!targetFreelancerId && projectId) {
+      projectObj = await Project.findById(projectId);
+      if (projectObj) {
+        title = projectObj.title || title;
+        const acceptedProp = projectObj.proposals?.find(p => p.status === 'Accepted');
+        if (acceptedProp?.freelancer_id) {
+          targetFreelancerId = acceptedProp.freelancer_id;
+        } else if (acceptedProp?.freelancer_email) {
+          const u = await User.findOne({ email: acceptedProp.freelancer_email });
+          if (u) targetFreelancerId = u._id;
+        }
+      }
     }
 
-    // Verify contract is completed
-    if (contract.status !== 'Completed') {
-      return res.status(400).json({ message: 'Reviews can only be submitted for completed contracts.' });
+    if (!targetFreelancerId) {
+      return res.status(400).json({ message: 'Freelancer identification is required for submitting a review.' });
     }
 
-    // Check if review already exists for this contract
-    const existingReview = await Review.findOne({ contract_id: contractId });
-    if (existingReview) {
-      return res.status(400).json({ message: 'You have already submitted a review for this contract.' });
+    // Check duplicate review
+    if (contractId) {
+      const existing = await Review.findOne({ contract_id: contractId, reviewer_id: reviewerId });
+      if (existing) {
+        return res.status(400).json({ message: 'You have already submitted a review for this contract.' });
+      }
+    } else if (projectId) {
+      const existing = await Review.findOne({ project_id: projectId, reviewer_id: reviewerId });
+      if (existing) {
+        return res.status(400).json({ message: 'You have already submitted a review for this project.' });
+      }
     }
 
     const review = new Review({
-      contract_id: contractId,
+      contract_id: contractObj ? contractObj._id : undefined,
+      project_id: projectObj ? projectObj._id : undefined,
       reviewer_id: reviewerId,
-      freelancer_id: contract.freelancer_id,
-      rating: Number(rating),
-      comment,
-      projectTitle: contract.title
+      freelancer_id: targetFreelancerId,
+      rating: Math.min(5, Math.max(1, Number(rating))),
+      comment: comment.trim(),
+      projectTitle: title
     });
 
     await review.save();
+
+    // Recalculate freelancer rating stats
+    await updateFreelancerRatingStats(targetFreelancerId);
+
+    // Notify freelancer
+    const reviewerName = req.user.name || 'A client';
+    await createNotification(
+      targetFreelancerId,
+      'review',
+      'New Client Review Received',
+      `${reviewerName} submitted a ${rating}-star review for "${title}": "${comment.slice(0, 60)}..."`
+    );
 
     res.status(201).json({
       success: true,
@@ -70,7 +129,8 @@ exports.getClientReviews = async (req, res) => {
 // 3. Get reviews received by freelancer
 exports.getFreelancerReviews = async (req, res) => {
   try {
-    const reviews = await Review.find({ freelancer_id: req.user.id })
+    const targetUserId = req.params.freelancerId || req.user.id;
+    const reviews = await Review.find({ freelancer_id: targetUserId })
       .populate('reviewer_id', 'name firstName lastName avatar companyName industry')
       .sort({ createdAt: -1 });
 
@@ -98,5 +158,42 @@ exports.getReviews = async (req, res) => {
   } catch (error) {
     console.error('Unified reviews fetch error:', error);
     res.status(500).json({ message: 'Error fetching reviews.' });
+  }
+};
+
+// 5. Respond to a review (for Freelancer)
+exports.respondToReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: 'Response text is required.' });
+    }
+
+    const review = await Review.findById(id);
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found.' });
+    }
+
+    if (review.freelancer_id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only the reviewed freelancer can post a response.' });
+    }
+
+    review.response = {
+      text: text.trim(),
+      createdAt: new Date()
+    };
+
+    await review.save();
+
+    res.json({
+      success: true,
+      message: 'Response posted successfully!',
+      review
+    });
+  } catch (error) {
+    console.error('Respond to review error:', error);
+    res.status(500).json({ message: 'Error posting response to review.' });
   }
 };

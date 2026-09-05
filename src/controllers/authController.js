@@ -4,7 +4,10 @@ const { User, FreelancerProfile } = require('../models');
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, bio, skills, location, country, title, hourlyRate } = req.body;
+    const { 
+      name, email, password, role, bio, skills, location, country, title, hourlyRate,
+      experience, availability, category, portfolio 
+    } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
     
     // Check if user exists
@@ -25,18 +28,37 @@ exports.register = async (req, res) => {
       email: normalizedEmail,
       password_hash,
       role: role || 'client',
-      location: userLocation
+      location: userLocation,
+      country: country || userLocation
     });
 
     // If freelancer, create profile
     let profile = null;
     if (newUser.role === 'freelancer') {
+      const parsedSkills = Array.isArray(skills) 
+        ? skills 
+        : (typeof skills === 'string' && skills.trim() ? skills.split(',').map(s => s.trim()) : []);
+
+      const formattedPortfolio = Array.isArray(portfolio) ? portfolio.map(item => ({
+        title: item.title || 'Project',
+        description: item.description || '',
+        category: item.category || category || 'Web Development',
+        skills: Array.isArray(item.skills) ? item.skills : [],
+        link: item.link || item.url || '',
+        url: item.url || item.link || '',
+        imageUrl: item.imageUrl || item.image || ''
+      })) : [];
+
       profile = await FreelancerProfile.create({
         user_id: newUser._id,
         title: title || '',
         bio: bio || '',
-        skills: skills || '',
-        hourlyRate: hourlyRate || 0
+        skills: parsedSkills,
+        category: category || 'Web Development',
+        hourlyRate: Number(hourlyRate) || 0,
+        experience: experience || 'Entry Level',
+        availability: availability || 'Full-time (40 hrs/week)',
+        portfolioItems: formattedPortfolio
       });
     }
 
@@ -56,15 +78,16 @@ exports.register = async (req, res) => {
         email: newUser.email, 
         role: newUser.role,
         location: newUser.location,
-        country: country || newUser.location,
-        bio: bio || '',
-        skills: skills || '',
-        title: title || ''
-      } 
+        country: newUser.country || newUser.location,
+        bio: profile?.bio || bio || '',
+        skills: profile?.skills || skills || '',
+        title: profile?.title || title || ''
+      },
+      profile
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Registration error:', error);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -83,6 +106,11 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    let profile = null;
+    if (user.role === 'freelancer') {
+      profile = await FreelancerProfile.findOne({ user_id: user._id });
+    }
+
     const payload = {
       id: user._id,
       role: user.role
@@ -90,7 +118,21 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    res.json({ 
+      token, 
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role,
+        location: user.location,
+        country: user.country,
+        bio: profile?.bio || '',
+        title: profile?.title || '',
+        skills: profile?.skills || []
+      },
+      profile
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -100,7 +142,10 @@ exports.login = async (req, res) => {
 exports.googleLogin = async (req, res) => {
   try {
     const { email, name, role } = req.body;
-    const normalizedEmail = (email || 'google.user@gigsphere.com').toLowerCase().trim();
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Email is required for Google authentication' });
+    }
 
     let user = await User.findOne({ email: normalizedEmail });
 
@@ -113,8 +158,16 @@ exports.googleLogin = async (req, res) => {
         name: name || 'Google User',
         email: normalizedEmail,
         password_hash,
-        role: role || 'client'
+        role: role || 'freelancer'
       });
+    }
+
+    let profile = null;
+    if (user.role === 'freelancer') {
+      profile = await FreelancerProfile.findOne({ user_id: user._id });
+      if (!profile) {
+        profile = await FreelancerProfile.create({ user_id: user._id });
+      }
     }
 
     const payload = {
@@ -131,8 +184,14 @@ exports.googleLogin = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+        location: user.location,
+        country: user.country,
+        bio: profile?.bio || '',
+        title: profile?.title || '',
+        skills: profile?.skills || []
+      },
+      profile
     });
   } catch (error) {
     console.error(error);

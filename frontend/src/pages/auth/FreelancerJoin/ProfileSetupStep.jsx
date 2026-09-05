@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, IndianRupee, Clock, FileText } from 'lucide-react';
+import { Camera, Clock, FileText } from 'lucide-react';
 
 export default function ProfileSetupStep({ formData, updateFormData, nextStep, prevStep }) {
   const [previewImage, setPreviewImage] = useState(formData.profileImage || null);
@@ -22,6 +22,28 @@ export default function ProfileSetupStep({ formData, updateFormData, nextStep, p
   const handleNext = (e) => {
     e.preventDefault();
     nextStep();
+  };
+
+  const formatCategory = (cat) => {
+    if (!cat) return 'General';
+    const map = {
+      programming: 'Tech & Dev',
+      design: 'Design',
+      writing: 'Writing',
+      marketing: 'Marketing',
+      video: 'Video & Audio'
+    };
+    return map[cat] || cat;
+  };
+
+  const formatAvailability = (avail) => {
+    if (!avail) return 'Not set';
+    const map = {
+      'full-time': 'Full-time',
+      'part-time': 'Part-time',
+      'as-needed': 'As needed'
+    };
+    return map[avail] || avail;
   };
 
   return (
@@ -63,7 +85,7 @@ export default function ProfileSetupStep({ formData, updateFormData, nextStep, p
               <FileText className="input-icon top-icon" size={20} />
               <textarea 
                 name="bio"
-                placeholder="Hi, I'm a professional..."
+                placeholder="Describe your professional experience, core skills, and what sets you apart..."
                 value={formData.bio || ''}
                 onChange={handleChange}
                 rows="4"
@@ -72,39 +94,21 @@ export default function ProfileSetupStep({ formData, updateFormData, nextStep, p
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="standard-label">Availability</label>
-              <div className="input-with-icon join-input no-float select-wrapper">
-                <Clock className="input-icon" size={20} />
-                <select 
-                  name="availability" 
-                  value={formData.availability || ''} 
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="" disabled>Select availability</option>
-                  <option value="full-time">Full-time (30+ hrs/wk)</option>
-                  <option value="part-time">Part-time (10-30 hrs/wk)</option>
-                  <option value="as-needed">As needed (Open to offers)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="standard-label">Fixed Rate (₹)</label>
-              <div className="input-with-icon join-input no-float">
-                <IndianRupee className="input-icon" size={20} />
-                <input 
-                  type="number" 
-                  name="hourlyRate"
-                  placeholder="e.g. 25"
-                  value={formData.hourlyRate || ''}
-                  onChange={handleChange}
-                  min="5"
-                  required 
-                />
-              </div>
+          <div className="form-group">
+            <label className="standard-label">Availability</label>
+            <div className="input-with-icon join-input no-float select-wrapper">
+              <Clock className="input-icon" size={20} />
+              <select 
+                name="availability" 
+                value={formData.availability || ''} 
+                onChange={handleChange}
+                required
+              >
+                <option value="" disabled>Select availability</option>
+                <option value="full-time">Full-time (30+ hrs/wk)</option>
+                <option value="part-time">Part-time (10-30 hrs/wk)</option>
+                <option value="as-needed">As needed (Open to offers)</option>
+              </select>
             </div>
           </div>
 
@@ -138,12 +142,12 @@ export default function ProfileSetupStep({ formData, updateFormData, nextStep, p
             
             <div className="preview-stats">
               <div className="stat">
-                <span className="stat-label">Rate</span>
-                <span className="stat-value">₹{formData.hourlyRate || '0'}</span>
+                <span className="stat-label">Category</span>
+                <span className="stat-value">{formatCategory(formData.category)}</span>
               </div>
               <div className="stat">
                 <span className="stat-label">Availability</span>
-                <span className="stat-value">{formData.availability ? formData.availability.replace('-', ' ') : 'Not set'}</span>
+                <span className="stat-value">{formatAvailability(formData.availability)}</span>
               </div>
             </div>
           </div>

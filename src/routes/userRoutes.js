@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Get all freelancers
+// Get all freelancers (public)
 router.get('/freelancers', userController.getFreelancers);
+
+// Full freelancer profile (User + FreelancerProfile merged)
+router.get('/profile/me', authMiddleware, userController.getMyProfile);
+router.put('/profile/me', authMiddleware, userController.updateMyProfile);
+
+// AI Profile Strength Analyzer
+router.post('/profile/ai-analyze', authMiddleware, userController.aiAnalyzeProfile);
 
 // Settings
 router.get('/settings', authMiddleware, userController.getSettings);

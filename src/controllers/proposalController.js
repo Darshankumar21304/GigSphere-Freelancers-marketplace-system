@@ -5,25 +5,47 @@ const { createNotification } = require('./notificationController');
 exports.getReceivedProposals = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { User } = require('../models');
     // Find all projects owned by the client
     const projects = await Project.find({ client_id: userId });
     
-    // Aggregate proposals and inject parent project details
+    // Collect all freelancer IDs across proposals
+    const freelancerIds = [];
+    projects.forEach(p => {
+      if (p.proposals && Array.isArray(p.proposals)) {
+        p.proposals.forEach(pr => {
+          if (pr.freelancer_id) freelancerIds.push(pr.freelancer_id);
+        });
+      }
+    });
+
+    const freelancers = await User.find({ _id: { $in: freelancerIds } }).select('name avatar profilePhoto email title');
+
+    // Aggregate proposals and inject parent project details & freelancer details
     const allProposals = [];
     projects.forEach(project => {
       if (project.proposals && Array.isArray(project.proposals)) {
         project.proposals.forEach(prop => {
+          const flUser = freelancers.find(f => f._id.toString() === (prop.freelancer_id ? prop.freelancer_id.toString() : ''));
           allProposals.push({
             _id: prop._id,
             id: prop._id,
             freelancer_id: prop.freelancer_id,
-            freelancer_name: prop.freelancer_name,
+            freelancerName: prop.freelancer_name || flUser?.name || 'Freelancer',
+            freelancer: {
+              name: prop.freelancer_name || flUser?.name || 'Freelancer',
+              avatar: flUser?.avatar || flUser?.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(prop.freelancer_name || 'F')}&background=1a73e8&color=fff`,
+              email: flUser?.email || '',
+              title: flUser?.title || 'Professional Freelancer'
+            },
             bidAmount: prop.bidAmount,
             coverLetter: prop.coverLetter,
             deliveryTime: prop.deliveryTime,
             status: prop.status || 'Pending',
             createdAt: prop.createdAt,
             project_id: project._id,
+            projectId: project._id,
+            projectTitle: project.title,
             project_title: project.title,
             project_budget: project.budget
           });
@@ -43,7 +65,7 @@ exports.getMyProposals = async (req, res) => {
   try {
     const userId = req.user.id;
     // Find projects where the current user submitted a proposal
-    const projects = await Project.find({ 'proposals.freelancer_id': userId });
+    const projects = await Project.find({ 'proposals.freelancer_id': userId }).populate('client_id', 'name email companyName avatar profilePhoto location');
     
     const myProposals = [];
     projects.forEach(project => {
@@ -58,9 +80,13 @@ exports.getMyProposals = async (req, res) => {
           status: prop.status || 'Pending',
           createdAt: prop.createdAt,
           project_id: project._id,
+          projectId: project._id,
           project_title: project.title,
+          projectTitle: project.title,
           project_budget: project.budget,
-          client_id: project.client_id
+          client_id: project.client_id,
+          clientName: project.client_id?.companyName || project.client_id?.name || 'Client Partner',
+          client: project.client_id
         });
       }
     });

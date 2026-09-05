@@ -94,7 +94,7 @@ const Navbar = () => {
         <div className="navbar-left">
           <Link to="/" className="antigravity-brand" onClick={closeMobileMenu}>
             <div className="antigravity-logo-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="6" fill="url(#gigsphere_grad)" />
                 <ellipse cx="12" cy="12" rx="10" ry="4" stroke="url(#gigsphere_grad_ring)" strokeWidth="2.2" strokeLinecap="round" transform="rotate(-30 12 12)" />
                 <defs>

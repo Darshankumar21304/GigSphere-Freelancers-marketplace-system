@@ -105,6 +105,7 @@ export default function Wallet() {
         currency: 'INR',
         name: 'GigSphere Marketplace',
         description: `Wallet Balance Deposit ₹${orderRes.amount}`,
+        order_id: orderRes.orderId,
         handler: async function (response) {
           try {
             const verifyRes = await apiFetch('/wallet/deposit/verify', {
@@ -112,7 +113,9 @@ export default function Wallet() {
               body: JSON.stringify({
                 transactionId: orderRes.transactionId,
                 razorpayPaymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-                razorpayOrderId: response.razorpay_order_id || orderRes.orderId
+                razorpayOrderId: response.razorpay_order_id || orderRes.orderId,
+                razorpaySignature: response.razorpay_signature,
+                amount: orderRes.amount
               })
             });
             setMsg(verifyRes.message);
@@ -125,18 +128,27 @@ export default function Wallet() {
             setDepositing(false);
           }
         },
+        modal: {
+          ondismiss: function () {
+            setDepositing(false);
+          }
+        },
         prefill: {
           name: bankForm.accountHolder || 'Client Account',
           email: 'user@gigsphere.com',
           contact: '9876543210'
         },
         theme: {
-          color: '#4f46e5'
+          color: '#1a73e8'
         }
       };
 
       if (window.Razorpay) {
         const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          alert('Payment Failed: ' + (response.error?.description || 'Transaction cancelled'));
+          setDepositing(false);
+        });
         rzp.open();
       } else {
         // Direct sandbox fallback
@@ -145,7 +157,8 @@ export default function Wallet() {
           body: JSON.stringify({
             transactionId: orderRes.transactionId,
             razorpayPaymentId: `pay_${Date.now()}`,
-            razorpayOrderId: orderRes.orderId
+            razorpayOrderId: orderRes.orderId,
+            amount: orderRes.amount
           })
         });
         setMsg(verifyRes.message);
@@ -247,7 +260,14 @@ export default function Wallet() {
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button 
               className="btn" 
-              onClick={() => setShowWithdrawModal(true)}
+              onClick={() => {
+                setUpiId(bankDetails?.upiId || '');
+                setAccountHolder(bankDetails?.accountHolder || '');
+                setAccountNumber(bankDetails?.accountNumber || '');
+                setIfscCode(bankDetails?.ifscCode || '');
+                setBankName(bankDetails?.bankName || '');
+                setShowWithdrawModal(true);
+              }}
               disabled={walletBalance <= 0}
               style={{ backgroundColor: '#4f46e5', color: 'white', flexGrow: 1, border: 'none' }}
             >

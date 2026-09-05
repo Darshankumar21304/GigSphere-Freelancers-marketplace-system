@@ -47,9 +47,14 @@ import AdminKyc from './pages/admin/AdminKyc';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import StyleTest from './pages/StyleTest';
+import { initTheme } from './utils/themeUtils';
 import './App.css';
 
 function App() {
+  React.useEffect(() => {
+    initTheme();
+  }, []);
+
   return (
     <Router>
       <div className="app-container">
@@ -78,11 +83,13 @@ function App() {
               <Route path="create-project" element={<CreateGig />} />
               <Route path="post-project" element={<CreateGig />} />
               <Route path="profile" element={<Profile />} />
-              <Route path="settings" element={<Profile />} />
+              <Route path="settings" element={<Settings />} />
               <Route path="hired" element={<HiredFreelancers />} />
               <Route path="reviews" element={<ClientReviews />} />
               <Route path="disputes" element={<Disputes />} />
               <Route path="notifications" element={<Notifications />} />
+              <Route path="browse-projects" element={<Explore />} />
+              <Route path="explore" element={<Explore />} />
             </Route>
             
             <Route path="/freelancer/dashboard" element={<ProtectedRoute allowedRole="freelancer"><DashboardLayout /></ProtectedRoute>}>
@@ -98,6 +105,8 @@ function App() {
               <Route path="disputes" element={<Disputes />} />
               <Route path="settings" element={<Settings />} />
               <Route path="notifications" element={<Notifications />} />
+              <Route path="browse-projects" element={<Explore />} />
+              <Route path="explore" element={<Explore />} />
             </Route>
 
             {/* Admin Dashboard Routes */}

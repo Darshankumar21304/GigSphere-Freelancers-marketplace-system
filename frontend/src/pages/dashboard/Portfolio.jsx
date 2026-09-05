@@ -1,405 +1,672 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, MapPin, Star, Eye, CheckCircle, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Plus, Star, Eye, CheckCircle,
   Image as ImageIcon, UploadCloud, Link as LinkIcon, Edit2, Trash2,
-  X
+  X, Award, Briefcase, GraduationCap, Code2, ChevronDown, ChevronUp,
+  Globe, Loader2, Save, ExternalLink
 } from 'lucide-react';
-import { getUserProfile, getUserRole } from '../../utils/authUtils';
+import { getUserProfile } from '../../utils/authUtils';
+import { apiFetch } from '../../utils/api';
+import { uploadFileToCloudinary } from '../../utils/fileUpload';
 import './Portfolio.css';
 
-const MOCK_PROFILE = {
-  name: 'Alex Developer',
-  title: 'Senior Full Stack Engineer',
-  location: 'Remote, India',
-  rating: 4.9,
-  completedProjects: 34,
-  portfolioViews: 1245,
-  profileCompletion: 92,
-  avatar: 'https://i.pravatar.cc/150?img=11'
+const GithubIcon = ({ size = 15, className = '', style = {} }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+    <path d="M9 18c-4.51 2-5-2-7-2" />
+  </svg>
+);
+
+const LinkedinIcon = ({ size = 15, className = '', style = {} }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+    <rect width="4" height="12" x="2" y="9" />
+    <circle cx="4" cy="4" r="2" />
+  </svg>
+);
+
+const CATEGORIES = ['All', 'Web Development', 'Mobile Apps', 'UI/UX Design', 'AI & Data', 'Blockchain', 'Other'];
+const TABS = ['Portfolio', 'Work Experience', 'Certifications', 'Social Links'];
+
+const formatExternalUrl = (url) => {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
 };
 
-const MOCK_PORTFOLIO = [
-  {
-    id: 'PORT-1',
-    title: 'Fintech Dashboard UX/UI',
-    description: 'A comprehensive financial dashboard allowing users to track their expenses, investments, and cryptocurrency portfolio in real time.',
-    category: 'UI/UX Design',
-    skills: ['Figma', 'UI Design', 'Prototyping'],
-    completionDate: 'Sep 2023',
-    clientName: 'Finova Corp',
-    link: 'https://dribbble.com/alexdev',
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'PORT-2',
-    title: 'E-commerce React Application',
-    description: 'Built a scalable e-commerce frontend using React, Redux, and Tailwind CSS. Integrated with Stripe for payments and Algolia for search.',
-    category: 'Web Development',
-    skills: ['React', 'Tailwind', 'Redux', 'Stripe'],
-    completionDate: 'Jul 2023',
-    clientName: 'Retail Giant',
-    link: 'https://github.com/alexdev',
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'PORT-3',
-    title: 'Food Delivery Mobile App',
-    description: 'Cross-platform mobile application built with React Native for a local food delivery startup. Features real-time GPS tracking and push notifications.',
-    category: 'Mobile Apps',
-    skills: ['React Native', 'Firebase', 'Google Maps API'],
-    completionDate: 'Mar 2023',
-    clientName: 'QuickBite',
-    link: '',
-    image: 'https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?auto=format&fit=crop&w=600&q=80'
-  }
-];
-
-const CATEGORIES = ['All Projects', 'Web Development', 'Mobile Apps', 'UI/UX Design', 'Graphic Design'];
-
 export default function Portfolio() {
-  const profile = getUserProfile();
-  const displayName = profile?.name || profile?.fullName || MOCK_PROFILE.name;
-  
-  const [projects, setProjects] = useState(MOCK_PORTFOLIO);
-  const [activeTab, setActiveTab] = useState('All Projects');
+  const userProfile = getUserProfile();
+  const [activeTab, setActiveTab] = useState('Portfolio');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
-  
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState(null);
 
-  // New Project Form State
-  const [newProject, setNewProject] = useState({
-    title: '', description: '', category: 'Web Development', 
-    skills: '', link: '', completionDate: ''
+  const [profile, setProfile] = useState(null);
+  const [portfolioItems, setPortfolioItems] = useState([]);
+  const [workExperience, setWorkExperience] = useState([]);
+  const [certifications, setCertifications] = useState([]);
+  const [socialLinks, setSocialLinks] = useState({ linkedinUrl: '', githubUrl: '', websiteUrl: '' });
+
+  const [isAddPortfolioOpen, setIsAddPortfolioOpen] = useState(false);
+  const [isAddExpOpen, setIsAddExpOpen] = useState(false);
+  const [isAddCertOpen, setIsAddCertOpen] = useState(false);
+
+  const [newPortfolioItem, setNewPortfolioItem] = useState({
+    title: '', description: '', category: 'Web Development',
+    skills: '', link: '', completionDate: '', clientName: '', imageUrl: ''
   });
-  const [uploadedImage, setUploadedImage] = useState(null);
+  const [portfolioImageFile, setPortfolioImageFile] = useState(null);
+  const [portfolioImagePreview, setPortfolioImagePreview] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const portfolioImageRef = useRef(null);
+
+  const [newExp, setNewExp] = useState({
+    company: '', role: '', startDate: '', endDate: '', isCurrent: false, description: ''
+  });
+
+  const [newCert, setNewCert] = useState({
+    name: '', issuer: '', issueDate: '', credentialUrl: '', docUrl: ''
+  });
+  const [certDocFile, setCertDocFile] = useState(null);
+  const [isUploadingCertDoc, setIsUploadingCertDoc] = useState(false);
+  const certDocRef = useRef(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    fetchProfileData();
   }, []);
 
-  const filteredProjects = projects.filter(p => {
-    if (activeTab === 'All Projects') return true;
-    return p.category === activeTab;
-  });
-
-  const handleDeleteConfirm = () => {
-    if (projectToDelete) {
-      setProjects(prev => prev.filter(p => p.id !== projectToDelete));
-      setProjectToDelete(null);
-      setIsDeleteModalOpen(false);
+  const fetchProfileData = async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiFetch('/users/profile/me');
+      if (data?.profile) {
+        setProfile(data.profile);
+        setPortfolioItems(data.profile.portfolioItems || []);
+        setWorkExperience(data.profile.workExperience || []);
+        setCertifications(data.profile.certifications || []);
+        setSocialLinks({
+          linkedinUrl: data.profile.linkedinUrl || '',
+          githubUrl: data.profile.githubUrl || '',
+          websiteUrl: data.profile.websiteUrl || ''
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      showToast('Error loading profile data', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Create local URL for preview
-      const imageUrl = URL.createObjectURL(file);
-      setUploadedImage(imageUrl);
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const saveToAPI = async (updates) => {
+    setIsSaving(true);
+    try {
+      await apiFetch('/users/profile/me', { method: 'PUT', body: JSON.stringify(updates) });
+      showToast('Profile updated successfully!');
+    } catch (err) {
+      showToast('Failed to save changes', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleAddProject = (e) => {
-    e.preventDefault();
-    if (!newProject.title || !newProject.description) return; // simple validation
+  // Portfolio image upload
+  const handlePortfolioImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPortfolioImageFile(file);
+    setPortfolioImagePreview(URL.createObjectURL(file));
+  };
 
-    const project = {
-      id: `PORT-${Date.now()}`,
-      title: newProject.title,
-      description: newProject.description,
-      category: newProject.category,
-      skills: newProject.skills.split(',').map(s => s.trim()).filter(s => s),
-      completionDate: newProject.completionDate,
-      clientName: 'Private Client',
-      link: newProject.link,
-      image: uploadedImage || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&w=600&q=80'
+  const uploadPortfolioImage = async () => {
+    if (!portfolioImageFile) return newPortfolioItem.imageUrl;
+    setIsUploadingImage(true);
+    try {
+      const result = await uploadFileToCloudinary(portfolioImageFile, '/api/upload/single');
+      return result.url;
+    } catch (err) {
+      showToast('Image upload failed: ' + err.message, 'error');
+      return '';
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Add portfolio item
+  const handleAddPortfolioItem = async () => {
+    if (!newPortfolioItem.title.trim()) return showToast('Title is required', 'error');
+    const imageUrl = await uploadPortfolioImage();
+    const item = {
+      ...newPortfolioItem,
+      imageUrl,
+      skills: newPortfolioItem.skills.split(',').map(s => s.trim()).filter(Boolean)
     };
-    
-    setProjects([project, ...projects]);
-    setIsAddModalOpen(false);
-    setNewProject({ title: '', description: '', category: 'Web Development', skills: '', link: '', completionDate: '' });
-    setUploadedImage(null);
+    const updated = [...portfolioItems, item];
+    setPortfolioItems(updated);
+    await saveToAPI({ portfolioItems: updated });
+    setNewPortfolioItem({ title: '', description: '', category: 'Web Development', skills: '', link: '', completionDate: '', clientName: '', imageUrl: '' });
+    setPortfolioImageFile(null);
+    setPortfolioImagePreview('');
+    setIsAddPortfolioOpen(false);
+  };
+
+  const handleDeletePortfolioItem = async (idx) => {
+    const updated = portfolioItems.filter((_, i) => i !== idx);
+    setPortfolioItems(updated);
+    await saveToAPI({ portfolioItems: updated });
+  };
+
+  // Work Experience
+  const handleAddExp = async () => {
+    if (!newExp.company.trim()) return showToast('Company name is required', 'error');
+    const updated = [...workExperience, newExp];
+    setWorkExperience(updated);
+    await saveToAPI({ workExperience: updated });
+    setNewExp({ company: '', role: '', startDate: '', endDate: '', isCurrent: false, description: '' });
+    setIsAddExpOpen(false);
+  };
+
+  const handleDeleteExp = async (idx) => {
+    const updated = workExperience.filter((_, i) => i !== idx);
+    setWorkExperience(updated);
+    await saveToAPI({ workExperience: updated });
+  };
+
+  // Certifications
+  const handleCertDocSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCertDocFile(file);
+    setIsUploadingCertDoc(true);
+    try {
+      const result = await uploadFileToCloudinary(file, '/api/upload/single');
+      setNewCert(prev => ({ ...prev, docUrl: result.url }));
+      showToast('Document uploaded to Cloudinary!');
+    } catch (err) {
+      showToast('Document upload failed: ' + err.message, 'error');
+    } finally {
+      setIsUploadingCertDoc(false);
+    }
+  };
+
+  const handleAddCert = async () => {
+    if (!newCert.name.trim()) return showToast('Certification name is required', 'error');
+    const updated = [...certifications, newCert];
+    setCertifications(updated);
+    await saveToAPI({ certifications: updated });
+    setNewCert({ name: '', issuer: '', issueDate: '', credentialUrl: '', docUrl: '' });
+    setCertDocFile(null);
+    setIsAddCertOpen(false);
+  };
+
+  const handleDeleteCert = async (idx) => {
+    const updated = certifications.filter((_, i) => i !== idx);
+    setCertifications(updated);
+    await saveToAPI({ certifications: updated });
+  };
+
+  // Social Links
+  const handleSaveSocialLinks = async () => {
+    await saveToAPI(socialLinks);
+  };
+
+  const filteredPortfolio = activeCategoryFilter === 'All'
+    ? portfolioItems
+    : portfolioItems.filter(p => p.category === activeCategoryFilter);
+
+  const fieldStyle = {
+    width: '100%', padding: '10px 14px', borderRadius: '10px',
+    border: '1px solid #e2e8f0', fontSize: '0.875rem', color: '#0f172a',
+    background: '#f8fafc', outline: 'none', boxSizing: 'border-box',
+    transition: 'border-color 0.2s, box-shadow 0.2s'
   };
 
   return (
-    <div className="gigsphere-freelancer-portfolio">
-      <div className="portfolio-container">
-        
-        {/* Header */}
-        <div className="page-header">
-          <div>
-            <div className="breadcrumb">Dashboard / Portfolio</div>
-            <h1 className="page-title">My Portfolio</h1>
-            <p className="page-desc">Showcase your best work and demonstrate your skills to potential Clients.</p>
+    <div style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto', position: 'relative' }}>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
+          padding: '12px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '0.875rem',
+          background: toast.type === 'error' ? '#ef4444' : '#10b981', color: '#fff',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', animation: 'slideIn 0.3s ease'
+        }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+        <div>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px' }}>Portfolio & Professional History</h1>
+          <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>Showcase your work, experience, and certifications. All media stored on Cloudinary CDN.</p>
+        </div>
+        {isSaving && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1a73e8', fontWeight: 600, fontSize: '0.875rem' }}>
+            <Loader2 size={16} className="spin" /> Saving...
           </div>
-          <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
-            <Plus size={18} /> Add Portfolio Project
-          </button>
-        </div>
-
-        {/* Profile Summary Card */}
-        <div className="profile-card">
-          <div className="profile-main">
-            <img src={MOCK_PROFILE.avatar} alt="Profile" className="profile-image" />
-            <div className="profile-info">
-              <h2 className="freelancer-name">{displayName}</h2>
-              <p className="professional-title">{MOCK_PROFILE.title}</p>
-              <div className="freelancer-meta">
-                <span className="freelancer-meta-item">
-                  <MapPin size={14} /> {MOCK_PROFILE.location}
-                </span>
-                <span className="freelancer-meta-item rating">
-                  <Star size={14} fill="currentColor" /> {MOCK_PROFILE.rating}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="profile-stats">
-            <div className="stat-box">
-              <span className="stat-value">{MOCK_PROFILE.completedProjects}</span>
-              <span className="stat-label">Projects</span>
-            </div>
-            <div className="stat-box">
-              <span className="stat-value">{MOCK_PROFILE.portfolioViews}</span>
-              <span className="stat-label">Views</span>
-            </div>
-            <div className="completion-box">
-              <div className="completion-header">
-                <span>Profile Completeness</span>
-                <span style={{color: 'var(--primary)'}}>{MOCK_PROFILE.profileCompletion}%</span>
-              </div>
-              <div className="progress-bar-container">
-                <div className="progress-bar-fill" style={{width: `${MOCK_PROFILE.profileCompletion}%`}}></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Categories */}
-        <div className="tabs-container">
-          {CATEGORIES.map(tab => (
-            <button 
-              key={tab}
-              className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Portfolio Grid */}
-        <div className="portfolio-grid">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="portfolio-card">
-                <div className="skeleton" style={{width: '100%', height: '200px', borderRadius: 0}}></div>
-                <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                  <div className="skeleton" style={{width: '80%', height: '20px'}}></div>
-                  <div className="skeleton" style={{width: '100%', height: '40px'}}></div>
-                  <div className="skeleton" style={{width: '50%', height: '16px'}}></div>
-                </div>
-              </div>
-            ))
-          ) : filteredProjects.length > 0 ? (
-            filteredProjects.map(project => (
-              <div key={project.id} className="portfolio-card">
-                <div className="card-image-wrapper">
-                  <img src={project.image} alt={project.title} className="card-image" />
-                  <div className="card-overlay">
-                    <button className="overlay-btn" title="View Project">
-                      <Eye size={18} />
-                    </button>
-                    <button className="overlay-btn" title="Edit Project">
-                      <Edit2 size={18} />
-                    </button>
-                    <button 
-                      className="overlay-btn" 
-                      title="Delete Project"
-                      onClick={() => {
-                        setProjectToDelete(project.id);
-                        setIsDeleteModalOpen(true);
-                      }}
-                    >
-                      <Trash2 size={18} color="#dc2626" />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="card-content">
-                  <h3 className="project-title">{project.title}</h3>
-                  <p className="project-desc">{project.description}</p>
-                  <div className="skills-list">
-                    {project.skills.map(skill => (
-                      <span key={skill} className="skill-chip">{skill}</span>
-                    ))}
-                  </div>
-                  
-                  <div className="card-footer">
-                    <div className="footer-item">
-                      <CheckCircle size={14} /> Completed {project.completionDate}
-                    </div>
-                    {project.link && (
-                      <a href={project.link} target="_blank" rel="noopener noreferrer" className="project-link footer-item">
-                        <LinkIcon size={14} /> View Live
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="empty-state">
-              <ImageIcon className="empty-icon" size={64} />
-              <h3 className="empty-title">Build a portfolio that gets you hired</h3>
-              <p className="empty-desc">
-                Clients are 4x more likely to hire freelancers who showcase their past work. Add relevant projects, case studies, or concepts to demonstrate your expertise.
-              </p>
-              <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
-                Add Your First Project
-              </button>
-            </div>
-          )}
-        </div>
-
+        )}
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content small-modal">
-            <div className="modal-header">
-              <h3 className="modal-title" style={{color: '#dc2626'}}>Delete Project</h3>
-              <button className="close-btn" onClick={() => setIsDeleteModalOpen(false)}>
-                <X size={20} />
-              </button>
+      {/* Profile Completion Banner */}
+      {profile && (
+        <div style={{ background: 'linear-gradient(135deg, #1a73e8 0%, #a142f4 100%)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.85, marginBottom: '4px' }}>PROFILE COMPLETION</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 900 }}>{profile.profileCompletion || 0}%</div>
+            <div style={{ marginTop: '8px', width: '280px', height: '6px', background: 'rgba(255,255,255,0.3)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${profile.profileCompletion || 0}%`, background: '#fff', borderRadius: '999px', transition: 'width 0.8s ease' }} />
             </div>
-            <div className="modal-body">
-              <p>Are you sure you want to delete this portfolio project? This action cannot be undone and it will be removed from your public profile.</p>
+          </div>
+          <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900 }}>{portfolioItems.length}</div>
+              <div style={{ opacity: 0.8 }}>Projects</div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDeleteConfirm}>Yes, Delete</button>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900 }}>{certifications.length}</div>
+              <div style={{ opacity: 0.8 }}>Certs</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900 }}>{workExperience.length}</div>
+              <div style={{ opacity: 0.8 }}>Experience</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Project Modal */}
-      {isAddModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">Add Portfolio Project</h3>
-              <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>
-                <X size={20} />
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #f1f5f9', marginBottom: '24px', overflowX: 'auto' }}>
+        {TABS.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} style={{
+            padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: '0.875rem', whiteSpace: 'nowrap',
+            color: activeTab === tab ? '#1a73e8' : '#64748b',
+            borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent',
+            marginBottom: '-2px', transition: 'all 0.2s'
+          }}>
+            {tab === 'Portfolio' && <Code2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />}
+            {tab === 'Work Experience' && <Briefcase size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />}
+            {tab === 'Certifications' && <Award size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />}
+            {tab === 'Social Links' && <Globe size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />}
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px', color: '#64748b' }}>
+          <Loader2 size={32} className="spin" />
+        </div>
+      ) : (
+        <>
+          {/* ===== PORTFOLIO TAB ===== */}
+          {activeTab === 'Portfolio' && (
+            <div>
+              {/* Category Filter + Add Button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {CATEGORIES.map(cat => (
+                    <button key={cat} onClick={() => setActiveCategoryFilter(cat)} style={{
+                      padding: '6px 16px', borderRadius: '999px', border: '1px solid',
+                      borderColor: activeCategoryFilter === cat ? '#1a73e8' : '#e2e8f0',
+                      background: activeCategoryFilter === cat ? '#1a73e8' : '#f8fafc',
+                      color: activeCategoryFilter === cat ? '#fff' : '#64748b',
+                      fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                    }}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setIsAddPortfolioOpen(true)} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 20px',
+                  borderRadius: '999px', background: 'linear-gradient(135deg, #1a73e8, #a142f4)',
+                  color: '#fff', border: 'none', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(26,115,232,0.3)'
+                }}>
+                  <Plus size={16} /> Add Project
+                </button>
+              </div>
+
+              {filteredPortfolio.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', border: '2px dashed #e2e8f0', borderRadius: '20px', background: '#f8fafc' }}>
+                  <ImageIcon size={48} color="#cbd5e1" style={{ marginBottom: '12px' }} />
+                  <h3 style={{ color: '#0f172a', fontWeight: 800, margin: '0 0 6px' }}>No portfolio projects yet</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.875rem', maxWidth: '400px', margin: '0 auto 16px' }}>
+                    Add your best work to showcase your skills to potential clients. Portfolio images are stored on Cloudinary CDN.
+                  </p>
+                  <button onClick={() => setIsAddPortfolioOpen(true)} style={{ padding: '10px 24px', borderRadius: '999px', background: '#1a73e8', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+                    Add First Project
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                  {filteredPortfolio.map((item, idx) => (
+                    <div key={idx} style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', transition: 'transform 0.3s, box-shadow 0.3s' }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 16px 40px rgba(26,115,232,0.12)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                      {/* Cover Image */}
+                      <div style={{ height: '180px', background: 'linear-gradient(135deg, #1a73e8 0%, #a142f4 100%)', position: 'relative', overflow: 'hidden' }}>
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                            <Code2 size={40} color="rgba(255,255,255,0.6)" />
+                          </div>
+                        )}
+                        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px' }}>
+                          {(item.link || item.url) && (
+                            <a href={formatExternalUrl(item.link || item.url)} target="_blank" rel="noopener noreferrer" style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }} title="Open External Project Link" onClick={(e) => e.stopPropagation()}>
+                              <ExternalLink size={14} color="#1a73e8" />
+                            </a>
+                          )}
+                          <button onClick={() => handleDeletePortfolioItem(idx)} style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            <Trash2 size={14} color="#ef4444" />
+                          </button>
+                        </div>
+                        <div style={{ position: 'absolute', bottom: '10px', left: '10px' }}>
+                          <span style={{ padding: '3px 10px', borderRadius: '20px', background: 'rgba(255,255,255,0.9)', color: '#1a73e8', fontSize: '0.72rem', fontWeight: 700 }}>
+                            {item.category}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ padding: '16px' }}>
+                        <h3 style={{ margin: '0 0 6px', fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>{item.title}</h3>
+                        {item.clientName && <p style={{ margin: '0 0 8px', fontSize: '0.78rem', color: '#1a73e8', fontWeight: 600 }}>Client: {item.clientName}</p>}
+                        <p style={{ margin: '0 0 12px', fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {item.description}
+                        </p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {(item.skills || []).slice(0, 4).map((skill, si) => (
+                            <span key={si} style={{ padding: '3px 10px', borderRadius: '20px', background: '#e8f0fe', color: '#1a73e8', fontSize: '0.72rem', fontWeight: 600 }}>
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                        {item.completionDate && (
+                          <p style={{ margin: '10px 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Completed: {item.completionDate}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== WORK EXPERIENCE TAB ===== */}
+          {activeTab === 'Work Experience' && (
+            <div>
+              {workExperience.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', border: '2px dashed #e2e8f0', borderRadius: '20px', background: '#f8fafc' }}>
+                  <Briefcase size={48} color="#cbd5e1" style={{ marginBottom: '12px' }} />
+                  <h3 style={{ color: '#0f172a', fontWeight: 800, margin: '0 0 6px' }}>No work experience added yet</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Add your past roles, full-time positions, or freelance experience.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {workExperience.map((exp, idx) => (
+                    <div key={idx} style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px', position: 'relative' }}>
+                      <button onClick={() => handleDeleteExp(idx)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <Trash2 size={16} color="#ef4444" />
+                      </button>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#e8f0fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Briefcase size={22} color="#1a73e8" />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: '0 0 2px', fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>{exp.role || 'Software Engineer'}</h3>
+                          <p style={{ margin: '0 0 6px', fontSize: '0.875rem', color: '#1a73e8', fontWeight: 600 }}>{exp.company}</p>
+                          <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: '#64748b' }}>
+                            {exp.startDate} - {exp.isCurrent ? 'Present' : (exp.endDate || 'N/A')}
+                          </p>
+                          {exp.description && <p style={{ margin: 0, fontSize: '0.85rem', color: '#334155', lineHeight: 1.5 }}>{exp.description}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== CERTIFICATIONS TAB ===== */}
+          {activeTab === 'Certifications' && (
+            <div>
+              {certifications.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', border: '2px dashed #e2e8f0', borderRadius: '20px', background: '#f8fafc' }}>
+                  <Award size={48} color="#cbd5e1" style={{ marginBottom: '12px' }} />
+                  <h3 style={{ color: '#0f172a', fontWeight: 800, margin: '0 0 6px' }}>No certifications yet</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Upload certificates from Google, Coursera, AWS, or any institution.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                  {certifications.map((cert, idx) => (
+                    <div key={idx} style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px', position: 'relative' }}>
+                      <button onClick={() => handleDeleteCert(idx)} style={{ position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <Trash2 size={15} color="#ef4444" />
+                      </button>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #fef3c7, #fde68a)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+                        <Award size={22} color="#d97706" />
+                      </div>
+                      <h3 style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', paddingRight: '24px' }}>{cert.name}</h3>
+                      {cert.issuer && <p style={{ margin: '0 0 4px', fontSize: '0.82rem', color: '#1a73e8', fontWeight: 600 }}>{cert.issuer}</p>}
+                      {cert.issueDate && <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: '#94a3b8' }}>Issued: {cert.issueDate}</p>}
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {cert.credentialUrl && (
+                          <a href={formatExternalUrl(cert.credentialUrl)} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 12px', borderRadius: '20px', border: '1px solid #1a73e8', color: '#1a73e8', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <LinkIcon size={11} /> View Credential
+                          </a>
+                        )}
+                        {cert.docUrl && (
+                          <a href={formatExternalUrl(cert.docUrl)} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 12px', borderRadius: '20px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <ExternalLink size={11} /> Document
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== SOCIAL LINKS TAB ===== */}
+          {activeTab === 'Social Links' && (
+            <div style={{ maxWidth: '560px' }}>
+              <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 20px', fontWeight: 800, color: '#0f172a' }}>Professional Links</h3>
+                {[
+                  { key: 'linkedinUrl', label: 'LinkedIn Profile', icon: LinkedinIcon, placeholder: 'https://linkedin.com/in/your-profile' },
+                  { key: 'githubUrl', label: 'GitHub Profile', icon: GithubIcon, placeholder: 'https://github.com/your-username' },
+                  { key: 'websiteUrl', label: 'Personal Website', icon: Globe, placeholder: 'https://yoursite.com' }
+                ].map(({ key, label, icon: Icon, placeholder }) => (
+                  <div key={key} style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontWeight: 700, fontSize: '0.875rem', color: '#374151' }}>
+                      <Icon size={15} /> {label}
+                    </label>
+                    <input
+                      type="url"
+                      placeholder={placeholder}
+                      value={socialLinks[key]}
+                      onChange={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value }))}
+                      style={fieldStyle}
+                    />
+                  </div>
+                ))}
+                <button onClick={handleSaveSocialLinks} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px', borderRadius: '999px', background: '#1a73e8', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+                  <Save size={15} /> Save Links
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ===== ADD PORTFOLIO MODAL ===== */}
+      {isAddPortfolioOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontWeight: 900, color: '#0f172a' }}>Add Portfolio Project</h2>
+              <button onClick={() => setIsAddPortfolioOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} color="#64748b" />
               </button>
             </div>
-            <form onSubmit={handleAddProject}>
-              <div className="modal-body">
-                
-                <div className="form-group">
-                  <label className="form-label">Project Title *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g. Modern E-commerce App"
-                    value={newProject.title}
-                    onChange={e => setNewProject({...newProject, title: e.target.value})}
-                    required
-                  />
-                </div>
 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
-                  <div className="form-group">
-                    <label className="form-label">Category *</label>
-                    <select 
-                      className="form-select"
-                      value={newProject.category}
-                      onChange={e => setNewProject({...newProject, category: e.target.value})}
-                    >
-                      {CATEGORIES.slice(1).map(cat => <option key={cat}>{cat}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Completion Date</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="e.g. Oct 2023"
-                      value={newProject.completionDate}
-                      onChange={e => setNewProject({...newProject, completionDate: e.target.value})}
-                    />
-                  </div>
+            {/* Image Upload */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '8px' }}>Project Cover Image (Cloudinary CDN)</label>
+              {portfolioImagePreview ? (
+                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', height: '160px', marginBottom: '8px' }}>
+                  <img src={portfolioImagePreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button onClick={() => { setPortfolioImagePreview(''); setPortfolioImageFile(null); }} style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={14} />
+                  </button>
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label">Project Description *</label>
-                  <textarea 
-                    className="form-textarea" 
-                    placeholder="Describe the project, your role, and the impact..."
-                    value={newProject.description}
-                    onChange={e => setNewProject({...newProject, description: e.target.value})}
-                    required
-                  ></textarea>
+              ) : (
+                <div onClick={() => portfolioImageRef.current?.click()} style={{ border: '2px dashed #e2e8f0', borderRadius: '12px', padding: '32px', textAlign: 'center', cursor: 'pointer', background: '#f8fafc', transition: 'border-color 0.2s' }}>
+                  <UploadCloud size={28} color="#94a3b8" style={{ marginBottom: '8px' }} />
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Click to upload project image (JPG, PNG, max 10MB)</p>
                 </div>
+              )}
+              <input ref={portfolioImageRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePortfolioImageSelect} />
+            </div>
 
-                <div className="form-group">
-                  <label className="form-label">Skills Used</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g. React, Node.js, Figma (comma separated)"
-                    value={newProject.skills}
-                    onChange={e => setNewProject({...newProject, skills: e.target.value})}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Project Link (Optional)</label>
-                  <input 
-                    type="url" 
-                    className="form-input" 
-                    placeholder="https://..."
-                    value={newProject.link}
-                    onChange={e => setNewProject({...newProject, link: e.target.value})}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Cover Image *</label>
-                  <label className="upload-area" style={{padding: uploadedImage ? '10px' : '40px 24px'}}>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      style={{display: 'none'}} 
-                      onChange={handleImageUpload}
-                    />
-                    {uploadedImage ? (
-                      <img src={uploadedImage} alt="Preview" style={{width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px'}} />
-                    ) : (
-                      <>
-                        <UploadCloud className="upload-icon" size={32} />
-                        <p className="upload-text">Click or drag image to upload</p>
-                        <p className="upload-subtext">SVG, PNG, JPG or GIF (max. 5MB)</p>
-                      </>
-                    )}
-                  </label>
-                </div>
-
+            {[
+              { key: 'title', label: 'Project Title *', placeholder: 'e.g. Fintech Dashboard' },
+              { key: 'clientName', label: 'Client / Company', placeholder: 'e.g. Heartware Inc.' },
+              { key: 'completionDate', label: 'Completion Date', placeholder: 'e.g. Aug 2024' },
+              { key: 'link', label: 'Live URL / GitHub', placeholder: 'https://...' },
+              { key: 'skills', label: 'Skills Used (comma-separated)', placeholder: 'React, Node.js, MongoDB' }
+            ].map(({ key, label, placeholder }) => (
+              <div key={key} style={{ marginBottom: '14px' }}>
+                <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '6px' }}>{label}</label>
+                <input value={newPortfolioItem[key]} onChange={e => setNewPortfolioItem(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} style={fieldStyle} />
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline" onClick={() => setIsAddModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Project</button>
-              </div>
-            </form>
+            ))}
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '6px' }}>Category</label>
+              <select value={newPortfolioItem.category} onChange={e => setNewPortfolioItem(p => ({ ...p, category: e.target.value }))} style={fieldStyle}>
+                {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '6px' }}>Description</label>
+              <textarea value={newPortfolioItem.description} onChange={e => setNewPortfolioItem(p => ({ ...p, description: e.target.value }))} placeholder="Describe what you built, the challenges, and impact..." rows={3} style={{ ...fieldStyle, resize: 'vertical' }} />
+            </div>
+
+            <button onClick={handleAddPortfolioItem} disabled={isUploadingImage || isSaving} style={{
+              width: '100%', padding: '12px', borderRadius: '12px', border: 'none',
+              background: 'linear-gradient(135deg, #1a73e8, #a142f4)', color: '#fff',
+              fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              opacity: (isUploadingImage || isSaving) ? 0.7 : 1
+            }}>
+              {(isUploadingImage || isSaving) ? <Loader2 size={18} className="spin" /> : <Plus size={18} />}
+              {isUploadingImage ? 'Uploading to Cloudinary...' : isSaving ? 'Saving...' : 'Add Project'}
+            </button>
           </div>
         </div>
       )}
 
+      {/* ===== ADD EXPERIENCE MODAL ===== */}
+      {isAddExpOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontWeight: 900, color: '#0f172a' }}>Add Work Experience</h2>
+              <button onClick={() => setIsAddExpOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            {[
+              { key: 'company', label: 'Company *', placeholder: 'e.g. Google, Infosys, Startup' },
+              { key: 'role', label: 'Role / Title', placeholder: 'e.g. Senior Frontend Developer' },
+              { key: 'startDate', label: 'Start Date', placeholder: 'e.g. Jan 2022' },
+              { key: 'endDate', label: 'End Date', placeholder: 'e.g. Dec 2023 (leave empty if current)' }
+            ].map(({ key, label, placeholder }) => (
+              <div key={key} style={{ marginBottom: '14px' }}>
+                <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '6px' }}>{label}</label>
+                <input value={newExp[key]} onChange={e => setNewExp(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} style={fieldStyle} />
+              </div>
+            ))}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
+              <input type="checkbox" checked={newExp.isCurrent} onChange={e => setNewExp(p => ({ ...p, isCurrent: e.target.checked }))} />
+              Currently working here
+            </label>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '6px' }}>Description</label>
+              <textarea value={newExp.description} onChange={e => setNewExp(p => ({ ...p, description: e.target.value }))} rows={3} placeholder="Key responsibilities and achievements..." style={{ ...fieldStyle, resize: 'vertical' }} />
+            </div>
+            <button onClick={handleAddExp} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #1a73e8, #a142f4)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}>
+              Save Experience
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ADD CERTIFICATION MODAL ===== */}
+      {isAddCertOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontWeight: 900, color: '#0f172a' }}>Add Certification</h2>
+              <button onClick={() => setIsAddCertOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            {[
+              { key: 'name', label: 'Certification Name *', placeholder: 'e.g. Google Cloud Professional' },
+              { key: 'issuer', label: 'Issued By', placeholder: 'e.g. Google, Coursera, AWS' },
+              { key: 'issueDate', label: 'Issue Date', placeholder: 'e.g. March 2024' },
+              { key: 'credentialUrl', label: 'Credential URL', placeholder: 'https://verify.credential.com/...' }
+            ].map(({ key, label, placeholder }) => (
+              <div key={key} style={{ marginBottom: '14px' }}>
+                <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '6px' }}>{label}</label>
+                <input value={newCert[key]} onChange={e => setNewCert(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} style={fieldStyle} />
+              </div>
+            ))}
+            {/* Certificate Document Upload to Cloudinary */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontWeight: 700, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '8px' }}>Upload Certificate Document (Cloudinary CDN)</label>
+              <div onClick={() => certDocRef.current?.click()} style={{ border: '2px dashed #e2e8f0', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: '#f8fafc' }}>
+                {isUploadingCertDoc ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#1a73e8' }}>
+                    <Loader2 size={18} className="spin" /> Uploading to Cloudinary...
+                  </div>
+                ) : newCert.docUrl ? (
+                  <div style={{ color: '#10b981', fontWeight: 600, fontSize: '0.875rem' }}>
+                    <CheckCircle size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                    Document uploaded successfully!
+                  </div>
+                ) : (
+                  <div>
+                    <UploadCloud size={24} color="#94a3b8" style={{ marginBottom: '6px' }} />
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>Upload PDF certificate (max 15MB)</p>
+                  </div>
+                )}
+              </div>
+              <input ref={certDocRef} type="file" accept=".pdf,.jpg,.png" style={{ display: 'none' }} onChange={handleCertDocSelect} />
+            </div>
+            <button onClick={handleAddCert} disabled={isUploadingCertDoc} style={{
+              width: '100%', padding: '12px', borderRadius: '12px', border: 'none',
+              background: 'linear-gradient(135deg, #1a73e8, #a142f4)', color: '#fff',
+              fontWeight: 700, cursor: 'pointer', fontSize: '1rem', opacity: isUploadingCertDoc ? 0.7 : 1
+            }}>
+              Save Certification
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
