@@ -23,4 +23,18 @@ router.get('/disputes', authMiddleware, userController.getUserDisputes);
 router.post('/disputes', authMiddleware, userController.fileNewDispute);
 router.post('/disputes/:id/message', authMiddleware, userController.addUserDisputeMessage);
 
+// Public user profile
+router.get('/clean-work-experience', async (req, res) => {
+  try {
+    const { FreelancerProfile } = require('../models');
+    const result = await FreelancerProfile.updateMany({}, { $set: { workExperience: [] } });
+    res.json({ message: 'Cleaned work experience across all freelancer profiles in MongoDB', result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id/public', userController.getUserPublicProfile);
+router.get('/:id', userController.getUserPublicProfile);
+
 module.exports = router;

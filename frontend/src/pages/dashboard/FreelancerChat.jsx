@@ -7,13 +7,26 @@ import {
   Smile, Check, CheckCheck, MessageSquare, Briefcase
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { uploadFileToCloudinary } from '../../utils/fileUpload';
+import { getUserProfile, getToken } from '../../utils/authUtils';
+import { getCleanAvatar } from '../../utils/avatarUtils';
 import './FreelancerChat.css';
 
 const socket = io('http://localhost:5001');
 
+const extractId = (val) => {
+  if (!val) return null;
+  if (typeof val === 'string') return (val === 'undefined' || val === 'null' || !val.trim()) ? null : val.trim();
+  if (typeof val === 'object') {
+    const id = val._id || val.id || val.user_id || val.userId || val.freelancer_id || val.clientId;
+    return extractId(id);
+  }
+  return String(val);
+};
+
 export default function FreelancerChat() {
+  const location = useLocation();
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -28,49 +41,191 @@ export default function FreelancerChat() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [mobileView, setMobileView] = useState('list');
 
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUser = getUserProfile() || JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUserId = extractId(currentUser._id || currentUser.id || currentUser.user_id) || 'freelancer';
+  const getAuthToken = () => getToken() || localStorage.getItem('token') || localStorage.getItem('gigsphere_user_token');
+
+  const [onlineUsers, setOnlineUsers] = useState([]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      socket.emit('user_connected', currentUserId);
+      socket.emit('check_online_users');
+    }
+
+    const handleOnlineUsers = (users) => {
+      if (Array.isArray(users)) {
+        setOnlineUsers(users.map(u => String(u)));
+      }
+    };
+
+    socket.on('get_online_users', handleOnlineUsers);
+
+    return () => {
+      socket.off('get_online_users', handleOnlineUsers);
+    };
+  }, [currentUserId]);
+
+  const isUserOnline = (partnerId) => {
+    const cleanId = extractId(partnerId);
+    if (!cleanId) return false;
+    return onlineUsers.some(u => extractId(u) === cleanId);
+  };
 
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5001/api/messages/conversations', {
-          headers: { Authorization: `Bearer ${token}` }
+        const token = getAuthToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        // 1. Fetch past conversation threads from backend
+        const response = await axios.get('http://localhost:5001/api/messages/conversations', { headers }).catch(() => ({ data: [] }));
+        let convs = Array.isArray(response.data) ? response.data : [];
+
+        // Helper to check if a contact already exists in convs by ID or Name
+        const isAlreadyPresent = (id, name) => {
+          const cleanTargetId = extractId(id);
+          const cleanTargetName = (name || '').toLowerCase().trim();
+          return convs.some(c => {
+            const existingId = extractId(c.partnerId || c._id);
+            const existingName = (c.partnerName || c.name || '').toLowerCase().trim();
+            if (cleanTargetId && existingId && cleanTargetId === existingId) return true;
+            if (cleanTargetName && existingName && (cleanTargetName === existingName || existingName.startsWith(cleanTargetName) || cleanTargetName.startsWith(existingName))) {
+              return true;
+            }
+            return false;
+          });
+        };
+
+        // 2. Populate proposals submitted only if client is genuinely new
+        const myPropsRes = await axios.get('http://localhost:5001/api/proposals/my-proposals', { headers }).catch(() => ({ data: [] }));
+        const myProposals = Array.isArray(myPropsRes.data) ? myPropsRes.data : [];
+
+        myProposals.forEach(prop => {
+          const clientId = extractId(prop.client_id || prop.client?.id || prop.client?._id);
+          const rawClientName = prop.clientName || prop.client?.name || prop.client?.companyName || '';
+          const isGenericName = !rawClientName || ['client user', 'client pro', 'demo client', 'client', 'unknown client', 'client partner', 'user'].includes(rawClientName.toLowerCase());
+          const clientName = !isGenericName ? rawClientName : (prop.client?.companyName && !['client user', 'demo client'].includes(prop.client?.companyName.toLowerCase()) ? prop.client?.companyName : 'Sarah Jenkins');
+
+          if (clientId && !isAlreadyPresent(clientId, clientName)) {
+            const rawAvatar = prop.client?.avatar || prop.client?.profilePhoto;
+            const clientAvatar = (rawAvatar && typeof rawAvatar === 'string' && rawAvatar.startsWith('http') && !rawAvatar.includes('pravatar.cc') && !rawAvatar.includes('ui-avatars.com')) 
+              ? rawAvatar 
+              : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80';
+            convs.push({
+              partnerId: clientId,
+              partnerName: clientName,
+              partnerAvatar: clientAvatar,
+              avatar: clientAvatar,
+              partnerRole: 'Client',
+              projectTitle: prop.projectTitle || prop.project_title || 'Applied Project',
+              lastMessage: 'Tap to start conversation',
+              lastMessageTime: 'Project Client',
+              unreadCount: 0
+            });
+          }
         });
-        setConversations(response.data || []);
-        if (response.data && response.data.length > 0) {
-          setActiveConversation(response.data[0]);
+
+        // 3. Handle incoming target user state (from Send Message button / URL params)
+        const targetState = location.state;
+        const queryPartnerId = new URLSearchParams(location.search).get('partnerId');
+        const targetId = extractId(
+          queryPartnerId ||
+          targetState?.partnerId || 
+          targetState?.freelancerId || 
+          targetState?.clientId || 
+          targetState?.user_id || 
+          targetState?.id
+        );
+
+        if (targetId) {
+          const existing = convs.find(c => {
+            const existingId = extractId(c.partnerId || c._id);
+            const rawName = targetState?.name || targetState?.partnerName || targetState?.clientName || targetState?.freelancerName;
+            const existingName = (c.partnerName || c.name || '').toLowerCase().trim();
+            return (existingId && existingId === targetId) || (rawName && existingName === rawName.toLowerCase().trim());
+          });
+
+          if (existing) {
+            setActiveConversation(existing);
+          } else {
+            const rawName = targetState?.name || targetState?.partnerName || targetState?.clientName || targetState?.freelancerName || 'Client Partner';
+            const cleanAvatar = getCleanAvatar(targetState?.avatar || targetState?.partnerAvatar || targetState?.profilePhoto, rawName);
+            const newConv = {
+              partnerId: targetId,
+              partnerName: rawName,
+              partnerAvatar: cleanAvatar,
+              avatar: cleanAvatar,
+              partnerRole: targetState?.role || 'Client',
+              projectTitle: targetState?.title || targetState?.projectTitle || 'Client Project',
+              lastMessage: 'Tap to start conversation',
+              lastMessageTime: 'Just now',
+              unreadCount: 0
+            };
+            convs = [newConv, ...convs];
+            setActiveConversation(newConv);
+          }
+          setMobileView('chat');
+        } else if (convs.length > 0) {
+          setActiveConversation(convs[0]);
+        }
+
+        // 4. Final distinct deduplication pass
+        const seenIds = new Set();
+        const seenNames = new Set();
+        const uniqueConvs = [];
+
+        for (const c of convs) {
+          const idKey = extractId(c.partnerId || c._id);
+          const nameKey = (c.partnerName || c.name || '').toLowerCase().trim();
+
+          const isIdDuplicate = idKey && seenIds.has(idKey);
+          const isNameDuplicate = nameKey && seenNames.has(nameKey);
+
+          if (!isIdDuplicate && !isNameDuplicate) {
+            if (idKey) seenIds.add(idKey);
+            if (nameKey) seenNames.add(nameKey);
+            uniqueConvs.push(c);
+          }
+        }
+
+        setConversations(uniqueConvs);
+        if (uniqueConvs.length > 0 && !activeConversation) {
+          setActiveConversation(uniqueConvs[0]);
         }
       } catch (error) {
         setConversations([]);
       }
     };
     fetchConversations();
-  }, []);
+  }, [location.state, location.search]);
 
   useEffect(() => {
     if (!activeConversation) return;
 
-    const roomId = [currentUser._id || currentUser.id || 'freelancer', activeConversation.partnerId].sort().join('_');
+    const partnerId = extractId(activeConversation.partnerId || activeConversation._id);
+    if (!partnerId) return;
+
+    const roomId = [currentUserId, partnerId].sort().join('_');
     socket.emit('join_room', roomId);
 
     const fetchHistory = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
+        const token = getAuthToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         // 1. Fetch history with authorization headers
         const response = await axios.get(
-          `http://localhost:5001/api/messages/history/${currentUser._id || currentUser.id || 'freelancer'}/${activeConversation.partnerId}`,
+          `http://localhost:5001/api/messages/history/${currentUserId}/${partnerId}`,
           { headers }
         );
         setMessages(response.data || []);
 
         // 2. Mark messages as read in the database
-        await axios.put(`http://localhost:5001/api/messages/read-all/${activeConversation.partnerId}`, {}, { headers }).catch(() => null);
+        await axios.put(`http://localhost:5001/api/messages/read-all/${partnerId}`, {}, { headers }).catch(() => null);
 
         // 3. Clear unreadCount locally
-        setConversations(prev => prev.map(c => c.partnerId === activeConversation.partnerId ? { ...c, unreadCount: 0 } : c));
+        setConversations(prev => prev.map(c => extractId(c.partnerId) === partnerId ? { ...c, unreadCount: 0 } : c));
       } catch (error) {
         setMessages([]);
       }
@@ -78,11 +233,24 @@ export default function FreelancerChat() {
     fetchHistory();
 
     socket.on('receive_message', (message) => {
-      setMessages((prev) => [...prev, message]);
+      if (!message) return;
+      setMessages((prev) => {
+        const isDuplicate = prev.some(m => 
+          (m.id && message.id && String(m.id) === String(message.id)) ||
+          (m._id && message._id && String(m._id) === String(message._id)) ||
+          (m.id && message._id && String(m.id) === String(message._id)) ||
+          (m._id && message.id && String(m._id) === String(message.id)) ||
+          (extractId(m.sender_id) === extractId(message.sender_id) &&
+           m.message_text === message.message_text &&
+           Math.abs(new Date(m.timestamp || m.createdAt || Date.now()).getTime() - new Date(message.timestamp || message.createdAt || Date.now()).getTime()) < 5000)
+        );
+        if (isDuplicate) return prev;
+        return [...prev, message];
+      });
     });
 
     socket.on('user_typing', (data) => {
-      if (data.sender_id !== (currentUser._id || currentUser.id)) {
+      if (data.sender_id !== currentUserId) {
         setIsTyping(true);
         clearTimeout(window.typingTimeout);
         window.typingTimeout = setTimeout(() => setIsTyping(false), 2000);
@@ -93,7 +261,7 @@ export default function FreelancerChat() {
       socket.off('receive_message');
       socket.off('user_typing');
     };
-  }, [activeConversation]);
+  }, [activeConversation, currentUserId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -102,8 +270,11 @@ export default function FreelancerChat() {
   const handleTyping = (e) => {
     setNewMessage(e.target.value);
     if (activeConversation) {
-      const roomId = [currentUser._id || currentUser.id || 'freelancer', activeConversation.partnerId].sort().join('_');
-      socket.emit('typing', { room: roomId, sender_id: currentUser._id || currentUser.id });
+      const partnerId = extractId(activeConversation.partnerId || activeConversation._id);
+      if (partnerId) {
+        const roomId = [currentUserId, partnerId].sort().join('_');
+        socket.emit('typing', { room: roomId, sender_id: currentUserId });
+      }
     }
   };
 
@@ -113,14 +284,16 @@ export default function FreelancerChat() {
 
     setIsUploading(true);
     try {
-      const res = await uploadFileToCloudinary(selectedFile, 'gigsphere/chat_attachments');
+      const res = await uploadFileToCloudinary(selectedFile, '/api/upload/single');
+      const fileUrl = res.url || res.secure_url || res.fileUrl;
       setFile({
         name: selectedFile.name,
-        url: res.secure_url,
+        url: fileUrl,
         type: selectedFile.type
       });
     } catch (err) {
-      alert('Failed to upload file to Cloudinary.');
+      console.error('FreelancerChat file upload error:', err);
+      alert(`Failed to upload file: ${err.message || 'Error uploading file'}`);
     } finally {
       setIsUploading(false);
     }
@@ -130,25 +303,67 @@ export default function FreelancerChat() {
     e.preventDefault();
     if ((!newMessage.trim() && !file) || !activeConversation) return;
 
-    const roomId = [currentUser._id || currentUser.id || 'freelancer', activeConversation.partnerId].sort().join('_');
-    const msgData = {
+    const partnerId = extractId(activeConversation.partnerId || activeConversation._id);
+    if (!partnerId) return;
+
+    const roomId = [currentUserId, partnerId].sort().join('_');
+    const tempId = 'temp_' + Date.now();
+    const textToSend = newMessage;
+    const fileToSend = file;
+
+    const optimisticMsg = {
+      _id: tempId,
+      id: tempId,
       room: roomId,
-      sender_id: currentUser._id || currentUser.id || 'freelancer',
-      receiver_id: activeConversation.partnerId,
-      message_text: newMessage,
-      file_url: file ? file.url : null,
-      timestamp: new Date()
+      sender_id: currentUserId,
+      receiver_id: partnerId,
+      message_text: textToSend,
+      file_url: fileToSend ? fileToSend.url : null,
+      timestamp: new Date().toISOString()
     };
 
-    socket.emit('send_message', msgData);
-    setMessages((prev) => [...prev, msgData]);
+    setMessages((prev) => [...prev, optimisticMsg]);
     setNewMessage('');
     setFile(null);
+
+    setConversations(prev => {
+      const exists = prev.some(c => extractId(c.partnerId) === partnerId || extractId(c._id) === partnerId);
+      if (exists) {
+        return prev.map(c => 
+          (extractId(c.partnerId) === partnerId || extractId(c._id) === partnerId)
+            ? { ...c, lastMessage: textToSend || (fileToSend ? 'Attachment sent' : ''), lastMessageTime: 'Just now' }
+            : c
+        );
+      } else {
+        return [{ ...activeConversation, lastMessage: textToSend || (fileToSend ? 'Attachment sent' : ''), lastMessageTime: 'Just now' }, ...prev];
+      }
+    });
+
+    const token = getAuthToken();
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.post('http://localhost:5001/api/messages/send', {
+        receiver_id: partnerId,
+        message_text: textToSend,
+        file_url: fileToSend ? fileToSend.url : null,
+        room: roomId
+      }, { headers });
+
+      const savedMessage = res.data?.message;
+      if (savedMessage) {
+        setMessages(prev => prev.map(m => (m._id === tempId || m.id === tempId) ? savedMessage : m));
+      }
+    } catch (err) {
+      console.error('REST msg send error:', err);
+      // Socket fallback
+      socket.emit('send_message', optimisticMsg);
+    }
   };
 
-  const filteredConversations = conversations.filter(c => 
-    c.partnerName && c.partnerName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter(c => {
+    const pName = c.partnerName || c.name || '';
+    return pName.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
     <div className="gigsphere-freelancer-messages">
@@ -157,13 +372,13 @@ export default function FreelancerChat() {
         {/* PANEL LEFT: Conversations */}
         <div className={`panel-left ${mobileView === 'list' ? 'mobile-visible' : 'mobile-hidden'}`}>
           <div className="list-header">
-            <h2 className="list-title">Client Messages</h2>
+            <h2 className="list-title">Messages</h2>
             <div className="search-box">
               <Search className="search-icon" size={16} />
               <input 
                 type="text" 
                 className="search-input"
-                placeholder="Search conversations..." 
+                placeholder="Search client conversations..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -186,8 +401,8 @@ export default function FreelancerChat() {
                   onClick={() => { setActiveConversation(conv); setMobileView('chat'); }}
                 >
                   <div className="avatar-wrapper">
-                    <img src={conv.partnerAvatar || "https://i.pravatar.cc/150?img=11"} alt={conv.partnerName} className="avatar" />
-                    <div className="status-dot"></div>
+                    <img src={getCleanAvatar(conv.partnerAvatar || conv.avatar, conv.partnerName)} alt={conv.partnerName} className="avatar" />
+                    <div className={`status-dot ${isUserOnline(conv.partnerId) ? 'online' : 'offline'}`}></div>
                   </div>
                   <div className="conv-info">
                     <div className="conv-header">
@@ -247,12 +462,15 @@ export default function FreelancerChat() {
                     <ChevronLeft size={24} />
                   </button>
                   <div className="avatar-wrapper">
-                    <img src={activeConversation.avatar || "https://i.pravatar.cc/150?img=11"} alt={activeConversation.partnerName} className="avatar" style={{width: '40px', height: '40px'}} />
-                    <div className="status-dot"></div>
+                    <img src={getCleanAvatar(activeConversation.avatar || activeConversation.partnerAvatar, activeConversation.partnerName)} alt={activeConversation.partnerName} className="avatar" style={{width: '40px', height: '40px'}} />
+                    <div className={`status-dot ${isUserOnline(activeConversation.partnerId) ? 'online' : 'offline'}`}></div>
                   </div>
                   <div className="chat-title-group">
                     <h2>{activeConversation.partnerName}</h2>
-                    <p className="chat-subtitle">{activeConversation.projectTitle || 'Client Project'}</p>
+                    <p className="chat-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isUserOnline(activeConversation.partnerId) ? '#10b981' : '#9ca3af' }}></span>
+                      {isUserOnline(activeConversation.partnerId) ? 'Online Now' : 'Offline'} • {activeConversation.projectTitle || 'Client Project'}
+                    </p>
                   </div>
                 </div>
                 <div className="chat-actions">
@@ -265,7 +483,7 @@ export default function FreelancerChat() {
                 <div className="date-separator"><span>Today</span></div>
                 
                 {messages.map((msg, idx) => {
-                  const isMe = msg.sender_id === (currentUser._id || currentUser.id || 'freelancer');
+                  const isMe = msg.sender_id === currentUserId;
                   const timeString = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   
                   return (
@@ -325,7 +543,7 @@ export default function FreelancerChat() {
                     placeholder={isUploading ? "Uploading attachment..." : "Write a message..."} 
                     value={newMessage}
                     onChange={handleTyping}
-                    className="chat-input"
+                    className="composer-input chat-input"
                     disabled={isUploading}
                   />
                   
@@ -357,7 +575,7 @@ export default function FreelancerChat() {
               <div className="details-section">
                 <h4 className="section-title">Client Information</h4>
                 <div className="info-card" style={{alignItems: 'center', textAlign: 'center'}}>
-                  <img src={activeConversation.avatar || "https://i.pravatar.cc/150?img=11"} alt={activeConversation.partnerName} style={{width: '64px', height: '64px', borderRadius: '50%'}} />
+                  <img src={getCleanAvatar(activeConversation.avatar || activeConversation.partnerAvatar, activeConversation.partnerName)} alt={activeConversation.partnerName} style={{width: '64px', height: '64px', borderRadius: '50%'}} />
                   <div className="info-row">
                     <span className="info-value" style={{fontSize: '16px'}}>{activeConversation.partnerName}</span>
                     <span className="info-label">GigSphere Verified Client</span>

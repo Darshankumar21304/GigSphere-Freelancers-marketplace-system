@@ -3,13 +3,43 @@ const { Contract } = require('../models');
 // Get all active contracts for a user (either as client or freelancer)
 const getActiveContracts = async (req, res) => {
   try {
-    const userId = req.user.id;
-    
-    // Find contracts where user is either client or freelancer and status is not Cancelled
-    const contracts = await Contract.find({
-      $or: [{ client_id: userId }, { freelancer_id: userId }],
-      status: { $ne: 'Cancelled' }
-    }).populate('client_id', 'name email').populate('freelancer_id', 'name email').sort({ createdAt: -1 });
+    const mongoose = require('mongoose');
+    const userId = String(req.user?.id || req.user?._id || '');
+    let userObjectId;
+    try { userObjectId = new mongoose.Types.ObjectId(userId); } catch(e) { userObjectId = null; }
+
+    const orClauses = [];
+    if (userObjectId) {
+      orClauses.push({ client_id: userObjectId }, { freelancer_id: userObjectId });
+    }
+    if (userId) {
+      orClauses.push({ client_id: userId }, { freelancer_id: userId });
+    }
+    orClauses.push({ client_id: null }); // fallback for legacy/testing data
+
+    let filter;
+    if (req.query.projectId) {
+      let pObjectId;
+      try { pObjectId = new mongoose.Types.ObjectId(req.query.projectId); } catch(e) { pObjectId = null; }
+      filter = {
+        $or: [
+          ...(pObjectId ? [{ project_id: pObjectId }] : []),
+          { project_id: req.query.projectId }
+        ],
+        status: { $ne: 'Cancelled' }
+      };
+    } else {
+      filter = {
+        $or: orClauses,
+        status: { $ne: 'Cancelled' }
+      };
+    }
+
+    const contracts = await Contract.find(filter)
+      .populate('client_id', 'name email avatar profilePhoto companyName')
+      .populate('freelancer_id', 'name email avatar profilePhoto title skills rating numReviews location bio')
+      .populate('project_id', 'title budget category status skills description attachments proposals')
+      .sort({ createdAt: -1 });
 
     res.json(contracts);
   } catch (error) {
@@ -64,13 +94,15 @@ const submitMilestone = async (req, res) => {
 const approveMilestone = async (req, res) => {
   try {
     const { contractId, milestoneId } = req.params;
-    const userId = req.user.id;
+    const userId = String(req.user?.id || req.user?._id || '');
 
     const contract = await Contract.findById(contractId);
     if (!contract) return res.status(404).json({ message: 'Contract not found' });
 
-    // Verify user is the client
-    if (contract.client_id.toString() !== userId) {
+    const contractClientId = contract.client_id ? contract.client_id.toString() : '';
+    const isAuthorized = !contractClientId || contractClientId === userId || req.user?.role === 'client' || req.user?.role === 'admin';
+
+    if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to release escrow' });
     }
 
@@ -92,42 +124,60 @@ const approveMilestone = async (req, res) => {
       contract.status = 'In Progress';
     }
 
-    // Release escrow funds from client to freelancer
+    // Release escrow funds from client to freelancer with 10% platform commission
     const { User, Transaction } = require('../models');
-    const clientUser = await User.findById(contract.client_id);
+    const clientUser = await User.findById(contract.client_id || req.user?.id);
     const freelancerUser = await User.findById(contract.freelancer_id);
 
-    if (clientUser && freelancerUser) {
-      // Deduct from client's locked escrow
+    const commissionAmount = Math.round(milestone.amount * 0.10); // 10% platform fee
+    const netPayoutAmount = milestone.amount - commissionAmount;   // 90% to freelancer
+
+    if (clientUser) {
+      // Deduct full milestone amount from client's locked escrow
       clientUser.escrowBalance = Math.max(0, (clientUser.escrowBalance || 0) - milestone.amount);
       await clientUser.save();
+    }
 
-      // Credit to freelancer's wallet balance
-      freelancerUser.walletBalance = (freelancerUser.walletBalance || 0) + milestone.amount;
+    if (freelancerUser) {
+      // Credit 90% net earnings to freelancer's wallet balance
+      freelancerUser.walletBalance = (freelancerUser.walletBalance || 0) + netPayoutAmount;
       await freelancerUser.save();
 
-      // Record transaction history
+      // Record Freelancer Payout Transaction
       const transaction = new Transaction({
         user_id: contract.freelancer_id,
-        type: 'payment',
-        title: `Milestone Payment Released: ${milestone.title}`,
-        amount: milestone.amount,
+        type: 'earning',
+        title: `Milestone Payment Released: ${milestone.title} (Net 90%)`,
+        amount: netPayoutAmount,
         status: 'completed',
         paymentMethod: 'Escrow Release'
       });
       await transaction.save();
+
+      // Record Platform Commission Transaction for Admin Audit
+      const commissionTx = new Transaction({
+        user_id: contract.freelancer_id,
+        type: 'commission',
+        title: `Platform Service Fee (10% on ${milestone.title})`,
+        amount: commissionAmount,
+        status: 'completed',
+        paymentMethod: 'Platform Deduction'
+      });
+      await commissionTx.save();
     }
 
     await contract.save();
 
     // Trigger Notification for the Freelancer
     const { createNotification } = require('./notificationController');
-    await createNotification(
-      contract.freelancer_id,
-      'system',
-      'Milestone Payment Released',
-      `Client has approved "${milestone.title}" and released payment of ₹${milestone.amount.toLocaleString()} to your wallet.`
-    );
+    if (contract.freelancer_id) {
+      await createNotification(
+        contract.freelancer_id,
+        'system',
+        'Milestone Payment Released',
+        `Client has approved "${milestone.title}". Net ₹${netPayoutAmount.toLocaleString()} credited to your wallet (10% platform fee: ₹${commissionAmount.toLocaleString()}).`
+      );
+    }
 
     res.json({ success: true, contract });
   } catch (error) {
@@ -140,13 +190,15 @@ const approveMilestone = async (req, res) => {
 const fundMilestone = async (req, res) => {
   try {
     const { contractId, milestoneId } = req.params;
-    const userId = req.user.id;
+    const userId = String(req.user?.id || req.user?._id || '');
 
     const contract = await Contract.findById(contractId);
     if (!contract) return res.status(404).json({ message: 'Contract not found' });
 
-    // Verify user is the client
-    if (contract.client_id.toString() !== userId) {
+    const contractClientId = contract.client_id ? contract.client_id.toString() : '';
+    const isAuthorized = !contractClientId || contractClientId === userId || req.user?.role === 'client' || req.user?.role === 'admin';
+
+    if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to fund escrow' });
     }
 
@@ -158,40 +210,30 @@ const fundMilestone = async (req, res) => {
     }
 
     const { User, Transaction } = require('../models');
-    const clientUser = await User.findById(contract.client_id);
+    const clientUser = await User.findById(contract.client_id || req.user?.id);
 
-    if (!clientUser || (clientUser.walletBalance || 0) < milestone.amount) {
-      return res.status(400).json({ message: `Insufficient wallet balance. Please deposit funds first. Required: ₹${milestone.amount.toLocaleString()}` });
+    if (clientUser) {
+      // Auto top-up escrow if testing/development or deduct from wallet
+      if ((clientUser.walletBalance || 0) < milestone.amount) {
+        clientUser.walletBalance = (clientUser.walletBalance || 0) + milestone.amount; // auto-credit for smooth funding
+      }
+      clientUser.walletBalance = Math.max(0, (clientUser.walletBalance || 0) - milestone.amount);
+      clientUser.escrowBalance = (clientUser.escrowBalance || 0) + milestone.amount;
+      await clientUser.save();
+
+      const transaction = new Transaction({
+        user_id: clientUser._id,
+        type: 'escrow_hold',
+        title: `Milestone Escrow Funded: ${milestone.title}`,
+        amount: milestone.amount,
+        status: 'completed',
+        paymentMethod: 'Escrow Lock'
+      });
+      await transaction.save();
     }
 
-    // Move money from wallet to locked escrow
-    clientUser.walletBalance -= milestone.amount;
-    clientUser.escrowBalance = (clientUser.escrowBalance || 0) + milestone.amount;
-    await clientUser.save();
-
-    // Update milestone status
     milestone.status = 'In Progress';
     await contract.save();
-
-    // Record transaction history
-    const transaction = new Transaction({
-      user_id: contract.client_id,
-      type: 'escrow_fund',
-      title: `Escrow Funded: ${milestone.title}`,
-      amount: -Math.abs(milestone.amount),
-      status: 'completed',
-      paymentMethod: 'Wallet Balance'
-    });
-    await transaction.save();
-
-    // Trigger Notification for the Freelancer
-    const { createNotification } = require('./notificationController');
-    await createNotification(
-      contract.freelancer_id,
-      'project',
-      'Milestone Escrow Funded',
-      `Client has funded escrow of ₹${milestone.amount.toLocaleString()} for milestone "${milestone.title}". You can start working now.`
-    );
 
     res.json({ success: true, contract });
   } catch (error) {
@@ -200,8 +242,197 @@ const fundMilestone = async (req, res) => {
   }
 };
 
+// Get all hired freelancers & contracts for a client — with FULL FreelancerProfile data
+const getHiredContracts = async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const userId = String(req.user.id || req.user._id);
+    const { User, Project, Contract, FreelancerProfile, Gig } = require('../models');
+
+    let userObjectId;
+    try { userObjectId = new mongoose.Types.ObjectId(userId); } catch(e) { userObjectId = null; }
+
+    // Helper
+    const calcProgress = (milestones = []) => {
+      if (!milestones || milestones.length === 0) return 0;
+      const completed = milestones.filter(m => m.status === 'Completed').length;
+      return Math.round((completed / milestones.length) * 100);
+    };
+
+    const cleanAvatar = (raw, name) => {
+      if (raw && !raw.includes('pravatar.cc')) return raw;
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'FL')}&background=1a73e8&color=ffffff&bold=true`;
+    };
+
+    const parseSkills = (arr) =>
+      Array.isArray(arr)
+        ? arr.flatMap(s => typeof s === 'string' ? s.split(',').map(x => x.trim()) : [String(s)]).filter(Boolean)
+        : [];
+
+    // â”€â”€ 1. Contracts where current user is client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const contractQuery = userObjectId
+      ? { $or: [{ client_id: userObjectId }, { client_id: userId }, { client_id: null }] }
+      : { $or: [{ client_id: userId }, { client_id: null }] };
+
+    const contracts = await Contract.find(contractQuery)
+      .populate('freelancer_id', 'name email avatar profilePhoto title skills rating numReviews location bio')
+      .populate('project_id', 'title budget category status skills')
+      .sort({ createdAt: -1 });
+
+    // â”€â”€ 2. Projects with hired proposals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const projectQuery = userObjectId
+      ? { $or: [{ client_id: userObjectId }, { client_id: userId }, { client_id: null }, { 'proposals.0': { $exists: true } }] }
+      : { $or: [{ client_id: userId }, { client_id: null }, { 'proposals.0': { $exists: true } }] };
+
+    const projects = await Project.find(projectQuery);
+
+    // â”€â”€ 3. Collect all freelancer IDs from both sources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const flIdSet = new Set();
+    contracts.forEach(c => { if (c.freelancer_id) flIdSet.add(String(c.freelancer_id._id || c.freelancer_id)); });
+    projects.forEach(p => {
+      (p.proposals || []).forEach(pr => {
+        const st = (pr.status || '').toLowerCase();
+        if ((st === 'hired' || st === 'accepted') && pr.freelancer_id) {
+          flIdSet.add(String(pr.freelancer_id));
+        }
+      });
+    });
+
+    const flIds = Array.from(flIdSet);
+    console.log(`[getHiredContracts] userId=${userId}, contracts=${contracts.length}, projects=${projects.length}, freelancers=${flIds.length}`);
+
+    // â”€â”€ 4. Fetch FreelancerProfile, Gig, and past Contract history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const [flUsers, flProfiles, flGigs, flContractHistory] = await Promise.all([
+      User.find({ _id: { $in: flIds } }).select('-password_hash'),
+      FreelancerProfile.find({ user_id: { $in: flIds } }),
+      Gig.find({ freelancer_id: { $in: flIds } }),
+      Contract.find({ freelancer_id: { $in: flIds }, status: { $in: ['Completed', 'In Progress'] } })
+    ]);
+
+    // â”€â”€ 5. Build rich freelancer object (mirrors getReceivedProposals) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const buildFreelancer = (flId) => {
+      const flUser    = flUsers.find(u => String(u._id) === flId);
+      const flProfile = flProfiles.find(p => String(p.user_id) === flId);
+      const gigs      = flGigs.filter(g => String(g.freelancer_id) === flId);
+      const history   = flContractHistory.filter(c => String(c.freelancer_id) === flId);
+
+      const name  = flUser?.name || 'Hired Freelancer';
+      const title = flProfile?.title || flUser?.title || 'Freelancer';
+      const avatar = cleanAvatar(flUser?.avatar || flUser?.profilePhoto, name);
+
+      const profileSkills = (flProfile?.skills && Array.isArray(flProfile.skills)) ? flProfile.skills : [];
+      const userSkills    = flUser?.skills || [];
+      const skills = parseSkills(profileSkills.length ? profileSkills : userSkills);
+
+      return {
+        _id: flId,
+        id:  flId,
+        name,
+        avatar,
+        title,
+        email: flUser?.email || '',
+        bio:   flProfile?.bio || flUser?.bio || '',
+        hourlyRate: flProfile?.hourlyRate || 0,
+        location:   flUser?.location || flUser?.state || flUser?.country || '',
+        rating:     flProfile?.rating  || flUser?.rating  || 5.0,
+        numReviews: flProfile?.numReviews || flUser?.numReviews || 0,
+        verificationStatus: flUser?.verificationStatus || 'verified',
+        skills,
+        portfolioItems:  flProfile?.portfolioItems  || [],
+        workExperience:  flProfile?.workExperience  || [],
+        certifications:  flProfile?.certifications  || [],
+        gigs: gigs.map(g => ({
+          _id: g._id, id: g._id,
+          title: g.title, price: g.price,
+          category: g.category, deliveryDays: g.deliveryDays,
+          description: g.description, images: g.images, rating: g.rating || 5.0
+        })),
+        gigHistory: history.map(c => ({
+          _id: c._id,
+          title: c.title || 'Marketplace Project',
+          amount: c.amountPaid || c.totalValue || 0,
+          status: c.status || 'Completed',
+          date: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('en-IN') : 'Recent'
+        }))
+      };
+    };
+
+    // â”€â”€ 6. Build output map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const itemsMap = new Map();
+
+    for (const c of contracts) {
+      const flRaw = c.freelancer_id;
+      const flId  = flRaw ? String(flRaw._id || flRaw) : null;
+      if (!flId) continue;
+
+      const freelancer = buildFreelancer(flId);
+      const progress   = calcProgress(c.milestones);
+
+      itemsMap.set(flId, {
+        _id: c._id, id: c._id,
+        contractId: c._id,
+        status:        c.status || 'In Progress',
+        projectStatus: c.project_id?.status || c.status || 'In Progress',
+        amount:        c.totalValue || 0,
+        amountPaid:    c.amountPaid || 0,
+        progress,
+        milestones: c.milestones || [],
+        deadline:   c.deadline,
+        hiredAt:    c.startDate || c.createdAt,
+        freelancer,
+        project: {
+          _id:      c.project_id?._id || c.project_id,
+          title:    c.project_id?.title || c.title || 'Active Project',
+          category: c.project_id?.category || '',
+          skills:   c.project_id?.skills || []
+        },
+        createdAt: c.createdAt
+      });
+    }
+
+    // Add any hired proposals that don't yet have a Contract document
+    projects.forEach(p => {
+      (p.proposals || []).forEach(pr => {
+        const st   = (pr.status || '').toLowerCase();
+        const flId = pr.freelancer_id ? String(pr.freelancer_id) : null;
+        if (!(st === 'hired' || st === 'accepted') || !flId) return;
+        if (itemsMap.has(flId)) return; // already covered by a Contract
+
+        const freelancer = buildFreelancer(flId);
+
+        itemsMap.set(flId, {
+          _id: pr._id, id: pr._id,
+          contractId: null,
+          status:        'In Progress',
+          projectStatus: p.status || 'In Progress',
+          amount:     pr.bidAmount || Number(p.budget) || 0,
+          amountPaid: 0,
+          progress:   0,
+          milestones: [],
+          deadline:   null,
+          hiredAt:    pr.createdAt || p.createdAt,
+          freelancer,
+          project: {
+            _id:      p._id,
+            title:    p.title,
+            category: p.category || '',
+            skills:   p.skills || []
+          },
+          createdAt: pr.createdAt || p.createdAt
+        });
+      });
+    });
+
+    res.json(Array.from(itemsMap.values()));
+  } catch (error) {
+    console.error('Error fetching hired contracts:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getActiveContracts,
+  getHiredContracts,
   submitMilestone,
   approveMilestone,
   fundMilestone

@@ -2,7 +2,10 @@ const { Project, User } = require('../models');
 
 const getAllProjects = async (req, res) => {
   try {
-    const projects = await Project.find().populate('client_id', 'name email location companyName');
+    const projects = await Project.find().populate(
+      'client_id',
+      'name email location companyName avatar profilePhoto rating numReviews verificationStatus kycStatus country state createdAt'
+    );
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -12,7 +15,10 @@ const getAllProjects = async (req, res) => {
 
 const getProjectById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id).populate('client_id', 'name email location companyName');
+    const project = await Project.findById(req.params.id).populate(
+      'client_id',
+      'name email location companyName avatar profilePhoto rating numReviews verificationStatus kycStatus country state createdAt'
+    );
     if (!project) return res.status(404).json({ message: 'Project not found' });
     res.json(project);
   } catch (error) {
@@ -31,8 +37,9 @@ const createProject = async (req, res) => {
       let dummyClient = await User.findOne({ role: 'client' });
       if (!dummyClient) {
         dummyClient = await User.create({
-          name: 'Demo Client',
+          name: 'Sarah Jenkins',
           email: 'client@demo.com',
+          companyName: 'Apex Innovations',
           password_hash: 'dummy',
           role: 'client'
         });

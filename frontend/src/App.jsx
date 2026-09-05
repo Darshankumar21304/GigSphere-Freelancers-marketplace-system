@@ -23,6 +23,7 @@ import MyProposals from './pages/dashboard/MyProposals';
 import ReceivedProposals from './pages/dashboard/ReceivedProposals';
 import ActiveProjects from './pages/dashboard/ActiveProjects';
 import Portfolio from './pages/dashboard/Portfolio';
+import GigHistory from './pages/dashboard/GigHistory';
 import FreelancerChat from './pages/dashboard/FreelancerChat';
 import Reviews from './pages/dashboard/Reviews';
 import Settings from './pages/dashboard/Settings';
@@ -33,6 +34,8 @@ import ClientSpending from './pages/dashboard/ClientSpending';
 import ClientReviews from './pages/dashboard/ClientReviews';
 import Notifications from './pages/dashboard/Notifications';
 import Disputes from './pages/dashboard/Disputes';
+import BrowseFreelancers from './pages/dashboard/BrowseFreelancers';
+import FreelancerPitches from './pages/dashboard/FreelancerPitches';
 
 
 import AdminLayout from './components/AdminLayout';
@@ -85,18 +88,22 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />
               <Route path="hired" element={<HiredFreelancers />} />
+              <Route path="browse-freelancers" element={<BrowseFreelancers />} />
               <Route path="reviews" element={<ClientReviews />} />
               <Route path="disputes" element={<Disputes />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="browse-projects" element={<Explore />} />
               <Route path="explore" element={<Explore />} />
+              <Route path="gig/:id" element={<GigDetail />} />
             </Route>
             
             <Route path="/freelancer/dashboard" element={<ProtectedRoute allowedRole="freelancer"><DashboardLayout /></ProtectedRoute>}>
               <Route index element={<Overview />} />
               <Route path="chat" element={<FreelancerChat />} />
+              <Route path="pitches" element={<FreelancerPitches />} />
               <Route path="my-proposals" element={<MyProposals />} />
               <Route path="active-projects" element={<ActiveProjects />} />
+              <Route path="gig-history" element={<GigHistory />} />
               <Route path="portfolio" element={<Portfolio />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="create-gig" element={<CreateGig />} />
@@ -107,6 +114,7 @@ function App() {
               <Route path="notifications" element={<Notifications />} />
               <Route path="browse-projects" element={<Explore />} />
               <Route path="explore" element={<Explore />} />
+              <Route path="gig/:id" element={<GigDetail />} />
             </Route>
 
             {/* Admin Dashboard Routes */}

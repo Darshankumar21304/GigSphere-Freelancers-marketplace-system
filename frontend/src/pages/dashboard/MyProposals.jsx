@@ -202,9 +202,27 @@ export default function MyProposals() {
                       </p>
                     )}
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#10b981' }}>{formatINR(prop.bidAmount || 0)}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>Bid Amount</div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#10b981' }}>{formatINR(prop.bidAmount || 0)}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>Bid Amount</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const targetId = prop.client_id?._id || prop.client_id || prop.client?.id;
+                        navigate('/freelancer/dashboard/chat', {
+                          state: {
+                            partnerId: targetId,
+                            name: prop.clientName || prop.client?.name || prop.client?.companyName || 'Client Partner',
+                            avatar: prop.client?.avatar || prop.client?.profilePhoto,
+                            title: prop.projectTitle || prop.project_title
+                          }
+                        });
+                      }}
+                      style={{ marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '30px', background: '#e8f0fe', color: '#1a73e8', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      <MessageSquare size={14} /> Send Message
+                    </button>
                   </div>
                 </div>
               </div>

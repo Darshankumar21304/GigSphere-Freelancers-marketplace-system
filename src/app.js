@@ -30,10 +30,24 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
+app.use('/api/pitches', require('./routes/pitchRoutes'));
 
 // Base route
 app.get('/', (req, res) => {
   res.send('Welcome to GigSphere API');
+});
+
+app.get('/api/debug/clean-seed-profile', async (req, res) => {
+  try {
+    const { FreelancerProfile } = require('./models');
+    const res1 = await FreelancerProfile.updateMany(
+      {},
+      { $set: { workExperience: [] } }
+    );
+    res.json({ success: true, message: 'Reset workExperience in MongoDB to empty array', updated: res1 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = app;

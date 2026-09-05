@@ -18,7 +18,7 @@ const projectSchema = new mongoose.Schema({
     bidAmount: Number,
     coverLetter: String,
     deliveryTime: String,
-    status: { type: String, enum: ['Pending', 'Shortlisted', 'Accepted', 'Rejected'], default: 'Pending' },
+    status: { type: String, enum: ['Pending', 'Shortlisted', 'Accepted', 'Hired', 'Rejected'], default: 'Pending' },
     createdAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });

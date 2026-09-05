@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../utils/api';
 import { Check, Star, MapPin, Globe, Clock, MessageSquare, Award } from 'lucide-react';
 import { getUserProfile } from '../../utils/authUtils';
+import { getCleanAvatar } from '../../utils/avatarUtils';
 import './Profile.css';
 
 export default function FreelancerProfile() {
@@ -45,7 +46,7 @@ export default function FreelancerProfile() {
         <aside className="profile-sidebar">
           <div className="profile-card">
             <div className="avatar-container">
-              <img src={freelancer?.avatar || freelancer?.profilePhoto || "https://i.pravatar.cc/300"} alt={name} className="profile-avatar" />
+              <img src={getCleanAvatar(freelancer?.avatar || freelancer?.profilePhoto, name)} alt={name} className="profile-avatar" />
               {freelancer?.kycStatus === 'Verified' && (
                 <div className="verified-badge" title="Identity Verified">
                   <Check size={16} strokeWidth={3} />
@@ -74,7 +75,14 @@ export default function FreelancerProfile() {
             
             <div className="profile-actions">
               <button className="btn btn-primary btn-hire" onClick={() => navigate('/client/dashboard/create-project')}>Hire Me</button>
-              <button className="btn btn-outline" onClick={() => navigate('/client/dashboard/chat')} style={{width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+              <button className="btn btn-outline" onClick={() => navigate('/client/dashboard/chat', {
+                state: {
+                  partnerId: freelancer?._id || id,
+                  name: name,
+                  avatar: freelancer?.avatar || freelancer?.profilePhoto,
+                  title: title
+                }
+              })} style={{width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
                 <MessageSquare size={18} />
                 Message
               </button>

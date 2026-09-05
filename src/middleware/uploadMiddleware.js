@@ -6,7 +6,8 @@ const storage = multer.memoryStorage();
 // File size limits in bytes
 const SIZE_LIMITS = {
   IMAGE: 10 * 1024 * 1024,     // 10 MB for photos / avatars
-  DOCUMENT: 15 * 1024 * 1024,  // 15 MB for PDFs & project briefs
+  DOCUMENT: 25 * 1024 * 1024,  // 25 MB for PDFs & project briefs
+  ARCHIVE: 50 * 1024 * 1024,   // 50 MB for ZIP files & code archives
   VIDEO: 50 * 1024 * 1024     // 50 MB for media / videos
 };
 
@@ -15,15 +16,21 @@ const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
   // Documents
   'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain',
+  // Archives & Code Bundles
+  'application/zip', 'application/x-zip-compressed', 'application/x-zip', 'application/octet-stream',
+  'application/x-rar-compressed', 'application/vnd.rar', 'application/x-7z-compressed', 'application/x-tar', 'application/gzip',
   // Videos / Audio
   'video/mp4', 'video/webm', 'video/quicktime', 'audio/mpeg', 'audio/wav', 'audio/mp3'
 ];
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+  const ext = file.originalname ? file.originalname.split('.').pop().toLowerCase() : '';
+  const isArchiveExt = ['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext);
+  
+  if (ALLOWED_MIME_TYPES.includes(file.mimetype) || isArchiveExt) {
     cb(null, true);
   } else {
-    cb(new Error(`File type '${file.mimetype}' is not supported. Please upload an image (JPG, PNG, WEBP), document (PDF, DOCX), or video (MP4, WEBM).`), false);
+    cb(new Error(`File type '${file.mimetype}' is not supported. Please upload an image, document (PDF, DOCX), video, or ZIP code archive.`), false);
   }
 };
 
@@ -47,7 +54,8 @@ const validateFileSize = (req, res, next) => {
     if (!file) continue;
     const isImage = file.mimetype.startsWith('image/');
     const isVideo = file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/');
-    const isDocument = file.mimetype.includes('pdf') || file.mimetype.includes('word') || file.mimetype.includes('text');
+    const isArchive = file.mimetype.includes('zip') || file.mimetype.includes('compressed') || file.mimetype.includes('tar') || /\.(zip|rar|7z|tar|gz)$/i.test(file.originalname);
+    const isDocument = !isArchive && (file.mimetype.includes('pdf') || file.mimetype.includes('word') || file.mimetype.includes('text'));
 
     if (isImage && file.size > SIZE_LIMITS.IMAGE) {
       return res.status(400).json({ 
@@ -55,9 +63,15 @@ const validateFileSize = (req, res, next) => {
       });
     }
 
+    if (isArchive && file.size > SIZE_LIMITS.ARCHIVE) {
+      return res.status(400).json({ 
+        message: `ZIP archive '${file.originalname}' exceeds the 50 MB size limit (Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB).` 
+      });
+    }
+
     if (isDocument && file.size > SIZE_LIMITS.DOCUMENT) {
       return res.status(400).json({ 
-        message: `Document '${file.originalname}' exceeds the 15 MB size limit (Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB).` 
+        message: `Document '${file.originalname}' exceeds the 25 MB size limit (Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB).` 
       });
     }
 

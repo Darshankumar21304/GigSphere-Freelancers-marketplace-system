@@ -26,6 +26,7 @@ import './BrowseProjects.css';
 
 const MOCK_CATEGORIES = [
   'All Projects',
+  'Saved & Favorites',
   'Web Development',
   'Mobile Development',
   'UI/UX Design',
@@ -55,6 +56,14 @@ export default function Explore() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [sortBy, setSortBy] = useState('Best Match');
+
+  // URL query check for ?saved=true
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('saved') === 'true') {
+      setActiveCategory('Saved & Favorites');
+    }
+  }, [location.search]);
   
   const [filters, setFilters] = useState({
     skill: '',
@@ -95,7 +104,12 @@ export default function Explore() {
     const fetchProjects = async () => {
       try {
         const data = await apiFetch('/projects');
-        setProjects(data);
+        const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
+        const updated = (Array.isArray(data) ? data : []).map(p => ({
+          ...p,
+          saved: savedList.includes(p._id)
+        }));
+        setProjects(updated);
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {
@@ -111,7 +125,15 @@ export default function Explore() {
       setShowAuthModal(true);
       return;
     }
-    setProjects(projects.map(p => p._id === id ? { ...p, saved: !p.saved } : p));
+    const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
+    let updated;
+    if (savedList.includes(id)) {
+      updated = savedList.filter(item => item !== id);
+    } else {
+      updated = [...savedList, id];
+    }
+    localStorage.setItem('saved_projects', JSON.stringify(updated));
+    setProjects(projects.map(p => p._id === id ? { ...p, saved: updated.includes(p._id) } : p));
   };
 
   const handleProposeClick = (project) => {
@@ -156,7 +178,12 @@ export default function Explore() {
   };
 
   const filteredProjects = projects.filter(p => {
-    if (activeCategory !== 'All Projects' && p.category !== activeCategory) return false;
+    if (activeCategory === 'Saved & Favorites') {
+      const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
+      if (!p.saved && !savedList.includes(p._id)) return false;
+    } else if (activeCategory !== 'All Projects' && p.category !== activeCategory) {
+      return false;
+    }
     
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -321,15 +348,19 @@ export default function Explore() {
             <h1 className="page-title">Browse Projects</h1>
             <p className="page-description">Discover projects that match your skills and experience.</p>
           </div>
-          <button className="saved-projects-btn" onClick={() => {
-            if (!isAuth) {
-              setShowAuthModal(true);
-            } else {
-              // Handle saved projects view (not implemented yet but auth check works)
-            }
-          }}>
-            <Bookmark size={18} />
-            Saved Projects
+          <button 
+            className={`saved-projects-btn ${activeCategory === 'Saved & Favorites' ? 'active' : ''}`} 
+            onClick={() => {
+              if (!isAuth) {
+                setShowAuthModal(true);
+              } else {
+                setActiveCategory(prev => prev === 'Saved & Favorites' ? 'All Projects' : 'Saved & Favorites');
+              }
+            }}
+            style={activeCategory === 'Saved & Favorites' ? { background: 'linear-gradient(135deg, #1a73e8, #1557b0)', color: '#ffffff' } : {}}
+          >
+            <Bookmark size={18} fill={activeCategory === 'Saved & Favorites' ? '#fff' : 'none'} />
+            {activeCategory === 'Saved & Favorites' ? 'Viewing Saved Favorites' : 'Saved Projects'}
           </button>
         </div>
 
@@ -441,13 +472,36 @@ export default function Explore() {
                             <h3 className="project-title">{project.title}</h3>
                           </Link>
                           
-                          <div className="client-info">
-                            <span style={{fontWeight: 600, color: 'var(--text-main)'}}>
-                              {project.client_id ? (project.client_id.companyName || project.client_id.name) : 'Unknown Client'}
-                            </span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 500, fontSize: '13px' }}>
-                              <CheckCircle size={14} /> Verified
-                            </span>
+                          <div className="client-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                            {(() => {
+                              const client = typeof project.client_id === 'object' ? (project.client_id || {}) : {};
+                              const rawName = client.name || client.companyName || '';
+                              const clientName = (rawName && !['Client User', 'Client Pro', 'Demo Client', 'Client', 'Unknown Client'].includes(rawName)) ? rawName : 'Heartware';
+                              const rawPic = client.avatar || client.profilePhoto;
+                              let clientAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=1a73e8&color=fff`;
+                              if (rawPic && typeof rawPic === 'string' && rawPic.trim() !== '') {
+                                if (rawPic.startsWith('http://') || rawPic.startsWith('https://')) clientAvatar = rawPic;
+                                else if (rawPic.startsWith('/uploads')) clientAvatar = `http://localhost:5001${rawPic}`;
+                                else clientAvatar = rawPic;
+                              }
+                              return (
+                                <>
+                                  <img 
+                                    src={clientAvatar} 
+                                    alt={clientName} 
+                                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary, #1a73e8)', flexShrink: 0 }} 
+                                  />
+                                  <div>
+                                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', display: 'block', lineHeight: 1.2 }}>
+                                      {clientName}
+                                    </span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 600, fontSize: '0.75rem', marginTop: '2px' }}>
+                                      <CheckCircle size={12} /> Verified Client
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                         <button 
@@ -529,10 +583,21 @@ export default function Explore() {
               </>
             ) : (
               <div className="empty-state">
-                <Briefcase className="empty-icon" />
-                <h3 className="empty-title">No projects found</h3>
-                <p className="empty-desc">We couldn't find any projects matching your current filters and search query. Try adjusting your criteria.</p>
-                <button className="btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+                {activeCategory === 'Saved & Favorites' ? (
+                  <>
+                    <Bookmark className="empty-icon" style={{ color: '#ef4444' }} />
+                    <h3 className="empty-title">No Saved Projects Yet</h3>
+                    <p className="empty-desc">Click the heart or bookmark icon on any project listing to save it to your favorites for quick access.</p>
+                    <button className="btn-primary" onClick={() => setActiveCategory('All Projects')}>Browse All Projects</button>
+                  </>
+                ) : (
+                  <>
+                    <Briefcase className="empty-icon" />
+                    <h3 className="empty-title">No projects found</h3>
+                    <p className="empty-desc">We couldn't find any projects matching your current filters and search query. Try adjusting your criteria.</p>
+                    <button className="btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+                  </>
+                )}
               </div>
             )}
             

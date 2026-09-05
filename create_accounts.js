@@ -17,16 +17,22 @@ async function seedAccounts() {
 
     const accounts = [
       {
-        name: 'Client User',
+        name: 'Sarah Jenkins',
         email: 'q@q.com',
         role: 'client',
-        location: 'United States'
+        companyName: 'Apex Innovations',
+        location: 'San Francisco, USA',
+        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
+        profilePhoto: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250'
       },
       {
-        name: 'Client Pro',
+        name: 'Robert Vance',
         email: 'client@q.com',
         role: 'client',
-        location: 'New York, USA'
+        companyName: 'Vance Technologies',
+        location: 'New York, USA',
+        avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250',
+        profilePhoto: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250'
       },
       {
         name: 'Freelancer User',
@@ -70,6 +76,9 @@ async function seedAccounts() {
         user.role = acc.role;
         user.name = acc.name;
         user.location = acc.location;
+        if (acc.companyName) user.companyName = acc.companyName;
+        if (acc.avatar) user.avatar = acc.avatar;
+        if (acc.profilePhoto) user.profilePhoto = acc.profilePhoto;
         await user.save();
         console.log(`[UPDATED] ${acc.role.toUpperCase()} -> Email: ${acc.email} | Password: ${defaultPassword}`);
       } else {
@@ -78,7 +87,10 @@ async function seedAccounts() {
           email: normalizedEmail,
           password_hash,
           role: acc.role,
-          location: acc.location
+          location: acc.location,
+          companyName: acc.companyName,
+          avatar: acc.avatar,
+          profilePhoto: acc.profilePhoto
         });
         console.log(`[CREATED] ${acc.role.toUpperCase()} -> Email: ${acc.email} | Password: ${defaultPassword}`);
       }

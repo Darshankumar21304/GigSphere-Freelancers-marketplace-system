@@ -11,6 +11,7 @@ const Contract = require('./Contract');
 const Transaction = require('./Transaction');
 const Notification = require('./Notification');
 const Dispute = require('./Dispute');
+const Pitch = require('./Pitch');
 
 module.exports = {
   User,
@@ -25,5 +26,6 @@ module.exports = {
   Contract,
   Transaction,
   Notification,
-  Dispute
+  Dispute,
+  Pitch
 };

@@ -520,6 +520,31 @@ const fileNewDispute = async (req, res) => {
   }
 };
 
+const getUserPublicProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select('-password_hash');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const { Gig, Contract, Review } = require('../models');
+    let profile = await FreelancerProfile.findOne({ user_id: id });
+    const gigs = await Gig.find({ freelancer_id: id });
+    const contracts = await Contract.find({ freelancer_id: id });
+    const reviews = await Review.find({ freelancer_id: id });
+
+    res.json({
+      user,
+      profile,
+      gigs,
+      contracts,
+      reviews
+    });
+  } catch (error) {
+    console.error('Error fetching public profile:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getFreelancers,
   getMyProfile,
@@ -530,5 +555,6 @@ module.exports = {
   submitKyc,
   getUserDisputes,
   addUserDisputeMessage,
-  fileNewDispute
+  fileNewDispute,
+  getUserPublicProfile
 };

@@ -9,30 +9,53 @@ exports.getChatHistory = async (req, res) => {
       return res.json([]);
     }
 
-    // Find messages between the two users safely
+    const u1Str = String(user1_id);
+    const u2Str = String(user2_id);
+    const authUserId = req.user ? String(req.user.id || req.user._id) : null;
+
+    const possibleUser1 = [u1Str];
+    const possibleUser2 = [u2Str];
+    if (authUserId) {
+      if (u1Str === 'client' || u1Str === 'freelancer') possibleUser1.push(authUserId);
+      if (u2Str === 'client' || u2Str === 'freelancer') possibleUser2.push(authUserId);
+    }
+    possibleUser1.push('client', 'freelancer');
+    possibleUser2.push('client', 'freelancer');
+
+    const roomIds = [];
+    possibleUser1.forEach(id1 => {
+      possibleUser2.forEach(id2 => {
+        roomIds.push([id1, id2].sort().join('_'));
+      });
+    });
+
     let chatMessages = await Message.find({
       $or: [
-        { sender_id: user1_id, receiver_id: user2_id },
-        { sender_id: user2_id, receiver_id: user1_id }
+        { room: { $in: roomIds } },
+        { sender_id: { $in: possibleUser1 }, receiver_id: { $in: possibleUser2 } },
+        { sender_id: { $in: possibleUser2 }, receiver_id: { $in: possibleUser1 } }
       ]
     })
-    .sort({ timestamp: 1 })
+    .sort({ createdAt: 1, _id: 1 })
     .catch(() => []);
 
-    // Format the response safely
     const formattedMessages = (chatMessages || []).map(m => {
       const msgObj = typeof m.toObject === 'function' ? m.toObject() : m;
       return {
         ...msgObj,
-        sender: msgObj.sender_id ? { id: msgObj.sender_id._id || msgObj.sender_id, name: msgObj.sender_id.name || 'User' } : null,
-        receiver: msgObj.receiver_id ? { id: msgObj.receiver_id._id || msgObj.receiver_id, name: msgObj.receiver_id.name || 'User' } : null
+        id: String(msgObj._id),
+        _id: String(msgObj._id),
+        sender_id: String(msgObj.sender_id),
+        receiver_id: String(msgObj.receiver_id),
+        timestamp: msgObj.timestamp || msgObj.createdAt,
+        createdAt: msgObj.createdAt
       };
     });
 
     res.json(formattedMessages);
   } catch (error) {
     console.error('Chat history fetch error:', error);
-    res.json([]); // Return empty array on error so UI never crashes
+    res.json([]);
   }
 };
 
@@ -105,23 +128,35 @@ exports.markMessagesRead = async (req, res) => {
 // GET /api/messages/conversations
 exports.getConversations = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = String(req.user.id || req.user._id);
     const { User } = require('../models');
 
     const messages = await Message.find({
-      $or: [{ sender_id: userId }, { receiver_id: userId }]
+      $or: [
+        { sender_id: userId },
+        { receiver_id: userId },
+        { sender_id: 'client' },
+        { receiver_id: 'client' },
+        { sender_id: 'freelancer' },
+        { receiver_id: 'freelancer' }
+      ]
     }).sort({ createdAt: -1 });
 
     const partnersMap = new Map();
 
     for (const msg of messages) {
-      const partnerId = msg.sender_id.toString() === userId.toString() 
-        ? msg.receiver_id.toString() 
-        : msg.sender_id.toString();
+      const sId = String(msg.sender_id);
+      const rId = String(msg.receiver_id);
+      let partnerId = null;
+
+      if (sId === userId) partnerId = rId;
+      else if (rId === userId) partnerId = sId;
+
+      if (!partnerId || partnerId === 'client' || partnerId === 'freelancer') continue;
 
       if (!partnersMap.has(partnerId)) {
         partnersMap.set(partnerId, {
-          lastMessage: msg.message_text,
+          lastMessage: msg.message_text || (msg.file_url ? 'Attachment sent' : ''),
           lastMessageTime: msg.createdAt
         });
       }
@@ -138,10 +173,16 @@ exports.getConversations = async (req, res) => {
         read: false
       });
 
+      const rawAvatar = partnerUser.avatar || partnerUser.profilePhoto;
+      const cleanAvatar = (rawAvatar && !rawAvatar.includes('pravatar.cc'))
+        ? rawAvatar 
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerUser.name)}&background=1a73e8&color=ffffff&bold=true`;
+
       conversationsList.push({
         partnerId: partnerUser._id,
         partnerName: partnerUser.name,
-        partnerAvatar: partnerUser.avatar || partnerUser.profilePhoto || 'https://i.pravatar.cc/150?img=5',
+        partnerAvatar: cleanAvatar,
+        avatar: cleanAvatar,
         partnerRole: partnerUser.role,
         lastMessage: data.lastMessage,
         lastMessageTime: new Date(data.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -153,5 +194,71 @@ exports.getConversations = async (req, res) => {
   } catch (error) {
     console.error('Error fetching conversations:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// POST /api/messages/send
+exports.sendMessage = async (req, res) => {
+  try {
+    const sender_id = String(req.user.id || req.user._id);
+    const { receiver_id, message_text, file_url, room } = req.body;
+
+    if (!receiver_id || (!message_text && !file_url)) {
+      return res.status(400).json({ message: 'Receiver ID and message or file are required' });
+    }
+
+    const recId = String(receiver_id);
+    const roomId = room || [sender_id, recId].sort().join('_');
+
+    const newMessage = await Message.create({
+      sender_id,
+      receiver_id: recId,
+      message_text: message_text || '',
+      file_url: file_url || null,
+      room: roomId
+    });
+
+    const { User } = require('../models');
+    const sender = await User.findById(sender_id).catch(() => null);
+    const senderName = sender ? sender.name : 'A user';
+
+    const { createNotification } = require('./notificationController');
+    await createNotification(
+      recId,
+      'message',
+      `New Message from ${senderName}`,
+      `You received a new message: "${(message_text || '').substring(0, 60)}"`
+    ).catch(() => null);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(roomId).emit('receive_message', {
+        id: newMessage._id,
+        _id: newMessage._id,
+        sender_id: newMessage.sender_id,
+        receiver_id: newMessage.receiver_id,
+        message_text: newMessage.message_text,
+        file_url: newMessage.file_url,
+        timestamp: newMessage.createdAt,
+        room: roomId
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: {
+        id: String(newMessage._id),
+        _id: String(newMessage._id),
+        sender_id: String(newMessage.sender_id),
+        receiver_id: String(newMessage.receiver_id),
+        message_text: newMessage.message_text,
+        file_url: newMessage.file_url,
+        timestamp: newMessage.createdAt,
+        room: roomId
+      }
+    });
+  } catch (error) {
+    console.error('SendMessage error:', error);
+    res.status(500).json({ message: 'Failed to send message' });
   }
 };

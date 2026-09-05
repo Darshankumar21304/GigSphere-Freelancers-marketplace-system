@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { apiFetch } from '../utils/api';
+import { getCleanAvatar } from '../utils/avatarUtils';
 import { 
   Filter, 
   Search,
@@ -233,7 +234,7 @@ export default function Freelancers() {
                       
                       <div className="card-header" style={{alignItems: 'center'}}>
                         <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
-                          <img src={freelancer.avatar || 'https://i.pravatar.cc/150'} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
+                          <img src={getCleanAvatar(freelancer.avatar || freelancer.profilePhoto, freelancer.name)} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
                           <div>
                             <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'}}>
                               <h3 className="project-title" style={{marginBottom: 0}}>{freelancer.name}</h3>

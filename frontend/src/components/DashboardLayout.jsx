@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PlusCircle, ClipboardList, MessageSquare, 
   Settings, LogOut, Wallet, Briefcase, FileText, Users, 
-  CreditCard, Star, Bell, Search, Folder, Menu, X, AlertTriangle
+  CreditCard, Star, Bell, Search, Folder, Menu, X, AlertTriangle, Heart, Clock, Sparkles, Send
 } from 'lucide-react';
 import { getUserRole, logoutUser } from '../utils/authUtils';
 import '../pages/dashboard/Dashboard.css';
@@ -35,7 +35,7 @@ export default function DashboardLayout() {
   const clientNavItems = [
     { name: 'Dashboard', path: '/client/dashboard', icon: LayoutDashboard, exact: true },
     { name: 'Profile', path: '/client/dashboard/profile', icon: Users },
-    { name: 'Browse Projects', path: '/client/dashboard/browse-projects', icon: Search },
+    { name: 'Browse Freelancers', path: '/client/dashboard/browse-freelancers', icon: Search },
     { name: 'Create Project', path: '/client/dashboard/create-project', icon: PlusCircle },
     { name: 'My Projects', path: '/client/dashboard/my-projects', icon: Briefcase },
     { name: 'Received Proposals', path: '/client/dashboard/proposals', icon: FileText },
@@ -49,8 +49,11 @@ export default function DashboardLayout() {
     { name: 'Dashboard', path: '/freelancer/dashboard', icon: LayoutDashboard, exact: true },
     { name: 'Profile', path: '/freelancer/dashboard/profile', icon: Users },
     { name: 'Browse Projects', path: '/freelancer/dashboard/browse-projects', icon: Search },
+    { name: 'Saved Favorites', path: '/freelancer/dashboard/browse-projects?saved=true', icon: Heart },
+    { name: 'Direct Pitches', path: '/freelancer/dashboard/pitches', icon: Sparkles },
     { name: 'My Proposals', path: '/freelancer/dashboard/my-proposals', icon: FileText },
     { name: 'Active Projects', path: '/freelancer/dashboard/active-projects', icon: Briefcase },
+    { name: 'Gig History', path: '/freelancer/dashboard/gig-history', icon: Clock },
     { name: 'Portfolio', path: '/freelancer/dashboard/portfolio', icon: Folder },
     { name: 'Earnings', path: '/freelancer/dashboard/wallet', icon: Wallet },
     { name: 'Disputes', path: '/freelancer/dashboard/disputes', icon: AlertTriangle },
