@@ -18,6 +18,8 @@ import {
   Users
 } from 'lucide-react';
 import './BrowseProjects.css'; // Reusing the same CSS for consistent layout
+import AuthModal from '../components/AuthModal';
+import FreelancerProfileModal from '../components/FreelancerProfileModal';
 
 const MOCK_SKILLS = [
   'All Skills',
@@ -38,6 +40,11 @@ export default function Freelancers() {
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Modals State
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [selectedFreelancer, setSelectedFreelancer] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
   // Fetch freelancers from backend
   useEffect(() => {
@@ -53,6 +60,31 @@ export default function Freelancers() {
     };
     fetchFreelancers();
   }, []);
+
+  const handleOpenProfile = (fl) => {
+    const profileData = fl.profile || {};
+    setSelectedFreelancer({
+      ...fl,
+      ...profileData,
+      _id: fl._id || fl.id,
+      name: fl.name,
+      title: profileData.title || fl.title || 'Freelance Specialist',
+      bio: profileData.bio || fl.bio || 'Ready to work on amazing projects.',
+      skills: profileData.skills || fl.skills || [],
+      hourlyRate: profileData.hourlyRate || fl.hourlyRate || 1500,
+      avatar: fl.profilePhoto || fl.avatar,
+      rating: fl.rating || profileData.rating || 5.0,
+      numReviews: fl.numReviews || fl.reviewCount || 1,
+      portfolioItems: profileData.portfolioItems || [],
+      workExperience: profileData.workExperience || [],
+      certifications: profileData.certifications || []
+    });
+    setIsProfileModalOpen(true);
+  };
+
+  const handleOpenAuth = () => {
+    setShowAuthModal(true);
+  };
 
 
 
@@ -233,15 +265,15 @@ export default function Freelancers() {
                     <div key={freelancer._id} className="project-card">
                       
                       <div className="card-header" style={{alignItems: 'center'}}>
-                        <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
+                        <div style={{display: 'flex', gap: '16px', alignItems: 'center', cursor: 'pointer'}} onClick={() => handleOpenProfile(freelancer)}>
                           <img src={getCleanAvatar(freelancer.avatar || freelancer.profilePhoto, freelancer.name)} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
                           <div>
-                            <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'}}>
+                            <div style={{textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'}}>
                               <h3 className="project-title" style={{marginBottom: 0}}>{freelancer.name}</h3>
                               {freelancer.kycStatus === 'Verified' && (
                                 <CheckCircle size={14} color="#10b981" fill="#dcfce7" title="Verified Freelancer" />
                               )}
-                            </Link>
+                            </div>
                             <p style={{margin: 0, fontSize: '14px', color: 'var(--text-main)', fontWeight: 500, marginTop: '4px'}}>{(freelancer.profile && freelancer.profile.title) || 'Freelancer'}</p>
                             <div className="client-info" style={{marginTop: '4px'}}>
                               <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
@@ -282,17 +314,37 @@ export default function Freelancers() {
                       <p className="project-desc">{(freelancer.profile && freelancer.profile.bio) || 'Ready to work on amazing projects.'}</p>
                       
                       <div className="skills-container">
-                        {(freelancer.profile && freelancer.profile.skills && freelancer.profile.skills.split(','))?.map(skill => (
-                          <span key={skill} className="skill-chip">{skill.trim()}</span>
-                        )) || <span className="skill-chip">General</span>}
+                        {(() => {
+                          const rawSkills = freelancer.profile?.skills || freelancer.skills;
+                          const skillsArr = Array.isArray(rawSkills) 
+                            ? rawSkills 
+                            : (typeof rawSkills === 'string' ? rawSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
+                          return skillsArr.length > 0 ? (
+                            skillsArr.map((skill, idx) => (
+                              <span key={idx} className="skill-chip">{skill}</span>
+                            ))
+                          ) : (
+                            <span className="skill-chip">General</span>
+                          );
+                        })()}
                       </div>
 
                       <div className="card-footer">
                         <div className="card-actions" style={{width: '100%', justifyContent: 'flex-end'}}>
-                          <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none'}}>
-                            <button className="btn-secondary">View Profile</button>
-                          </Link>
-                          <button className="btn-primary" onClick={() => navigate('/client/dashboard/create-project')}>Hire Talent</button>
+                          <button 
+                            type="button" 
+                            className="btn-secondary" 
+                            onClick={() => handleOpenProfile(freelancer)}
+                          >
+                            View Profile
+                          </button>
+                          <button 
+                            type="button" 
+                            className="btn-primary" 
+                            onClick={handleOpenAuth}
+                          >
+                            Hire Talent
+                          </button>
                         </div>
                       </div>
                       
@@ -325,6 +377,31 @@ export default function Freelancers() {
           </main>
         </div>
       </div>
+
+      {/* Freelancer Profile Modal */}
+      <FreelancerProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        freelancer={selectedFreelancer}
+        onHire={() => {
+          setIsProfileModalOpen(false);
+          setShowAuthModal(true);
+        }}
+        onMessage={() => {
+          setIsProfileModalOpen(false);
+          setShowAuthModal(true);
+        }}
+        onShortlist={() => {
+          setIsProfileModalOpen(false);
+          setShowAuthModal(true);
+        }}
+      />
+
+      {/* Interactive Login / Register Auth Modal Popup */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 }

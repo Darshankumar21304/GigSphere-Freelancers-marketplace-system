@@ -9,6 +9,32 @@ exports.getWalletDetails = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const { Contract } = require('../models');
+    let escrowBalance = user.escrowBalance || 0;
+
+    if (escrowBalance === 0) {
+      const activeContracts = await Contract.find({
+        $or: [
+          { client_id: user._id },
+          { client_id: String(user._id) },
+          { client_id: null }
+        ],
+        status: { $nin: ['Completed', 'Cancelled'] }
+      }).lean();
+
+      activeContracts.forEach(c => {
+        if (c.milestones && Array.isArray(c.milestones) && c.milestones.length > 0) {
+          c.milestones.forEach(m => {
+            if (m.status === 'In Progress' || m.status === 'Pending' || m.status === 'Under Review') {
+              escrowBalance += Number(m.amount || 0);
+            }
+          });
+        } else {
+          escrowBalance += Number(c.totalValue || 0);
+        }
+      });
+    }
+
     // Retrieve completed deposits or non-pending transactions only
     const transactions = await Transaction.find({ 
       user_id: req.user.id,
@@ -21,7 +47,7 @@ exports.getWalletDetails = async (req, res) => {
     res.json({
       success: true,
       walletBalance: user.walletBalance || 0,
-      escrowBalance: user.escrowBalance || 0,
+      escrowBalance,
       bankDetails: user.bankDetails || {},
       transactions
     });

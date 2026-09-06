@@ -12,6 +12,9 @@ const Transaction = require('./Transaction');
 const Notification = require('./Notification');
 const Dispute = require('./Dispute');
 const Pitch = require('./Pitch');
+const RecommendationEvent = require('./RecommendationEvent');
+const TrustReview = require('./TrustReview');
+const TrustEvent = require('./TrustEvent');
 
 module.exports = {
   User,
@@ -27,5 +30,9 @@ module.exports = {
   Transaction,
   Notification,
   Dispute,
-  Pitch
+  Pitch,
+  RecommendationEvent,
+  TrustReview,
+  TrustEvent
 };
+

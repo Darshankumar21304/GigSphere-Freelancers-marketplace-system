@@ -3,7 +3,7 @@ import {
   Download, 
   ArrowUpRight, 
   ArrowDownLeft, 
-  DollarSign, 
+  IndianRupee, 
   Briefcase, 
   Clock, 
   PlusCircle, 
@@ -255,7 +255,7 @@ export default function Wallet() {
       {/* Balances Grid */}
       <div className="wallet-balances">
         <div className="balance-card hover-lift" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#ffffff' }}>
-          <div className="balance-label" style={{ color: '#94a3b8' }}><DollarSign size={16} /> Available Wallet Balance</div>
+          <div className="balance-label" style={{ color: '#94a3b8' }}><IndianRupee size={16} /> Available Wallet Balance</div>
           <div className="balance-amount" style={{ color: '#ffffff' }}>{isLoading ? '...' : formatINR(walletBalance)}</div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button 

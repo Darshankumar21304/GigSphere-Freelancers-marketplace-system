@@ -11,6 +11,7 @@ const projectSchema = new mongoose.Schema({
   duration: { type: String },
   deadline: { type: String },
   experienceLevel: { type: String, enum: ['Beginner', 'Entry Level', 'Intermediate', 'Expert'], default: 'Intermediate' },
+  status: { type: String, enum: ['Open', 'In Progress', 'Completed', 'Closed', 'Cancelled'], default: 'Open' },
   attachments: [mongoose.Schema.Types.Mixed],
   proposals: [{
     freelancer_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

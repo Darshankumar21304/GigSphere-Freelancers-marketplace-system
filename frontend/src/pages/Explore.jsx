@@ -79,27 +79,12 @@ export default function Explore() {
   const [proposalForm, setProposalForm] = useState({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
 
-  const handleProposalSubmit = async (e) => {
-    e.preventDefault();
-    if (!proposalProject) return;
-    setIsSubmittingProposal(true);
-    try {
-      await apiFetch(`/projects/${proposalProject._id}/proposals`, {
-        method: 'POST',
-        body: JSON.stringify(proposalForm)
-      });
-      alert('Proposal submitted successfully!');
-      setProposalProject(null);
-      setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
-    } catch (err) {
-      console.error('Failed to submit proposal:', err);
-      alert('Failed to submit proposal: ' + err.message);
-    } finally {
-      setIsSubmittingProposal(false);
-    }
-  };
+  const [recommendations, setRecommendations] = useState([]);
+  const [isRecsLoading, setIsRecsLoading] = useState(false);
+  const [isAiDrafting, setIsAiDrafting] = useState(false);
+  const [aiDraftTone, setAiDraftTone] = useState('professional');
 
-  // Fetch projects from backend
+  // Fetch projects and recommendations from backend
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -116,8 +101,98 @@ export default function Explore() {
         setIsLoading(false);
       }
     };
+
+    const fetchRecommendations = async () => {
+      if (role === 'freelancer' && isAuth) {
+        setIsRecsLoading(true);
+        try {
+          const res = await apiFetch('/freelancer/ai/recommendations?limit=6');
+          if (res && Array.isArray(res.recommendations)) {
+            setRecommendations(res.recommendations);
+          }
+        } catch (err) {
+          console.error('Error loading AI recommendations in Explore:', err);
+        } finally {
+          setIsRecsLoading(false);
+        }
+      }
+    };
+
     fetchProjects();
-  }, []);
+    fetchRecommendations();
+  }, [role, isAuth]);
+
+  // Track AI interaction events
+  const trackAiEvent = async (eventType, project, score = 0) => {
+    if (!isAuth || role !== 'freelancer' || !project) return;
+    try {
+      await apiFetch('/freelancer/ai/events', {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: project._id || project.id,
+          eventType,
+          score: score || project.matchScore || project.matchPercentage || 0
+        })
+      });
+    } catch (e) {
+      // non-blocking
+    }
+  };
+
+  // AI Proposal Assistant handler
+  const handleAiProposalAssist = async (action = 'generate') => {
+    if (!proposalProject) return;
+    setIsAiDrafting(true);
+    try {
+      const res = await apiFetch('/freelancer/ai/proposal', {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: proposalProject._id || proposalProject.id,
+          projectTitle: proposalProject.title,
+          projectDescription: proposalProject.description,
+          requiredSkills: proposalProject.skills || proposalProject.requiredSkills || [],
+          action,
+          tone: aiDraftTone,
+          currentDraft: proposalForm.coverLetter
+        })
+      });
+
+      if (res && res.proposalText) {
+        setProposalForm(prev => ({
+          ...prev,
+          coverLetter: res.proposalText,
+          bidAmount: prev.bidAmount || proposalProject.budget || ''
+        }));
+      }
+    } catch (err) {
+      console.error('AI proposal generation failed:', err);
+      alert('AI Proposal Assistant: ' + err.message);
+    } finally {
+      setIsAiDrafting(false);
+    }
+  };
+
+  const handleProposalSubmit = async (e) => {
+    e.preventDefault();
+    if (!proposalProject) return;
+    setIsSubmittingProposal(true);
+    try {
+      await apiFetch(`/projects/${proposalProject._id}/proposals`, {
+        method: 'POST',
+        body: JSON.stringify(proposalForm)
+      });
+      // Track proposal submitted event for adaptive learning
+      trackAiEvent('proposal_submitted', proposalProject, proposalProject.matchScore || 85);
+      alert('Proposal submitted successfully!');
+      setProposalProject(null);
+      setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
+    } catch (err) {
+      console.error('Failed to submit proposal:', err);
+      alert('Failed to submit proposal: ' + err.message);
+    } finally {
+      setIsSubmittingProposal(false);
+    }
+  };
 
   const toggleSave = (e, id) => {
     e.preventDefault();
@@ -127,10 +202,15 @@ export default function Explore() {
     }
     const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
     let updated;
+    const targetProject = projects.find(p => p._id === id);
     if (savedList.includes(id)) {
       updated = savedList.filter(item => item !== id);
     } else {
       updated = [...savedList, id];
+      // Track bookmark event for adaptive learning
+      if (targetProject) {
+        trackAiEvent('project_bookmark', targetProject, targetProject.matchScore || 80);
+      }
     }
     localStorage.setItem('saved_projects', JSON.stringify(updated));
     setProjects(projects.map(p => p._id === id ? { ...p, saved: updated.includes(p._id) } : p));
@@ -146,6 +226,7 @@ export default function Explore() {
       return;
     }
     setProposalProject(project);
+    trackAiEvent('project_view', project, project.matchScore || 75);
   };
 
   const handleFilterChange = (key, value) => {
@@ -415,6 +496,106 @@ export default function Explore() {
           {/* Main Results */}
           <main className="results-area">
             
+            {/* AI RECOMMENDED FOR YOU SECTION (PRIMARY RECOMMENDATION SURFACE) */}
+            {role === 'freelancer' && isAuth && (
+              <div className="ai-recomms-section" style={{ marginBottom: '28px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, border: '1px solid #a7f3d0' }}>
+                      ✨ AI Smart Match
+                    </span>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: 0 }}>
+                      Recommended For You
+                    </h2>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Personalized to your profile skills & experience
+                  </span>
+                </div>
+
+                {isRecsLoading ? (
+                  <div style={{ padding: '24px', background: '#fff', borderRadius: '12px', textAlign: 'center', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                    Scanning marketplace briefs for best matches...
+                  </div>
+                ) : recommendations.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                    {recommendations.slice(0, 4).map(rec => (
+                      <div key={rec._id || rec.id} className="project-card" style={{ border: '1.5px solid #10b981', background: 'linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                          <span style={{ background: '#10b981', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800, padding: '3px 9px', borderRadius: '14px' }}>
+                            {rec.matchPercentage || rec.matchScore}% Match
+                          </span>
+                          <button 
+                            className="bookmark-icon-btn"
+                            onClick={(e) => toggleSave(e, rec._id)}
+                            style={{ padding: '4px' }}
+                          >
+                            <Bookmark size={18} fill={rec.saved ? 'currentColor' : 'none'} />
+                          </button>
+                        </div>
+
+                        <Link to={`/gig/${rec._id}`} style={{ textDecoration: 'none' }}>
+                          <h3 className="project-title" style={{ fontSize: '1.05rem', margin: '0 0 6px', color: '#0f172a' }}>{rec.title}</h3>
+                        </Link>
+
+                        <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700, margin: '4px 0 10px' }}>
+                          Budget: {formatINR(rec.budget || rec.budgetMax || 0)}
+                        </div>
+
+                        {/* Matching Skills */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                          {(rec.matchingSkills || []).map((sk, sIdx) => (
+                            <span key={sIdx} style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px' }}>
+                              ✓ {sk}
+                            </span>
+                          ))}
+                          {(rec.missingSkills || []).slice(0, 2).map((sk, sIdx) => (
+                            <span key={sIdx} style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '6px' }}>
+                              + {sk}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Why this project explainability */}
+                        <div style={{ background: 'rgba(255,255,255,0.7)', padding: '10px', borderRadius: '8px', fontSize: '0.76rem', color: '#334155', marginBottom: '14px', border: '1px solid #bbf7d0' }}>
+                          <strong style={{ display: 'block', marginBottom: '4px', color: '#065f46' }}>Why this project?</strong>
+                          <ul style={{ margin: 0, paddingLeft: '16px', lineHeight: 1.4 }}>
+                            {(rec.reasons || rec.whyRecommended || []).map((r, rIdx) => (
+                              <li key={rIdx}>{r}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
+                          <button 
+                            className="btn-secondary" 
+                            style={{ flex: 1, padding: '8px', fontSize: '0.8rem' }}
+                            onClick={() => {
+                              trackAiEvent('project_view', rec, rec.matchPercentage);
+                              navigate(`/gig/${rec._id}`);
+                            }}
+                          >
+                            View Details
+                          </button>
+                          <button 
+                            className="btn-primary" 
+                            style={{ flex: 1, padding: '8px', fontSize: '0.8rem', background: '#059669' }}
+                            onClick={() => handleProposeClick(rec)}
+                          >
+                            Submit Proposal
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '16px 20px', background: '#f8fafc', borderRadius: '10px', fontSize: '0.82rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
+                    💡 <strong>Smart Matching Active:</strong> As new client briefs matching your technical stack are posted, personalized high-confidence recommendations will automatically appear here.
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="results-toolbar">
               <div className="results-count">
                 Showing <strong>{filteredProjects.length}</strong> projects found
@@ -646,14 +827,42 @@ export default function Explore() {
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Cover Letter / Pitch</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', margin: 0 }}>Cover Letter / Pitch</label>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      disabled={isAiDrafting}
+                      onClick={() => handleAiProposalAssist('generate')}
+                      style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {isAiDrafting ? '✨ Generating...' : '✨ AI Generate'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAiDrafting || !proposalForm.coverLetter}
+                      onClick={() => handleAiProposalAssist('shorten')}
+                      style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Shorten
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAiDrafting || !proposalForm.coverLetter}
+                      onClick={() => handleAiProposalAssist('professional')}
+                      style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Professional Tone
+                    </button>
+                  </div>
+                </div>
                 <textarea 
                   required
-                  rows="4"
+                  rows="5"
                   placeholder="Describe your relevant experience and why you are the best fit for this project..."
                   value={proposalForm.coverLetter}
                   onChange={(e) => setProposalForm({ ...proposalForm, coverLetter: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db', resize: 'vertical' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db', resize: 'vertical', fontSize: '0.88rem', lineHeight: 1.5 }}
                 />
               </div>
 

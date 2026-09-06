@@ -30,8 +30,10 @@ import Settings from './pages/dashboard/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 import HiredFreelancers from './pages/dashboard/HiredFreelancers';
 import ClientOverview from './pages/dashboard/ClientOverview';
+import ClientAnalytics from './pages/dashboard/ClientAnalytics';
 import ClientSpending from './pages/dashboard/ClientSpending';
 import ClientReviews from './pages/dashboard/ClientReviews';
+import FreelancerAnalytics from './pages/dashboard/FreelancerAnalytics';
 import Notifications from './pages/dashboard/Notifications';
 import Disputes from './pages/dashboard/Disputes';
 import BrowseFreelancers from './pages/dashboard/BrowseFreelancers';
@@ -45,6 +47,7 @@ import AdminListings from './pages/admin/AdminListings';
 import AdminDisputes from './pages/admin/AdminDisputes';
 import AdminPayouts from './pages/admin/AdminPayouts';
 import AdminAiSecurity from './pages/admin/AdminAiSecurity';
+import AdminTrustFraud from './pages/admin/AdminTrustFraud';
 import AdminKyc from './pages/admin/AdminKyc';
 
 import Navbar from './components/Navbar';
@@ -88,6 +91,7 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />
               <Route path="hired" element={<HiredFreelancers />} />
+              <Route path="analytics" element={<ClientAnalytics />} />
               <Route path="browse-freelancers" element={<BrowseFreelancers />} />
               <Route path="reviews" element={<ClientReviews />} />
               <Route path="disputes" element={<Disputes />} />
@@ -105,6 +109,7 @@ function App() {
               <Route path="active-projects" element={<ActiveProjects />} />
               <Route path="gig-history" element={<GigHistory />} />
               <Route path="portfolio" element={<Portfolio />} />
+              <Route path="analytics" element={<FreelancerAnalytics />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="create-gig" element={<CreateGig />} />
               <Route path="profile" element={<Profile />} />
@@ -125,6 +130,7 @@ function App() {
               <Route path="disputes" element={<AdminDisputes />} />
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="kyc" element={<AdminKyc />} />
+              <Route path="trust-fraud" element={<AdminTrustFraud />} />
               <Route path="ai-security" element={<AdminAiSecurity />} />
             </Route>
           </Routes>

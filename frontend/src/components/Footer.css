@@ -24,6 +24,21 @@
   color: var(--white);
 }
 
+.footer-brand-logo {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.footer-brand-logo:hover {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+.footer-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .footer-brand p {
   color: var(--text-secondary);
   font-size: var(--text-sm);

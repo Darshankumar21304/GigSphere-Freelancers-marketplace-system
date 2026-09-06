@@ -98,7 +98,7 @@ export default function MediaPreviewModal({ isOpen, onClose, file }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
             {isDrive && <HardDrive size={20} color="#2563eb" />}
             {isFigma && <Palette size={20} color="#a855f7" />}
-            {isGithub && <Github size={20} color="#0f172a" />}
+            {isGithub && <GithubIcon size={20} color="#0f172a" />}
             {isZip && <Archive size={20} color="#d97706" />}
             {isImage && <ImageIcon size={20} color="#1a73e8" />}
             {isPdf && <FileText size={20} color="#dc2626" />}

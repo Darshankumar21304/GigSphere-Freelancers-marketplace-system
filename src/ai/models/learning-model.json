@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "skills": {
+    "react": {
+      "views": 2,
+      "bookmarks": 0,
+      "proposals": 0,
+      "hires": 7,
+      "completions": 0,
+      "successRate": 0.9
+    },
+    "node.js": {
+      "views": 2,
+      "bookmarks": 0,
+      "proposals": 0,
+      "hires": 7,
+      "completions": 0,
+      "successRate": 0.9
+    },
+    "mongodb": {
+      "views": 0,
+      "bookmarks": 0,
+      "proposals": 0,
+      "hires": 0,
+      "completions": 0,
+      "successRate": 0
+    },
+    "rag": {
+      "views": 2,
+      "bookmarks": 0,
+      "proposals": 0,
+      "hires": 0,
+      "completions": 0,
+      "successRate": 0
+    },
+    "python": {
+      "views": 0,
+      "bookmarks": 0,
+      "proposals": 0,
+      "hires": 0,
+      "completions": 0,
+      "successRate": 0
+    }
+  },
+  "projectSignals": {},
+  "global": {
+    "lastUpdated": "2026-09-06T06:43:24.586Z"
+  },
+  "limits": {
+    "maxSkillBoost": 0.1,
+    "maxSkillPenalty": -0.1
+  }
+}

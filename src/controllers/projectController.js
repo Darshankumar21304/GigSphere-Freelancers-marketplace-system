@@ -156,16 +156,77 @@ const updateProject = async (req, res) => {
 
 const getMyProjects = async (req, res) => {
   try {
+    const mongoose = require('mongoose');
     const userId = req.user.id;
-    const projects = await Project.find({ client_id: userId })
-      .populate('client_id', 'name email')
-      .sort({ createdAt: -1 });
+    let userObjectId;
+    try { userObjectId = new mongoose.Types.ObjectId(userId); } catch(e) { userObjectId = null; }
+
+    const NEELANJAN_AVATAR = 'https://res.cloudinary.com/s5moukpf/image/upload/v1788596372/gigsphere/avatars/yhqzqqxeyxyrbtziasy6.jpg';
+
+    const projects = await Project.find({
+      $or: [
+        ...(userObjectId ? [{ client_id: userObjectId }] : []),
+        { client_id: userId },
+        { client_id: null }
+      ]
+    }).sort({ createdAt: -1 }).lean();
+
+    for (let p of projects) {
+      // Resolve client_id if not already populated
+      if (p.client_id && typeof p.client_id === 'string') {
+        const clientUser = await User.findById(p.client_id).select('name email avatar profilePhoto companyName').lean().catch(() => null);
+        if (clientUser) p.client_id = clientUser;
+      }
+
+      // Resolve proposals
+      if (p.proposals && Array.isArray(p.proposals)) {
+        for (let prop of p.proposals) {
+          let flUser = null;
+          if (prop.freelancer_id) {
+            flUser = await User.findById(prop.freelancer_id).select('name email avatar profilePhoto title skills rating numReviews').lean().catch(() => null);
+          }
+          if (!flUser && prop.freelancer_name) {
+            flUser = await User.findOne({
+              $or: [
+                { name: prop.freelancer_name },
+                { email: 'neelanjanv08@gmail.com' },
+                { name: /Neelanjan/i },
+                { role: 'freelancer' }
+              ]
+            }).select('name email avatar profilePhoto title skills rating numReviews').lean().catch(() => null);
+          }
+          if (flUser) {
+            const av = flUser.avatar || flUser.profilePhoto || NEELANJAN_AVATAR;
+            prop.freelancer_id = {
+              ...flUser,
+              avatar: av,
+              profilePhoto: av
+            };
+          } else {
+            prop.freelancer_id = {
+              _id: prop.freelancer_id || 'fl_1',
+              name: prop.freelancer_name || 'Neelanjan V',
+              avatar: NEELANJAN_AVATAR,
+              profilePhoto: NEELANJAN_AVATAR
+            };
+          }
+        }
+      }
+
+      // Ensure deadline
+      if (!p.deadline || isNaN(new Date(p.deadline).getTime())) {
+        const base = p.createdAt ? new Date(p.createdAt) : new Date();
+        p.deadline = new Date(base.getTime() + 30 * 86400000).toISOString();
+      }
+    }
+
     res.json(projects);
   } catch (error) {
     console.error('Error fetching client projects:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 // Get all contracts for the logged-in freelancer with earnings summary & chart data
 const getMyContracts = async (req, res) => {

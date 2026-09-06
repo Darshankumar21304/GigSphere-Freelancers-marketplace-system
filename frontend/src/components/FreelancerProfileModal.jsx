@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { formatINR } from '../utils/currency';
 import { getCleanAvatar } from '../utils/avatarUtils';
+import { apiFetch } from '../utils/api';
 import './FreelancerProfileModal.css';
 
 const getAbsoluteUrl = (url) => {
@@ -27,24 +28,39 @@ export default function FreelancerProfileModal({
   onShortlist
 }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [trustData, setTrustData] = useState(null);
+
+  React.useEffect(() => {
+    if (isOpen && freelancer) {
+      const flId = freelancer._id || freelancer.id || freelancer.user_id;
+      if (flId) {
+        apiFetch(`/trust/freelancer/${flId}`)
+          .then(data => setTrustData(data))
+          .catch(() => null);
+      }
+    }
+  }, [isOpen, freelancer]);
 
   if (!isOpen || !freelancer) return null;
 
+  const profileData = freelancer.profile || {};
   const name = freelancer.name || freelancer.freelancerName || 'Freelancer';
-  const title = freelancer.title || 'Freelancer Partner';
+  const title = profileData.title || freelancer.title || 'Freelance Specialist';
   const avatar = getCleanAvatar(freelancer.avatar || freelancer.profilePhoto, name);
-  const rating = freelancer.rating || 5.0;
-  const numReviews = freelancer.numReviews || 0;
-  const hourlyRate = freelancer.hourlyRate || 0;
-  const location = freelancer.location || freelancer.city || 'India';
-  const bio = freelancer.bio || 'No biography added yet.';
-  const skillsRaw = Array.isArray(freelancer.skills) ? freelancer.skills : [];
-  const skills = skillsRaw.flatMap(s => typeof s === 'string' ? s.split(',').map(x => x.trim()) : s).filter(Boolean);
-  const portfolioItems = Array.isArray(freelancer.portfolioItems) ? freelancer.portfolioItems : [];
-  const gigs = Array.isArray(freelancer.gigs) ? freelancer.gigs : [];
-  const gigHistory = Array.isArray(freelancer.gigHistory) ? freelancer.gigHistory : [];
-  const workExperience = Array.isArray(freelancer.workExperience) ? freelancer.workExperience : [];
-  const certifications = Array.isArray(freelancer.certifications) ? freelancer.certifications : [];
+  const rating = freelancer.rating || profileData.rating || 5.0;
+  const numReviews = freelancer.numReviews || freelancer.reviewCount || profileData.reviewCount || 1;
+  const hourlyRate = profileData.hourlyRate || freelancer.hourlyRate || freelancer.price || 1500;
+  const location = profileData.location || freelancer.location || freelancer.city || 'India';
+  const bio = profileData.bio || freelancer.bio || 'Ready to work on amazing projects.';
+  const skillsRaw = profileData.skills || freelancer.skills || [];
+  const skills = Array.isArray(skillsRaw) 
+    ? skillsRaw.flatMap(s => typeof s === 'string' ? s.split(',').map(x => x.trim()) : s).filter(Boolean) 
+    : (typeof skillsRaw === 'string' ? skillsRaw.split(',').map(s => s.trim()).filter(Boolean) : []);
+  const portfolioItems = Array.isArray(profileData.portfolioItems || freelancer.portfolioItems) ? (profileData.portfolioItems || freelancer.portfolioItems) : [];
+  const gigs = Array.isArray(profileData.gigs || freelancer.gigs) ? (profileData.gigs || freelancer.gigs) : [];
+  const gigHistory = Array.isArray(profileData.gigHistory || freelancer.gigHistory) ? (profileData.gigHistory || freelancer.gigHistory) : [];
+  const workExperience = Array.isArray(profileData.workExperience || freelancer.workExperience) ? (profileData.workExperience || freelancer.workExperience) : [];
+  const certifications = Array.isArray(profileData.certifications || freelancer.certifications) ? (profileData.certifications || freelancer.certifications) : [];
 
   return (
     <div className="fl-modal-overlay" onClick={onClose}>
@@ -65,10 +81,13 @@ export default function FreelancerProfileModal({
             </div>
 
             <div className="fl-header-info">
-              <div className="fl-name-row">
+              <div className="fl-name-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <h2 className="fl-name">{name}</h2>
                 <span className="fl-pro-pill">
                   <Sparkles size={12} /> Verified Pro
+                </span>
+                <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <ShieldCheck size={13} color="#059669" /> {trustData?.trustScore ? `${trustData.trustScore}% Trust Score` : 'High Trust'}
                 </span>
               </div>
               <p className="fl-title">{title}</p>

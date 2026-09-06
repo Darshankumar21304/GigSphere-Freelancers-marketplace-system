@@ -75,6 +75,93 @@ export default function Orders() {
       setIsLoadingWorkspaceData(true);
       try {
         const projId = String(activeWorkspace.id || activeWorkspace._id || '');
+
+        // 1. Fetch fresh project attachments from backend
+        const freshProjRes = await apiFetch(`/projects/${projId}`).catch(() => null);
+        const freshProj = freshProjRes?.project || freshProjRes;
+        const currentAtts = (freshProj && Array.isArray(freshProj.attachments)) ? freshProj.attachments : (activeWorkspace.attachments || []);
+
+        let loadedFiles = currentAtts.map(att => {
+          let fullUrl = '';
+          let name = 'Project Deliverable';
+          let type = '';
+
+          if (typeof att === 'string') {
+            if (att.startsWith('http://') || att.startsWith('https://')) {
+              fullUrl = att;
+              name = att.split('/').pop().split('?')[0];
+            } else {
+              fullUrl = `https://res.cloudinary.com/s5moukpf/image/upload/v1788070426/gigsphere/avatars/${att}.jpg`;
+              name = `Attachment_${att.slice(0, 8)}.jpg`;
+              type = 'image/jpeg';
+            }
+          } else if (att && typeof att === 'object') {
+            fullUrl = att.url || '';
+            name = att.name || (fullUrl ? fullUrl.split('/').pop() : 'Deliverable Document');
+            type = att.type || '';
+          }
+
+          const isDrive = (att && att.isDrive) || (fullUrl && (fullUrl.includes('drive.google.com') || fullUrl.includes('docs.google.com') || fullUrl.includes('dropbox.com') || fullUrl.includes('onedrive')));
+          const isFigma = (att && att.isFigma) || (fullUrl && (fullUrl.includes('figma.com') || fullUrl.includes('canva.com')));
+          const isGithub = (att && att.isGithub) || (fullUrl && fullUrl.includes('github.com')) || (name && name.toLowerCase().includes('github'));
+          const isZip = !isDrive && !isFigma && !isGithub && ((att && att.isZip) || (name && /\.(zip|rar|7z|tar|gz)$/i.test(name)) || (fullUrl && /\.(zip|rar|7z|tar|gz)/i.test(fullUrl)) || (type && type.includes('zip')));
+
+          const rawUploadedBy = (att && typeof att === 'object' && att.uploadedBy) ? att.uploadedBy : '';
+          const uploadedBy = rawUploadedBy ? rawUploadedBy : (isGithub || (name && (name.toLowerCase().includes('requirement') || name.toLowerCase().includes('submission') || name.toLowerCase().includes('vault'))) ? 'Freelancer' : 'Client');
+
+          return {
+            name,
+            url: fullUrl,
+            type,
+            isDrive,
+            isFigma,
+            isGithub,
+            isZip,
+            isLink: isDrive || isFigma || isGithub || (att && att.isLink) || fullUrl.startsWith('http'),
+            size: isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : (isZip ? 'ZIP Archive' : 'Project Asset'))),
+            uploadedBy
+          };
+        });
+
+        // 2. Merge freelancer shared deliverables from local storage if available
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('gigsphere_fl_deliverables_')) {
+              const savedVal = localStorage.getItem(key);
+              if (savedVal) {
+                const parsed = JSON.parse(savedVal);
+                if (Array.isArray(parsed)) {
+                  parsed.forEach(f => {
+                    if (f && f.url && !loadedFiles.some(existing => existing.url === f.url)) {
+                      const isDrive = f.isDrive || (f.url && (f.url.includes('drive.google.com') || f.url.includes('dropbox.com') || f.url.includes('onedrive')));
+                      const isFigma = f.isFigma || (f.url && (f.url.includes('figma.com') || f.url.includes('canva.com')));
+                      const isGithub = f.isGithub || (f.url && f.url.includes('github.com')) || (f.name && f.name.toLowerCase().includes('github'));
+                      const isZip = f.isZip || (!isDrive && !isFigma && !isGithub && (f.name && /\.(zip|rar|7z|tar|gz)$/i.test(f.name)));
+                      loadedFiles.push({
+                        name: f.name || 'Freelancer Deliverable',
+                        url: f.url,
+                        type: f.type || '',
+                        isDrive,
+                        isFigma,
+                        isGithub,
+                        isZip,
+                        isLink: isDrive || isFigma || isGithub || f.isLink || f.url.startsWith('http'),
+                        size: f.size || (isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : (isZip ? 'ZIP Archive' : 'Project Deliverable')))),
+                        uploadedBy: f.uploadedBy || 'Freelancer',
+                        uploadedAt: f.uploadedAt || ''
+                      });
+                    }
+                  });
+                }
+              }
+            }
+          }
+        } catch(e) {}
+
+        setWorkspaceFiles(loadedFiles);
+
+        // 3. Fetch active contract
         const contracts = await apiFetch(`/contracts/active?projectId=${projId}`).catch(() => []);
         
         let matched = Array.isArray(contracts) ? contracts.find(c => {
@@ -237,8 +324,11 @@ export default function Orders() {
     } else if (action === 'Workspace') {
       setActiveWorkspace(project);
       setWorkspaceTab('overview');
+      const projId = project.id || project._id;
+
+      let loadedFiles = [];
       if (project.attachments && Array.isArray(project.attachments)) {
-        setWorkspaceFiles(project.attachments.map(att => {
+        loadedFiles = project.attachments.map(att => {
           let fullUrl = '';
           let name = 'Project Deliverable';
           let type = '';
@@ -274,8 +364,46 @@ export default function Orders() {
             isLink: isDrive || isFigma || isGithub || (att && att.isLink) || fullUrl.startsWith('http'),
             size: isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : (isZip ? 'ZIP Archive' : 'Project Asset')))
           };
-        }));
+        });
       }
+
+      // Merge freelancer shared deliverables from local storage if available
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('gigsphere_fl_deliverables_')) {
+            const savedVal = localStorage.getItem(key);
+            if (savedVal) {
+              const parsed = JSON.parse(savedVal);
+              if (Array.isArray(parsed)) {
+                parsed.forEach(f => {
+                  if (f && f.url && !loadedFiles.some(existing => existing.url === f.url)) {
+                    const isDrive = f.isDrive || (f.url && (f.url.includes('drive.google.com') || f.url.includes('dropbox.com') || f.url.includes('onedrive')));
+                    const isFigma = f.isFigma || (f.url && (f.url.includes('figma.com') || f.url.includes('canva.com')));
+                    const isGithub = f.isGithub || (f.url && f.url.includes('github.com')) || (f.name && f.name.toLowerCase().includes('github'));
+                    const isZip = f.isZip || (!isDrive && !isFigma && !isGithub && (f.name && /\.(zip|rar|7z|tar|gz)$/i.test(f.name)));
+                    loadedFiles.push({
+                      name: f.name || 'Freelancer Deliverable',
+                      url: f.url,
+                      type: f.type || '',
+                      isDrive,
+                      isFigma,
+                      isGithub,
+                      isZip,
+                      isLink: isDrive || isFigma || isGithub || f.isLink || f.url.startsWith('http'),
+                      size: f.size || (isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : (isZip ? 'ZIP Archive' : 'Project Deliverable')))),
+                      uploadedBy: f.uploadedBy || 'Freelancer',
+                      uploadedAt: f.uploadedAt || ''
+                    });
+                  }
+                });
+              }
+            }
+          }
+        }
+      } catch(e) {}
+
+      setWorkspaceFiles(loadedFiles);
     }
   };
 
@@ -306,6 +434,23 @@ export default function Orders() {
     }
   };
 
+  const convertWorkspaceFilesToAttachments = (filesList) => {
+    return filesList.map(f => ({
+      name: f.name,
+      url: f.url,
+      type: f.type || '',
+      isDrive: !!f.isDrive,
+      isFigma: !!f.isFigma,
+      isGithub: !!f.isGithub,
+      isZip: !!f.isZip,
+      isLink: !!f.isLink,
+      size: f.size || '',
+      description: f.description || '',
+      uploadedBy: f.uploadedBy || 'Client',
+      uploadedAt: f.uploadedAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+  };
+
   const handleUploadWorkspaceFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -321,15 +466,18 @@ export default function Orders() {
         type: file.type,
         isZip,
         size: isZip ? `${(file.size / (1024 * 1024)).toFixed(2)} MB (ZIP)` : `${(file.size / 1024).toFixed(1)} KB`,
+        uploadedBy: 'Client',
         uploadedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setWorkspaceFiles(prev => [...prev, newFileObj]);
+      const updatedFiles = [...workspaceFiles, newFileObj];
+      setWorkspaceFiles(updatedFiles);
 
       if (activeWorkspace) {
         const projId = activeWorkspace.id || activeWorkspace._id;
-        const currentAtts = activeWorkspace.attachments || [];
-        const updatedAtts = [...currentAtts, { name: file.name, url: fileUrl, type: file.type, isZip }];
+        const updatedAtts = convertWorkspaceFilesToAttachments(updatedFiles);
+        setActiveWorkspace(prev => prev ? { ...prev, attachments: updatedAtts } : prev);
+        setProjects(prev => prev.map(p => (p.id === projId || p._id === projId) ? { ...p, attachments: updatedAtts } : p));
         await apiFetch(`/projects/${projId}`, {
           method: 'PUT',
           body: JSON.stringify({ attachments: updatedAtts })
@@ -365,6 +513,7 @@ export default function Orders() {
       isLink: true,
       size: isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : 'External Web Link')),
       description: clientGithubForm.description,
+      uploadedBy: 'Client',
       uploadedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -373,8 +522,9 @@ export default function Orders() {
 
     if (activeWorkspace) {
       const projId = activeWorkspace.id || activeWorkspace._id;
-      const currentAtts = activeWorkspace.attachments || [];
-      const updatedAtts = [...currentAtts, { name: clientGithubForm.title, url: clientGithubForm.url, type: category, isDrive, isFigma, isGithub, isLink: true, description: clientGithubForm.description }];
+      const updatedAtts = convertWorkspaceFilesToAttachments(updatedFiles);
+      setActiveWorkspace(prev => prev ? { ...prev, attachments: updatedAtts } : prev);
+      setProjects(prev => prev.map(p => (p.id === projId || p._id === projId) ? { ...p, attachments: updatedAtts } : p));
       try {
         await apiFetch(`/projects/${projId}`, {
           method: 'PUT',
@@ -395,7 +545,9 @@ export default function Orders() {
 
     if (activeWorkspace) {
       const projId = activeWorkspace.id || activeWorkspace._id;
-      const updatedAtts = updatedFiles.map(f => ({ name: f.name, url: f.url, type: f.type, isGithub: f.isGithub, isZip: f.isZip }));
+      const updatedAtts = convertWorkspaceFilesToAttachments(updatedFiles);
+      setActiveWorkspace(prev => prev ? { ...prev, attachments: updatedAtts } : prev);
+      setProjects(prev => prev.map(p => (p.id === projId || p._id === projId) ? { ...p, attachments: updatedAtts } : p));
       try {
         await apiFetch(`/projects/${projId}`, {
           method: 'PUT',
@@ -887,93 +1039,154 @@ export default function Orders() {
         )}
 
         {/* TAB 3: SHARED DELIVERABLES & ASSETS */}
-        {workspaceTab === 'files' && (
-          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Project Deliverables & Shared Assets</h3>
-                <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Upload project specifications, source code archives (.zip), PDFs, design mockups, or share GitHub repository links.</p>
+        {workspaceTab === 'files' && (() => {
+          const freelancerFiles = workspaceFiles.filter(f => f.uploadedBy === 'Freelancer');
+          const clientFiles = workspaceFiles.filter(f => f.uploadedBy !== 'Freelancer');
+
+          const renderFileCard = (f, originalIdx, accentColor) => (
+            <div key={originalIdx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
+                {f.isDrive ? (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Folder size={22} color="#2563eb" />
+                  </div>
+                ) : f.isFigma ? (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Layers size={22} color="#7c3aed" />
+                  </div>
+                ) : f.isGithub ? (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <GithubIcon size={22} color="#0f172a" />
+                  </div>
+                ) : f.isZip ? (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Archive size={22} color="#d97706" />
+                  </div>
+                ) : (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e8f0fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileCheck size={22} color="#1a73e8" />
+                  </div>
+                )}
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{f.name}</h5>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <span style={{ padding: '1px 6px', background: accentColor === 'green' ? '#dcfce7' : '#e0f2fe', color: accentColor === 'green' ? '#15803d' : '#0369a1', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                      {f.uploadedBy === 'Freelancer' || accentColor === 'green' ? 'Freelancer Upload' : 'Client Asset'}
+                    </span>
+                    • {f.size || (f.isGithub ? 'GitHub Repo' : (f.isZip ? 'ZIP Archive' : 'Project File'))}
+                  </span>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsClientGithubModalOpen(true)}
-                  style={{ padding: '8px 18px', background: '#24292f', color: '#ffffff', border: 'none', borderRadius: '30px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }}
-                >
-                  <Github size={16} />
-                  Share GitHub Link
-                </button>
+              {f.url && (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => { setPreviewFile(f); setIsMediaPreviewOpen(true); }} 
+                    style={{ padding: '6px 12px', background: '#1a73e8', color: '#ffffff', border: 'none', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    Preview In-App
+                  </button>
+                  {f.isGithub ? (
+                    <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 10px', background: '#24292f', color: '#ffffff', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }} title="Open Repository on GitHub">
+                      <ExternalLink size={13} /> GitHub
+                    </a>
+                  ) : (
+                    <a href={f.url} download={f.name} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }} title="Download File">
+                      <Download size={13} /> {f.isZip ? 'ZIP' : ''}
+                    </a>
+                  )}
+                  <button 
+                    onClick={() => handleDeleteWorkspaceFile(originalIdx)}
+                    style={{ padding: '6px 8px', background: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Remove Attachment"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
 
-                <label style={{ padding: '8px 18px', background: '#1a73e8', color: '#ffffff', borderRadius: '30px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <Upload size={16} />
-                  {isUploadingFile ? 'Uploading...' : 'Upload File / ZIP'}
-                  <input type="file" accept=".zip,.rar,.7z,.tar,.gz,image/*,application/pdf,video/*" onChange={handleUploadWorkspaceFile} style={{ display: 'none' }} disabled={isUploadingFile} />
-                </label>
+          return (
+            <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>Project Deliverables & Shared Assets</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Organized hub for freelancer-submitted work and client project specifications.</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsClientGithubModalOpen(true)}
+                    style={{ padding: '8px 18px', background: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '30px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }}
+                  >
+                    <ExternalLink size={16} />
+                    Share Link / Drive
+                  </button>
+
+                  <label style={{ padding: '8px 18px', background: '#1a73e8', color: '#ffffff', borderRadius: '30px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Upload size={16} />
+                    {isUploadingFile ? 'Uploading...' : 'Upload File / ZIP'}
+                    <input type="file" accept=".zip,.rar,.7z,.tar,.gz,image/*,application/pdf,video/*" onChange={handleUploadWorkspaceFile} style={{ display: 'none' }} disabled={isUploadingFile} />
+                  </label>
+                </div>
+              </div>
+
+              {/* SECTION 1: FREELANCER SUBMITTED DELIVERABLES */}
+              <div style={{ marginBottom: '28px', background: '#f8fafc', borderRadius: '14px', padding: '18px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <div style={{ width: '8px', height: '18px', background: '#10b981', borderRadius: '4px' }}></div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                    🚀 Freelancer Submitted Deliverables & Submissions ({freelancerFiles.length})
+                  </h4>
+                </div>
+
+                {freelancerFiles.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', background: '#ffffff', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+                    <Paperclip size={24} color="#94a3b8" style={{ marginBottom: '6px' }} />
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>No freelancer deliverables uploaded yet</p>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Source code archives, GitHub repos, and completed PDFs submitted by the freelancer will appear here.</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+                    {freelancerFiles.map(f => {
+                      const originalIdx = workspaceFiles.findIndex(item => item.url === f.url);
+                      return renderFileCard(f, originalIdx, 'green');
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: CLIENT SHARED PROJECT MATERIALS & SPECS */}
+              <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '18px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <div style={{ width: '8px', height: '18px', background: '#1a73e8', borderRadius: '4px' }}></div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                    📁 Client Shared Project Specs & Materials ({clientFiles.length})
+                  </h4>
+                </div>
+
+                {clientFiles.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', background: '#ffffff', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+                    <Paperclip size={24} color="#94a3b8" style={{ marginBottom: '6px' }} />
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>No initial project specifications uploaded yet</p>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Use "Upload File / ZIP" or "Share Link / Drive" above to upload requirements or design mockups for your project.</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+                    {clientFiles.map(f => {
+                      const originalIdx = workspaceFiles.findIndex(item => item.url === f.url);
+                      return renderFileCard(f, originalIdx, 'blue');
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-
-            {workspaceFiles.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                <Paperclip size={32} color="#94a3b8" style={{ marginBottom: '8px' }} />
-                <h4 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>No Deliverables Attached Yet</h4>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Upload project specifications, ZIP code archives, PDFs, or share GitHub repositories for your project team.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
-                {workspaceFiles.map((f, idx) => (
-                  <div key={idx} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                      {f.isGithub ? (
-                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <GithubIcon size={20} color="#0f172a" />
-                        </div>
-                      ) : f.isZip ? (
-                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Archive size={20} color="#d97706" />
-                        </div>
-                      ) : (
-                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#e8f0fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <FileCheck size={20} color="#1a73e8" />
-                        </div>
-                      )}
-                      <div style={{ overflow: 'hidden' }}>
-                        <h5 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{f.name}</h5>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{f.size || (f.isGithub ? 'GitHub Repo' : (f.isZip ? 'ZIP Archive' : 'Project Asset'))}</span>
-                      </div>
-                    </div>
-                    {f.url && (
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <button 
-                          onClick={() => { setPreviewFile(f); setIsMediaPreviewOpen(true); }} 
-                          style={{ padding: '6px 12px', background: '#1a73e8', color: '#ffffff', border: 'none', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          Preview In-App
-                        </button>
-                        {f.isGithub ? (
-                          <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 10px', background: '#24292f', color: '#ffffff', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }} title="Open Repository on GitHub">
-                            <ExternalLink size={13} /> GitHub
-                          </a>
-                        ) : (
-                          <a href={f.url} download={f.name} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 10px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }} title="Download File">
-                            <Download size={13} /> {f.isZip ? 'ZIP' : ''}
-                          </a>
-                        )}
-                        <button 
-                          onClick={() => handleDeleteWorkspaceFile(idx)}
-                          style={{ padding: '6px 8px', background: '#fef2f2', border: 'none', color: '#ef4444', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Remove Attachment"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 4: ACTIVITY TIMELINE */}
         {workspaceTab === 'timeline' && (

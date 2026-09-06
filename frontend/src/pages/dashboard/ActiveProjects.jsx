@@ -102,57 +102,70 @@ export default function ActiveProjects() {
     }
   };
 
-  const handleOpenWorkspace = (projectId, tab = 'Overview') => {
+  const handleOpenWorkspace = async (projectId, tab = 'Overview') => {
     setSelectedProjectId(projectId);
     setWorkspaceTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     const proj = projects.find(p => p.id === projectId || p._id === projectId);
-    let clientAtts = [];
-    if (proj && proj.attachments && Array.isArray(proj.attachments)) {
-      clientAtts = proj.attachments.map((att, idx) => {
-        let fullUrl = '';
-        let name = 'Client Shared Asset';
-        let type = '';
+    const realProjId = proj?.project_id?._id || (typeof proj?.project_id === 'string' ? proj?.project_id : null) || proj?._id || projectId;
 
-        if (typeof att === 'string') {
-          if (att.startsWith('http://') || att.startsWith('https://')) {
-            fullUrl = att;
-            name = att.split('/').pop().split('?')[0];
-          } else {
-            fullUrl = `https://res.cloudinary.com/s5moukpf/image/upload/v1788070426/gigsphere/avatars/${att}.jpg`;
-            name = `Attachment_${att.slice(0, 8)}.jpg`;
-            type = 'image/jpeg';
-          }
-        } else if (att && typeof att === 'object') {
-          fullUrl = att.url || '';
-          name = att.name || (fullUrl ? fullUrl.split('/').pop() : 'Client Deliverable');
-          type = att.type || '';
+    // Fetch fresh project from backend to get latest attachments
+    let freshAtts = [];
+    if (realProjId) {
+      try {
+        const freshRes = await apiFetch(`/projects/${realProjId}`);
+        const freshProj = freshRes?.project || freshRes;
+        if (freshProj && Array.isArray(freshProj.attachments)) {
+          freshAtts = freshProj.attachments;
         }
-
-        const isDrive = (att && att.isDrive) || (fullUrl && (fullUrl.includes('drive.google.com') || fullUrl.includes('docs.google.com') || fullUrl.includes('dropbox.com') || fullUrl.includes('onedrive')));
-        const isFigma = (att && att.isFigma) || (fullUrl && (fullUrl.includes('figma.com') || fullUrl.includes('canva.com')));
-        const isGithub = (att && att.isGithub) || (fullUrl && fullUrl.includes('github.com')) || (name && name.toLowerCase().includes('github'));
-        const isZip = !isDrive && !isFigma && !isGithub && ((att && att.isZip) || (name && /\.(zip|rar|7z|tar|gz)$/i.test(name)) || (fullUrl && /\.(zip|rar|7z|tar|gz)/i.test(fullUrl)) || (type && type.includes('zip')));
-
-        return {
-          id: `client_att_${idx}`,
-          name,
-          url: fullUrl,
-          type,
-          isDrive,
-          isFigma,
-          isGithub,
-          isZip,
-          isLink: isDrive || isFigma || isGithub || (att && att.isLink) || fullUrl.startsWith('http'),
-          size: isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : (isZip ? 'ZIP Archive' : 'Client Material'))),
-          uploadedBy: 'Client',
-          uploadedAt: 'Project Start'
-        };
-      });
+      } catch (e) {}
     }
 
-    const saved = localStorage.getItem(`gigsphere_fl_deliverables_${projectId}`);
+    const rawAtts = freshAtts.length > 0 ? freshAtts : ((proj?.project_id && Array.isArray(proj.project_id.attachments)) ? proj.project_id.attachments : (Array.isArray(proj?.attachments) ? proj.attachments : []));
+
+    let clientAtts = rawAtts.map((att, idx) => {
+      let fullUrl = '';
+      let name = 'Project Asset';
+      let type = '';
+
+      if (typeof att === 'string') {
+        if (att.startsWith('http://') || att.startsWith('https://')) {
+          fullUrl = att;
+          name = att.split('/').pop().split('?')[0];
+        } else {
+          fullUrl = `https://res.cloudinary.com/s5moukpf/image/upload/v1788070426/gigsphere/avatars/${att}.jpg`;
+          name = `Attachment_${att.slice(0, 8)}.jpg`;
+          type = 'image/jpeg';
+        }
+      } else if (att && typeof att === 'object') {
+        fullUrl = att.url || '';
+        name = att.name || (fullUrl ? fullUrl.split('/').pop() : 'Deliverable Document');
+        type = att.type || '';
+      }
+
+      const isDrive = (att && att.isDrive) || (fullUrl && (fullUrl.includes('drive.google.com') || fullUrl.includes('docs.google.com') || fullUrl.includes('dropbox.com') || fullUrl.includes('onedrive')));
+      const isFigma = (att && att.isFigma) || (fullUrl && (fullUrl.includes('figma.com') || fullUrl.includes('canva.com')));
+      const isGithub = (att && att.isGithub) || (fullUrl && fullUrl.includes('github.com')) || (name && name.toLowerCase().includes('github'));
+      const isZip = !isDrive && !isFigma && !isGithub && ((att && att.isZip) || (name && /\.(zip|rar|7z|tar|gz)$/i.test(name)) || (fullUrl && /\.(zip|rar|7z|tar|gz)/i.test(fullUrl)) || (type && type.includes('zip')));
+
+      return {
+        id: (att && (att._id || att.id)) || `att_${idx}`,
+        name,
+        url: fullUrl,
+        type,
+        isDrive,
+        isFigma,
+        isGithub,
+        isZip,
+        isLink: isDrive || isFigma || isGithub || (att && att.isLink) || fullUrl.startsWith('http'),
+        size: isDrive ? 'Google Drive Folder' : (isFigma ? 'Figma Design' : (isGithub ? 'GitHub Repository' : (isZip ? 'ZIP Archive' : 'Project Asset'))),
+        uploadedBy: (att && att.uploadedBy) || 'Client',
+        uploadedAt: (att && att.uploadedAt) || 'Project Start'
+      };
+    });
+
+    const saved = localStorage.getItem(`gigsphere_fl_deliverables_${realProjId}`) || localStorage.getItem(`gigsphere_fl_deliverables_${projectId}`);
     let localDels = [];
     if (saved) {
       try { localDels = JSON.parse(saved); } catch(e) { localDels = []; }
@@ -160,7 +173,7 @@ export default function ActiveProjects() {
 
     const combined = [...localDels];
     clientAtts.forEach(ca => {
-      if (!combined.some(d => d.url === ca.url)) {
+      if (ca.url && !combined.some(d => d.url === ca.url)) {
         combined.push(ca);
       }
     });
@@ -172,6 +185,23 @@ export default function ActiveProjects() {
     setSelectedProjectId(null);
   };
 
+  const convertDeliverablesToAttachments = (dels) => {
+    return dels.map(d => ({
+      name: d.name,
+      url: d.url,
+      type: d.type || '',
+      isDrive: !!d.isDrive,
+      isFigma: !!d.isFigma,
+      isGithub: !!d.isGithub,
+      isZip: !!d.isZip,
+      isLink: !!d.isLink,
+      size: d.size || '',
+      description: d.description || '',
+      uploadedBy: d.uploadedBy || 'Freelancer',
+      uploadedAt: d.uploadedAt || new Date().toLocaleDateString('en-IN')
+    }));
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -181,11 +211,12 @@ export default function ActiveProjects() {
 
     try {
       const res = await uploadFileToCloudinary(file, '/api/upload/single');
+      const fileUrl = res.fileUrl || res.avatarUrl || res.url;
       const isZip = file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') || file.type.includes('zip');
       const newFileObj = {
         id: Date.now().toString(),
         name: file.name,
-        url: res.fileUrl || res.avatarUrl || res.url,
+        url: fileUrl,
         size: isZip ? `${(file.size / (1024 * 1024)).toFixed(2)} MB (ZIP)` : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
         type: file.type || (isZip ? 'application/zip' : 'document'),
         isZip,
@@ -195,8 +226,31 @@ export default function ActiveProjects() {
 
       const updated = [newFileObj, ...uploadedDeliverables];
       setUploadedDeliverables(updated);
+
       if (selectedProjectId) {
+        const proj = projects.find(p => p.id === selectedProjectId || p._id === selectedProjectId);
+        const realProjId = proj?.project_id?._id || (typeof proj?.project_id === 'string' ? proj?.project_id : null) || proj?._id || selectedProjectId;
+        
         localStorage.setItem(`gigsphere_fl_deliverables_${selectedProjectId}`, JSON.stringify(updated));
+        if (realProjId) {
+          localStorage.setItem(`gigsphere_fl_deliverables_${realProjId}`, JSON.stringify(updated));
+          const updatedAtts = convertDeliverablesToAttachments(updated);
+          apiFetch(`/projects/${realProjId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ attachments: updatedAtts })
+          }).catch(err => console.error('Error syncing file to MongoDB:', err));
+
+          setProjects(prev => prev.map(p => {
+            const pId = p.id || p._id;
+            if (pId === selectedProjectId) {
+              if (p.project_id && typeof p.project_id === 'object') {
+                return { ...p, project_id: { ...p.project_id, attachments: updatedAtts } };
+              }
+              return { ...p, attachments: updatedAtts };
+            }
+            return p;
+          }));
+        }
       }
     } catch (err) {
       setUploadError(err.message || 'File upload failed');
@@ -205,7 +259,7 @@ export default function ActiveProjects() {
     }
   };
 
-  const handleAddGithubLink = (e) => {
+  const handleAddGithubLink = async (e) => {
     e.preventDefault();
     if (!githubForm.url || !githubForm.title) {
       alert('Please provide resource URL and a title');
@@ -235,8 +289,31 @@ export default function ActiveProjects() {
 
     const updated = [newLinkObj, ...uploadedDeliverables];
     setUploadedDeliverables(updated);
+
     if (selectedProjectId) {
+      const proj = projects.find(p => p.id === selectedProjectId || p._id === selectedProjectId);
+      const realProjId = proj?.project_id?._id || (typeof proj?.project_id === 'string' ? proj?.project_id : null) || proj?._id || selectedProjectId;
+
       localStorage.setItem(`gigsphere_fl_deliverables_${selectedProjectId}`, JSON.stringify(updated));
+      if (realProjId) {
+        localStorage.setItem(`gigsphere_fl_deliverables_${realProjId}`, JSON.stringify(updated));
+        const updatedAtts = convertDeliverablesToAttachments(updated);
+        apiFetch(`/projects/${realProjId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ attachments: updatedAtts })
+        }).catch(err => console.error('Error syncing link to MongoDB:', err));
+
+        setProjects(prev => prev.map(p => {
+          const pId = p.id || p._id;
+          if (pId === selectedProjectId) {
+            if (p.project_id && typeof p.project_id === 'object') {
+              return { ...p, project_id: { ...p.project_id, attachments: updatedAtts } };
+            }
+            return { ...p, attachments: updatedAtts };
+          }
+          return p;
+        }));
+      }
     }
     setGithubForm({ title: '', url: '', description: '', category: 'drive' });
     setIsGithubModalOpen(false);
@@ -245,8 +322,31 @@ export default function ActiveProjects() {
   const handleDeleteDeliverable = (fileId) => {
     const updated = uploadedDeliverables.filter(f => f.id !== fileId);
     setUploadedDeliverables(updated);
+
     if (selectedProjectId) {
+      const proj = projects.find(p => p.id === selectedProjectId || p._id === selectedProjectId);
+      const realProjId = proj?.project_id?._id || (typeof proj?.project_id === 'string' ? proj?.project_id : null) || proj?._id || selectedProjectId;
+
       localStorage.setItem(`gigsphere_fl_deliverables_${selectedProjectId}`, JSON.stringify(updated));
+      if (realProjId) {
+        localStorage.setItem(`gigsphere_fl_deliverables_${realProjId}`, JSON.stringify(updated));
+        const updatedAtts = convertDeliverablesToAttachments(updated);
+        apiFetch(`/projects/${realProjId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ attachments: updatedAtts })
+        }).catch(err => console.error('Error syncing deletion to MongoDB:', err));
+
+        setProjects(prev => prev.map(p => {
+          const pId = p.id || p._id;
+          if (pId === selectedProjectId) {
+            if (p.project_id && typeof p.project_id === 'object') {
+              return { ...p, project_id: { ...p.project_id, attachments: updatedAtts } };
+            }
+            return { ...p, attachments: updatedAtts };
+          }
+          return p;
+        }));
+      }
     }
   };
 

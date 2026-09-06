@@ -285,3 +285,27 @@
   border-color: #1a73e8;
   box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
 }
+
+.action-card-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: #93c5fd !important;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.08);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+

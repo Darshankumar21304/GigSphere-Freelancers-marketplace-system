@@ -27,7 +27,23 @@ export default function AdminLayout() {
       {/* Minimalist Sidebar */}
       <aside className="admin-sidebar">
         <div className="admin-brand">
-          <Link to="/" style={{ textDecoration: 'none', color: '#0f172a', fontWeight: '800', fontSize: '1.2rem', letterSpacing: '-0.03em' }}>
+          <Link to="/" style={{ textDecoration: 'none', color: '#0f172a', fontWeight: '800', fontSize: '1.2rem', letterSpacing: '-0.03em', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="6" fill="url(#admin_gigsphere_grad)" />
+              <ellipse cx="12" cy="12" rx="10" ry="4" stroke="url(#admin_gigsphere_grad_ring)" strokeWidth="2.2" strokeLinecap="round" transform="rotate(-30 12 12)" />
+              <defs>
+                <linearGradient id="admin_gigsphere_grad" x1="6" y1="6" x2="18" y2="18" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#1A73E8" />
+                  <stop offset="0.5" stopColor="#A142F4" />
+                  <stop offset="1" stopColor="#00E5FF" />
+                </linearGradient>
+                <linearGradient id="admin_gigsphere_grad_ring" x1="2" y1="8" x2="22" y2="16" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#00E5FF" />
+                  <stop offset="0.5" stopColor="#1A73E8" />
+                  <stop offset="1" stopColor="#A142F4" />
+                </linearGradient>
+              </defs>
+            </svg>
             GigSphere
           </Link>
           <span className="admin-brand-tag">ADMIN</span>
@@ -62,6 +78,11 @@ export default function AdminLayout() {
           <NavLink to="/admin/dashboard/kyc" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <FileCheck size={18} />
             <span>KYC Approvals</span>
+          </NavLink>
+
+          <NavLink to="/admin/dashboard/trust-fraud" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            <ShieldCheck size={18} color="#1a73e8" />
+            <span>Trust & Fraud AI</span>
           </NavLink>
 
           <NavLink to="/admin/dashboard/ai-security" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>

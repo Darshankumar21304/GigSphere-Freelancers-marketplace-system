@@ -11,6 +11,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { uploadFileToCloudinary } from '../../utils/fileUpload';
 import { getUserProfile, getToken } from '../../utils/authUtils';
 import { getCleanAvatar } from '../../utils/avatarUtils';
+import MediaPreviewModal from '../../components/MediaPreviewModal';
 import './FreelancerChat.css';
 
 const socket = io('http://localhost:5001');
@@ -34,6 +35,8 @@ export default function FreelancerChat() {
   const [isTyping, setIsTyping] = useState(false);
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [isMediaPreviewOpen, setIsMediaPreviewOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState('All');
@@ -490,13 +493,20 @@ export default function FreelancerChat() {
                     <div key={idx} className={`message-row ${isMe ? 'outgoing' : 'incoming'}`}>
                       <div className="message-bubble">
                         {msg.file_url && (
-                          <div className="attachment-preview">
-                            {msg.file_url.match(/\.(jpeg|jpg|gif|png)$/i) != null ? (
-                              <img src={msg.file_url} alt="attachment" className="attachment-image" />
+                          <div 
+                            className="attachment-preview" 
+                            onClick={() => { 
+                              setPreviewFile({ url: msg.file_url, name: 'Chat Attachment' }); 
+                              setIsMediaPreviewOpen(true); 
+                            }} 
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {msg.file_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                              <img src={msg.file_url} alt="attachment" className="attachment-image" style={{ borderRadius: '8px', maxHeight: '200px', cursor: 'pointer' }} />
                             ) : (
-                              <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="attachment-file">
-                                <FileIcon size={16} /> <span>View Attachment</span>
-                              </a>
+                              <div className="attachment-file" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <FileIcon size={16} /> <span>Preview In-App</span>
+                              </div>
                             )}
                           </div>
                         )}
@@ -601,6 +611,13 @@ export default function FreelancerChat() {
             </div>
           </div>
         )}
+
+        {/* In-App Media / PDF Attachment Preview Modal */}
+        <MediaPreviewModal 
+          isOpen={isMediaPreviewOpen} 
+          onClose={() => setIsMediaPreviewOpen(false)} 
+          file={previewFile} 
+        />
 
       </div>
     </div>

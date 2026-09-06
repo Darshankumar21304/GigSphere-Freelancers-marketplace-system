@@ -31,6 +31,10 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/pitches', require('./routes/pitchRoutes'));
+app.use('/api/recommendations', require('./routes/recommendationRoutes'));
+app.use('/api/trust', require('./routes/trustRoutes'));
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/freelancer/ai', require('./routes/freelancerAIRoutes'));
 
 // Base route
 app.get('/', (req, res) => {

@@ -1,5 +1,4 @@
 const { User, FreelancerProfile } = require('../models');
-const adminController = require('./adminController');
 
 const getFreelancers = async (req, res) => {
   try {

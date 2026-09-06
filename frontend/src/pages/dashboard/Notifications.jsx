@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle, MessageSquare, Briefcase, FileText, X, Check, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, CheckCircle, MessageSquare, Briefcase, FileText, X, Check, CheckCheck, Loader2, Sparkles } from 'lucide-react';
 import { apiFetch } from '../../utils/api';
 import './Notifications.css';
 
 const getIconDetails = (type) => {
   switch (type) {
+    case 'ai_recommendation':
+    case 'recommendation':
+      return { Icon: Sparkles, color: '#6366f1', bg: '#eef2ff' };
     case 'message':
       return { Icon: MessageSquare, color: '#3b82f6', bg: '#eff6ff' };
     case 'proposal':
