@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, Code, Palette, PenTool, Video, Music, TrendingUp, Star, 
   CheckCircle2, ShieldCheck, Briefcase, Zap, Globe, MessageSquare, 
@@ -9,6 +9,9 @@ import { Link } from 'react-router-dom';
 import { formatINR } from '../utils/currency';
 import AntigravityCanvas from '../components/AntigravityCanvas';
 import AuthModal from '../components/AuthModal';
+import FreelancerProfileModal from '../components/FreelancerProfileModal';
+import { getCleanAvatar } from '../utils/avatarUtils';
+import { apiFetch } from '../utils/api';
 import './Home.css';
 
 const categories = [
@@ -22,98 +25,57 @@ const categories = [
   { name: 'Blockchain & Smart Contracts', icon: Layers, color: '#1a73e8', bg: '#e8f0fe' }
 ];
 
-const featuredFreelancers = [
-  {
-    id: 1,
-    name: 'Priya Sharma',
-    title: 'Lead UI/UX & Product Designer',
-    avatar: 'https://i.pravatar.cc/150?img=5',
-    rating: 4.9,
-    reviews: 142,
-    skills: ['Figma', 'Product Design', 'User Research'],
-    location: 'Bangalore, India',
-    price: 1800,
-    riskScore: 5
-  },
-  {
-    id: 2,
-    name: 'Arjun Mehta',
-    title: 'Senior Full Stack & Cloud Engineer',
-    avatar: 'https://i.pravatar.cc/150?img=11',
-    rating: 5.0,
-    reviews: 98,
-    skills: ['React', 'Node.js', 'MongoDB', 'AWS'],
-    location: 'Pune, India',
-    price: 2400,
-    riskScore: 8
-  },
-  {
-    id: 3,
-    name: 'Rohan Kumar',
-    title: 'AI Systems & LLM Integrator',
-    avatar: 'https://i.pravatar.cc/150?img=14',
-    rating: 4.9,
-    reviews: 76,
-    skills: ['Python', 'OpenAI', 'LangChain', 'FastAPI'],
-    location: 'Mumbai, India',
-    price: 2200,
-    riskScore: 10
-  },
-  {
-    id: 4,
-    name: 'Neha Verma',
-    title: 'Growth Specialist & Copywriter',
-    avatar: 'https://i.pravatar.cc/150?img=9',
-    rating: 4.9,
-    reviews: 110,
-    skills: ['Copywriting', 'SEO', 'Funnel Optimization'],
-    location: 'Delhi, India',
-    price: 1200,
-    riskScore: 6
-  }
-];
-
-const featuredProjects = [
-  {
-    id: 1,
-    title: 'Fintech SaaS Dashboard & Mobile App',
-    description: 'Looking for an experienced React & React Native developer to build a modern crypto/banking wallet app.',
-    category: 'Web & Full Stack',
-    skills: ['React Native', 'Tailwind', 'Node.js'],
-    budget: 75000,
-    type: 'Fixed Price',
-    posted: '2 hours ago'
-  },
-  {
-    id: 2,
-    title: 'AI Customer Support Bot & Workflow Engine',
-    description: 'Build a custom AI chatbot integrated with MongoDB and Puter/OpenAI APIs for automated ticket resolution.',
-    category: 'AI & Data Engineering',
-    skills: ['Python', 'LLMs', 'Node.js', 'FastAPI'],
-    budget: 45000,
-    type: 'Fixed Price',
-    posted: '4 hours ago'
-  },
-  {
-    id: 3,
-    title: 'Minimalist Brand Identity & UI Kit',
-    description: 'Require a senior product designer to craft clean Google-style branding, vector icons, and a Figma design system.',
-    category: 'UI/UX & Product Design',
-    skills: ['Figma', 'Branding', 'Design Systems'],
-    budget: 30000,
-    type: 'Fixed Price',
-    posted: '1 day ago'
-  }
-];
-
 export default function Home() {
+  // Live Database Records State
+  const [freelancers, setFreelancers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
   // Interactive Landing Page Demos State
   const [demoRiskVal, setDemoRiskVal] = useState(12);
 
   // Auth Popup Modal State
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authTab, setAuthTab] = useState('register');
+  const [authTab, setAuthTab] = useState('login');
   const [authRole, setAuthRole] = useState('client');
+
+  // Freelancer Profile Modal State
+  const [selectedFreelancer, setSelectedFreelancer] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleOpenProfile = (fl) => {
+    setSelectedFreelancer(fl);
+    setIsProfileModalOpen(true);
+  };
+
+  const handleOpenAuth = (tab = 'login') => {
+    setAuthTab(tab);
+    setShowAuthModal(true);
+  };
+
+  useEffect(() => {
+    fetchLandingPageData();
+  }, []);
+
+  const fetchLandingPageData = async () => {
+    setLoadingData(true);
+    try {
+      const [flRes, prRes] = await Promise.all([
+        apiFetch('/users/freelancers').catch(() => []),
+        apiFetch('/projects').catch(() => [])
+      ]);
+
+      const flList = Array.isArray(flRes) ? flRes : (flRes.freelancers || []);
+      const prList = Array.isArray(prRes) ? prRes : (prRes.projects || []);
+
+      setFreelancers(flList.slice(0, 4));
+      setProjects(prList.slice(0, 3));
+    } catch (err) {
+      console.error('Error fetching landing page data:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const openAuthModal = (tab = 'register', role = 'client') => {
     setAuthTab(tab);
@@ -333,44 +295,77 @@ export default function Home() {
           </div>
           
           <div className="freelancers-grid">
-            {featuredFreelancers.map((freelancer) => (
-              <div key={freelancer.id} className="freelancer-card hover-lift">
-                <div className="freelancer-header">
-                  <img src={freelancer.avatar} alt={freelancer.name} className="freelancer-avatar" />
-                  <div>
-                    <h3 className="freelancer-name">{freelancer.name}</h3>
-                    <p className="freelancer-title">{freelancer.title}</p>
-                  </div>
+            {loadingData ? (
+              [1, 2, 3, 4].map(i => (
+                <div key={i} className="freelancer-card" style={{ opacity: 0.6 }}>
+                  <div style={{ height: 48, width: 48, borderRadius: '50%', background: '#e2e8f0', marginBottom: 12 }}></div>
+                  <div style={{ height: 16, width: '60%', background: '#e2e8f0', borderRadius: 4, marginBottom: 8 }}></div>
+                  <div style={{ height: 12, width: '40%', background: '#f1f5f9', borderRadius: 4, marginBottom: 16 }}></div>
+                  <div style={{ height: 32, width: '100%', background: '#f8fafc', borderRadius: 6 }}></div>
                 </div>
-                
-                <div className="freelancer-details">
-                  <div className="detail-item">
-                    <Star size={14} fill="#f59e0b" color="#f59e0b" />
-                    <span>{freelancer.rating} ({freelancer.reviews})</span>
+              ))
+            ) : freelancers.length > 0 ? (
+              freelancers.map((freelancer) => {
+                const flId = freelancer._id || freelancer.id;
+                const flName = freelancer.name || 'Freelancer';
+                const flTitle = freelancer.profile?.title || freelancer.title || 'Verified Specialist';
+                const flAvatar = getCleanAvatar(freelancer.profilePhoto || freelancer.avatar, flName);
+                const flRating = freelancer.rating || freelancer.profile?.rating || 4.9;
+                const flReviews = freelancer.reviewCount || 1;
+                const flPrice = freelancer.profile?.hourlyRate || freelancer.price || 1500;
+                const flRisk = freelancer.aiRiskScore || 8;
+                const rawSkills = freelancer.profile?.skills || freelancer.skills || ['Full Stack', 'Cloud'];
+                const flSkills = Array.isArray(rawSkills) ? rawSkills : (typeof rawSkills === 'string' ? rawSkills.split(',').map(s => s.trim()) : []);
+
+                return (
+                  <div key={flId} className="freelancer-card hover-lift">
+                    <div className="freelancer-header" style={{ cursor: 'pointer' }} onClick={() => handleOpenProfile(freelancer)}>
+                      <img src={flAvatar} alt={flName} className="freelancer-avatar" />
+                      <div>
+                        <h3 className="freelancer-name">{flName}</h3>
+                        <p className="freelancer-title">{flTitle}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="freelancer-details">
+                      <div className="detail-item">
+                        <Star size={14} fill="#f59e0b" color="#f59e0b" />
+                        <span>{flRating} ({flReviews})</span>
+                      </div>
+                      <div className="detail-item">
+                        <ShieldCheck size={14} color="#10b981" />
+                        <span style={{ color: '#10b981', fontWeight: 700 }}>AI Risk {flRisk}%</span>
+                      </div>
+                    </div>
+                    
+                    <div className="freelancer-skills">
+                      {flSkills.slice(0, 4).map((skill, i) => (
+                        <span key={i} className="skill-badge">{skill}</span>
+                      ))}
+                    </div>
+                    
+                    <div className="freelancer-footer">
+                      <div className="freelancer-price">
+                        <span className="price-label">Rate</span>
+                        <span className="price-amount">{formatINR(flPrice)}/hr</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        className="min-btn min-btn-primary"
+                        onClick={() => handleOpenProfile(freelancer)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        View Profile
+                      </button>
+                    </div>
                   </div>
-                  <div className="detail-item">
-                    <ShieldCheck size={14} color="#10b981" />
-                    <span style={{ color: '#10b981', fontWeight: 700 }}>AI Risk {freelancer.riskScore}%</span>
-                  </div>
-                </div>
-                
-                <div className="freelancer-skills">
-                  {freelancer.skills.map((skill, i) => (
-                    <span key={i} className="skill-badge">{skill}</span>
-                  ))}
-                </div>
-                
-                <div className="freelancer-footer">
-                  <div className="freelancer-price">
-                    <span className="price-label">Rate</span>
-                    <span className="price-amount">{formatINR(freelancer.price)}/hr</span>
-                  </div>
-                  <Link to={`/freelancer/${freelancer.id}`} className="min-btn min-btn-primary">
-                    View Profile
-                  </Link>
-                </div>
+                );
+              })
+            ) : (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                No active freelancers found in the database.
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -389,32 +384,70 @@ export default function Home() {
           </div>
           
           <div className="projects-grid">
-            {featuredProjects.map((project) => (
-              <div key={project.id} className="project-card hover-lift">
-                <div className="project-header">
-                  <span className="project-category">{project.category}</span>
-                  <span className="project-posted">{project.posted}</span>
+            {loadingData ? (
+              [1, 2, 3].map(i => (
+                <div key={i} className="project-card" style={{ opacity: 0.6 }}>
+                  <div style={{ height: 16, width: '40%', background: '#e2e8f0', borderRadius: 4, marginBottom: 12 }}></div>
+                  <div style={{ height: 20, width: '80%', background: '#cbd5e1', borderRadius: 4, marginBottom: 8 }}></div>
+                  <div style={{ height: 40, width: '100%', background: '#f1f5f9', borderRadius: 4, marginBottom: 16 }}></div>
+                  <div style={{ height: 32, width: '100%', background: '#f8fafc', borderRadius: 6 }}></div>
                 </div>
-                <h3 className="project-title">{project.title}</h3>
-                <p className="project-desc">{project.description}</p>
-                
-                <div className="project-skills">
-                  {project.skills.map((skill, i) => (
-                    <span key={i} className="skill-badge">{skill}</span>
-                  ))}
-                </div>
-                
-                <div className="project-footer">
-                  <div className="project-budget">
-                    <span className="budget-amount">{formatINR(project.budget)}</span>
-                    <span className="budget-type">{project.type}</span>
+              ))
+            ) : projects.length > 0 ? (
+              projects.map((project) => {
+                const prId = project._id || project.id;
+                const prTitle = project.title || 'Project Opportunity';
+                const prDesc = project.description || 'Project description';
+                const prCat = project.category || 'Web & Full Stack';
+                const prBudget = project.budget || 25000;
+                const prType = project.type || 'Fixed Price';
+                const prPosted = project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Recent';
+                const rawSkills = project.skills || ['Full Stack'];
+                const prSkills = Array.isArray(rawSkills) ? rawSkills : (typeof rawSkills === 'string' ? rawSkills.split(',').map(s => s.trim()) : []);
+
+                return (
+                  <div key={prId} className="project-card hover-lift">
+                    <div className="project-header">
+                      <span className="project-category">{prCat}</span>
+                      <span className="project-posted">{prPosted}</span>
+                    </div>
+                    <h3 className="project-title">{prTitle}</h3>
+                    <p className="project-desc">{prDesc}</p>
+                    
+                    <div className="project-skills">
+                      {prSkills.slice(0, 4).map((skill, i) => (
+                        <span key={i} className="skill-badge">{skill}</span>
+                      ))}
+                    </div>
+                    
+                    <div className="project-footer">
+                      <div className="project-budget">
+                        <span className="budget-amount">{formatINR(prBudget)}</span>
+                        <span className="budget-type">{prType}</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        className="min-btn min-btn-primary"
+                        onClick={() => {
+                          if (localStorage.getItem('token')) {
+                            window.location.href = `/gig/${prId}`;
+                          } else {
+                            handleOpenAuth('login');
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        Submit Bid
+                      </button>
+                    </div>
                   </div>
-                  <Link to={`/gig/${project.id}`} className="min-btn min-btn-primary">
-                    Submit Bid
-                  </Link>
-                </div>
+                );
+              })
+            ) : (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                No open projects available in the database right now.
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -434,6 +467,25 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Freelancer Profile Modal Popup */}
+      <FreelancerProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        freelancer={selectedFreelancer}
+        onHire={() => {
+          setIsProfileModalOpen(false);
+          handleOpenAuth('login');
+        }}
+        onMessage={() => {
+          setIsProfileModalOpen(false);
+          handleOpenAuth('login');
+        }}
+        onShortlist={() => {
+          setIsProfileModalOpen(false);
+          handleOpenAuth('login');
+        }}
+      />
 
       {/* Interactive Log In Auth Modal Popup */}
       <AuthModal 

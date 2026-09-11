@@ -219,13 +219,19 @@
   right: 2px;
   width: 12px;
   height: 12px;
-  background-color: #10b981;
-  border: 2px solid var(--bg-surface);
+  border: 2px solid var(--bg-surface, #ffffff);
   border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.gigsphere-freelancer-messages .status-dot.online {
+  background-color: #10b981 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
 }
 
 .gigsphere-freelancer-messages .status-dot.offline {
-  background-color: #9ca3af;
+  background-color: #9ca3af !important;
+  box-shadow: none;
 }
 
 .gigsphere-freelancer-messages .conv-info {
@@ -541,29 +547,33 @@
 
 .gigsphere-freelancer-messages .composer-inner {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
-  background-color: var(--bg-body);
-  border: 1px solid var(--border-color);
-  border-radius: 24px;
-  padding: 8px 16px;
-  transition: border-color 0.2s;
+  background-color: var(--bg-body, #f8fafc);
+  border: 1.5px solid var(--border-color, #cbd5e1);
+  border-radius: 30px;
+  padding: 6px 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
 }
 
 .gigsphere-freelancer-messages .composer-inner:focus-within {
-  border-color: var(--primary);
+  border-color: var(--primary, #1a73e8);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
 }
 
-.gigsphere-freelancer-messages .composer-input {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text-main);
+.gigsphere-freelancer-messages .composer-input,
+.gigsphere-freelancer-messages .chat-input {
+  flex: 1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: var(--text-main, #0f172a);
   font-size: 14px;
-  outline: none;
-  resize: none;
-  max-height: 120px;
-  padding: 8px 0;
+  padding: 8px 6px;
   font-family: inherit;
 }
 

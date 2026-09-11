@@ -11,6 +11,7 @@ const projectSchema = new mongoose.Schema({
   duration: { type: String },
   deadline: { type: String },
   experienceLevel: { type: String, enum: ['Beginner', 'Entry Level', 'Intermediate', 'Expert'], default: 'Intermediate' },
+  status: { type: String, enum: ['Open', 'Active', 'In Progress', 'Submitted for Review', 'Revision Requested', 'Completed', 'Closed', 'Cancelled'], default: 'Open' },
   attachments: [mongoose.Schema.Types.Mixed],
   proposals: [{
     freelancer_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -18,7 +19,7 @@ const projectSchema = new mongoose.Schema({
     bidAmount: Number,
     coverLetter: String,
     deliveryTime: String,
-    status: { type: String, enum: ['Pending', 'Shortlisted', 'Accepted', 'Rejected'], default: 'Pending' },
+    status: { type: String, enum: ['Pending', 'Shortlisted', 'Accepted', 'Hired', 'Rejected'], default: 'Pending' },
     createdAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });

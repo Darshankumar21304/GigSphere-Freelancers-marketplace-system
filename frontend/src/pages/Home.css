@@ -60,18 +60,12 @@
 }
 
 .hero-title {
-  font-size: 3rem;
+  font-size: clamp(2.2rem, 6vw, 4rem);
   font-weight: 800;
   line-height: 1.12;
   letter-spacing: -0.03em;
   color: #0f172a;
   margin-bottom: 1.25rem;
-}
-
-@media (min-width: 768px) {
-  .hero-title {
-    font-size: 4rem;
-  }
 }
 
 .gradient-text {
@@ -192,6 +186,20 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
   max-width: 720px;
   margin: 0 auto;
+}
+
+@media (max-width: 600px) {
+  .hero-metrics-bar {
+    gap: 1.25rem;
+    padding: 0.85rem 1.25rem;
+    border-radius: 20px;
+  }
+  .hero-section {
+    padding: 50px 0 60px 0;
+  }
+  .metric-divider {
+    display: none;
+  }
 }
 
 .metric-item {
@@ -663,7 +671,7 @@
 }
 
 .cta-title {
-  font-size: 2.5rem;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
   font-weight: 800;
   margin-bottom: 1rem;
   letter-spacing: -0.02em;

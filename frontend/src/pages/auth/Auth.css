@@ -76,7 +76,9 @@
 
 .password-toggle {
   position: absolute;
-  right: 16px;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   color: #94a3b8;
@@ -85,6 +87,14 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
+  z-index: 5;
+}
+
+.password-toggle svg {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
 }
 
 .password-toggle:hover {

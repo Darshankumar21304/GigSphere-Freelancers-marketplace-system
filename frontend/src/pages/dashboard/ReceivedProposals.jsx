@@ -6,6 +6,7 @@ import {
   Star, MapPin, Clock, Calendar, FileText, FolderPlus, Sparkles
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
+import { apiFetch } from '../../utils/api';
 import './ReceivedProposals.css';
 
 // Mock Data
@@ -90,64 +91,84 @@ export default function ReceivedProposals() {
   const [sortOption, setSortOption] = useState('Newest First');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Profile Modal State
+  const [selectedFreelancerForModal, setSelectedFreelancerForModal] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [currentProposalIdForModal, setCurrentProposalIdForModal] = useState(null);
+
   const tabs = ['All Proposals', 'New', 'Under Review', 'Shortlisted', 'Hired', 'Rejected', 'Withdrawn'];
 
-  const handleUpdateStatus = (proposalId, newStatus) => {
-    setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: newStatus } : p));
-    setMenuOpen(null);
-    if (newStatus === 'Hired') {
-      alert('Freelancer hired successfully! Navigating to Hired Freelancers...');
-      navigate('/client/dashboard/hired');
+  useEffect(() => {
+    fetchProposalsAndProjects();
+  }, []);
+
+  const fetchProposalsAndProjects = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch client projects & proposals safely
+      const fetchedProjects = await apiFetch('/projects').catch(() => []);
+      if (Array.isArray(fetchedProjects) && fetchedProjects.length > 0) {
+        setProjectsList([
+          { id: 'all', title: 'All Projects' },
+          ...fetchedProjects.map(p => ({ id: p._id || p.id, title: p.title, budget: p.budget || p.maxBudget }))
+        ]);
+      }
+
+      const fetchedProposals = await apiFetch('/proposals/received').catch(() => []);
+      if (Array.isArray(fetchedProposals)) {
+        setProposals(fetchedProposals);
+      } else {
+        setProposals([]);
+      }
+    } catch (err) {
+      console.error('Error fetching received proposals:', err);
+      setProposals([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (proposalId, newStatus) => {
+    try {
+      await apiFetch(`/proposals/${proposalId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      }).catch(() => null);
+
+      setProposals(prev => prev.map(p => (p._id === proposalId || p.id === proposalId) ? { ...p, status: newStatus } : p));
+
+      if (newStatus === 'Hired') {
+        alert('Freelancer hired successfully!');
+        navigate('/client/dashboard/hired');
+      }
+    } catch (err) {
+      console.error('Status update error:', err);
     }
   };
 
   // Filter proposals dynamically
   const filteredProposals = proposals.filter(p => {
-    const matchesProject = selectedProject === 'all' || p.projectId === selectedProject;
-    const matchesTab = activeTab === 'All Proposals' || p.status === activeTab;
-    const matchesSearch = p.freelancer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.projectTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesProject = selectedProject === 'all' || p.projectId === selectedProject || p.project_id === selectedProject;
+
+    let matchesTab = true;
+    if (activeTab !== 'All Proposals') {
+      matchesTab = (p.status || 'New').toLowerCase() === activeTab.toLowerCase();
+    }
+
+    const freelancerName = p.freelancer?.name || p.freelancerName || '';
+    const projectTitle = p.projectTitle || p.project?.title || '';
+    const coverText = p.coverLetter || p.proposalText || '';
+
+    const matchesSearch = freelancerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      projectTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      coverText.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesProject && matchesTab && matchesSearch;
-  }).sort((a, b) => {
-    if (sortOption === 'Lowest Bid') return a.bidAmount - b.bidAmount;
-    if (sortOption === 'Highest Bid') return b.bidAmount - a.bidAmount;
-    if (sortOption === 'Best Rated') return b.freelancer.rating - a.freelancer.rating;
-    return 0; // default Newest First
   });
 
-  // Project Info for Selector
-  const currentProjectInfo = MOCK_PROJECTS.find(p => p.id === selectedProject);
-
-  // KPI Stats based on selected project
-  const projectProposals = selectedProject === 'all' ? proposals : proposals.filter(p => p.projectId === selectedProject);
-  const stats = {
-    total: projectProposals.length,
-    new: projectProposals.filter(p => p.status === 'New').length,
-    shortlisted: projectProposals.filter(p => p.status === 'Shortlisted').length,
-    hired: projectProposals.filter(p => p.status === 'Hired').length,
-  };
-
-  const getStatusClass = (status) => {
-    return status.toLowerCase().replace(/\s+/g, '-');
-  };
-
-  const toggleProposalSelection = (id) => {
-    if (selectedProposals.includes(id)) {
-      setSelectedProposals(selectedProposals.filter(pid => pid !== id));
-    } else {
-      if (selectedProposals.length < 3) {
-        setSelectedProposals([...selectedProposals, id]);
-      } else {
-        alert('You can only compare up to 3 proposals at a time.');
-      }
-    }
-  };
-
-  const getEmptyStateContent = () => {
-    if (searchQuery) return { title: 'No Search Results', desc: 'No proposals match your search terms. Try adjusting your keywords.' };
-    if (activeTab !== 'All Proposals') return { title: `No ${activeTab} Proposals`, desc: `There are currently no proposals in the ${activeTab} stage.` };
-    return { title: 'No Proposals Received Yet', desc: 'Once freelancers submit proposals for your projects, they will appear here.' };
+  const getTabCount = (tabName) => {
+    if (tabName === 'All Proposals') return proposals.length;
+    return proposals.filter(p => (p.status || 'New').toLowerCase() === tabName.toLowerCase()).length;
   };
 
   return (
@@ -164,7 +185,7 @@ export default function ReceivedProposals() {
       </div>
 
       {/* KPI Cards */}
-      <div className="rp-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div className="grid-responsive-4" style={{ gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Total Proposals</span>
@@ -268,11 +289,26 @@ export default function ReceivedProposals() {
           {filteredProposals.map(prop => (
             <div key={prop._id || prop.id} style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  <img src={prop.freelancer?.avatar || 'https://i.pravatar.cc/150?img=12'} alt="Freelancer" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                <div
+                  onClick={() => {
+                    setSelectedFreelancerForModal(prop.freelancer);
+                    setCurrentProposalIdForModal(prop._id || prop.id);
+                    setIsProfileModalOpen(true);
+                  }}
+                  style={{ display: 'flex', gap: '14px', alignItems: 'center', cursor: 'pointer' }}
+                  title="Click to view freelancer portfolio, gigs & history popup"
+                >
+                  <img src={getCleanAvatar(prop.freelancer?.avatar || prop.freelancer?.profilePhoto, prop.freelancer?.name || prop.freelancerName)} alt="Freelancer" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #1a73e8' }} />
                   <div>
-                    <h4 style={{ margin: '0 0 2px', fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>{prop.freelancer?.name || 'Freelancer'}</h4>
-                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{prop.freelancer?.title || 'Professional'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h4 style={{ margin: '0 0 2px', fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                        {prop.freelancer?.name || prop.freelancerName || 'Freelancer'}
+                      </h4>
+                      <span style={{ padding: '2px 8px', borderRadius: '12px', background: '#e8f0fe', color: '#1a73e8', fontSize: '0.72rem', fontWeight: 800 }}>
+                        View Portfolio & Gigs
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{prop.freelancer?.title || 'Professional'}</span>
                   </div>
                 </div>
 
@@ -281,6 +317,27 @@ export default function ReceivedProposals() {
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Bid Amount</span>
                 </div>
               </div>
+
+              {/* Freelancer Skill Badges */}
+              {(() => {
+                const rawSkills = Array.isArray(prop.freelancer?.skills) ? prop.freelancer.skills : [];
+                const parsedSkills = rawSkills.flatMap(s => typeof s === 'string' ? s.split(',').map(x => x.trim()) : s).filter(Boolean);
+                if (parsedSkills.length === 0) return null;
+                return (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {parsedSkills.slice(0, 6).map((sk, idx) => (
+                      <span key={idx} style={{ padding: '3px 10px', borderRadius: '20px', background: '#f1f5f9', color: '#334155', fontSize: '0.75rem', fontWeight: 700, border: '1px solid #e2e8f0' }}>
+                        {sk}
+                      </span>
+                    ))}
+                    {parsedSkills.length > 6 && (
+                      <span style={{ padding: '3px 8px', borderRadius: '20px', background: '#f8fafc', color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>
+                        +{parsedSkills.length - 6} more
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
               <p style={{ fontSize: '0.875rem', color: '#334155', margin: 0, lineHeight: 1.5 }}>
                 {prop.coverLetter || prop.proposalText}
@@ -313,6 +370,37 @@ export default function ReceivedProposals() {
           ))}
         </div>
       )}
+
+      {/* Freelancer Portfolio & Gigs Modal Popup */}
+      <FreelancerProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        freelancer={selectedFreelancerForModal}
+        onHire={(fl) => {
+          if (currentProposalIdForModal) {
+            handleUpdateStatus(currentProposalIdForModal, 'Hired');
+            setIsProfileModalOpen(false);
+          }
+        }}
+        onShortlist={(fl) => {
+          if (currentProposalIdForModal) {
+            handleUpdateStatus(currentProposalIdForModal, 'Shortlisted');
+            setIsProfileModalOpen(false);
+          }
+        }}
+        onMessage={(fl) => {
+          setIsProfileModalOpen(false);
+          const flId = fl?.id || fl?._id || fl?.user_id || fl?.freelancer_id;
+          navigate('/client/dashboard/chat', {
+            state: {
+              partnerId: typeof flId === 'object' ? (flId._id || flId.id) : flId,
+              name: fl?.name || fl?.freelancerName,
+              avatar: fl?.avatar || fl?.profilePhoto,
+              title: fl?.title
+            }
+          });
+        }}
+      />
     </div>
   );
 }

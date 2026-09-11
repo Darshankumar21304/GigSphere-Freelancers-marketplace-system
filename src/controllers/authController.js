@@ -4,12 +4,7 @@ const { User, FreelancerProfile } = require('../models');
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, bio, skills, location, country, title, hourlyRate, avatar, profileImage } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required for registration.' });
-    }
-
+    const { name, email, password, role, bio, skills, location, country, title, hourlyRate } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedPassword = password.trim();
 
@@ -34,19 +29,36 @@ exports.register = async (req, res) => {
       email: normalizedEmail,
       password_hash,
       role: role || 'client',
-      location: userLocation,
-      avatar: userAvatar
+      location: userLocation
     });
 
     // If freelancer, create profile
     let profile = null;
     if (newUser.role === 'freelancer') {
+      const parsedSkills = Array.isArray(skills)
+        ? skills
+        : (typeof skills === 'string' && skills.trim() ? skills.split(',').map(s => s.trim()) : []);
+
+      const formattedPortfolio = Array.isArray(portfolio) ? portfolio.map(item => ({
+        title: item.title || 'Project',
+        description: item.description || '',
+        category: item.category || category || 'Web Development',
+        skills: Array.isArray(item.skills) ? item.skills : [],
+        link: item.link || item.url || '',
+        url: item.url || item.link || '',
+        imageUrl: item.imageUrl || item.image || ''
+      })) : [];
+
       profile = await FreelancerProfile.create({
         user_id: newUser._id,
         title: title || '',
         bio: bio || '',
-        skills: skills || '',
-        hourlyRate: hourlyRate || 0
+        skills: parsedSkills,
+        category: category || 'Web Development',
+        hourlyRate: Number(hourlyRate) || 0,
+        experience: experience || 'Entry Level',
+        availability: availability || 'Full-time (40 hrs/week)',
+        portfolioItems: formattedPortfolio
       });
     }
 
@@ -74,8 +86,8 @@ exports.register = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error during registration: ' + error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -97,11 +109,41 @@ exports.login = async (req, res) => {
 
     let isMatch = await bcrypt.compare(trimmedPassword, user.password_hash);
     if (!isMatch) {
-      isMatch = await bcrypt.compare(password, user.password_hash);
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Incorrect password. Please double-check your password or reset it.' });
+    const payload = {
+      id: user._id,
+      role: user.role
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.googleLogin = async (req, res) => {
+  try {
+    const { email, name, role } = req.body;
+    const normalizedEmail = (email || 'google.user@gigsphere.com').toLowerCase().trim();
+
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      // Auto-create user via Google OAuth
+      const salt = await bcrypt.genSalt(10);
+      const password_hash = await bcrypt.hash(`google_${Date.now()}`, salt);
+
+      user = await User.create({
+        name: name || 'Google User',
+        email: normalizedEmail,
+        password_hash,
+        role: role || 'client'
+      });
     }
 
     const payload = {
@@ -117,9 +159,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        avatar: user.avatar || '',
-        location: user.location || ''
+        role: user.role
       }
     });
   } catch (error) {
@@ -151,5 +191,31 @@ exports.resetPassword = async (req, res) => {
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({ message: 'Server error resetting password: ' + error.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect current password' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password_hash = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };

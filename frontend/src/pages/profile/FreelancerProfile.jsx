@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiFetch } from '../../utils/api';
 import { Check, Star, MapPin, Globe, Clock, MessageSquare, Award } from 'lucide-react';
 import { getUserProfile } from '../../utils/authUtils';
+import { getCleanAvatar } from '../../utils/avatarUtils';
 import './Profile.css';
 
 export default function FreelancerProfile() {
@@ -17,8 +18,8 @@ export default function FreelancerProfile() {
     const fetchProfile = async () => {
       try {
         if (id) {
-          const res = await axios.get(`http://localhost:5001/api/users/${id}`);
-          setFreelancer(res.data);
+          const data = await apiFetch(`/users/${id}`);
+          setFreelancer(data);
         } else if (savedProfile) {
           setFreelancer(savedProfile);
         }
@@ -40,20 +41,25 @@ export default function FreelancerProfile() {
   return (
     <div className="profile-page">
       <div className="container profile-layout">
-        
+
         {/* Left Sidebar */}
         <aside className="profile-sidebar">
           <div className="profile-card">
             <div className="profile-avatar-container">
-              <img src={freelancer?.avatar || freelancer?.profileImage || savedProfile?.avatar || savedProfile?.profileImage || 'https://i.pravatar.cc/300?img=47'} alt={name} className="profile-avatar" />
+              <img src={freelancer?.avatar || 'https://i.pravatar.cc/300?img=47'} alt={name} className="profile-avatar" />
               <div className="verified-badge" title="Verified Identity">
                 <Check size={16} strokeWidth={3} />
               </div>
             </div>
-            
-            <h1 className="profile-name">{name}</h1>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', margin: '12px 0 4px', flexWrap: 'wrap' }}>
+              <h1 className="profile-name" style={{ margin: 0 }}>{name}</h1>
+              {freelancer?.kycStatus === 'Verified' && (
+                <Check size={14} color="#10b981" style={{ background: '#dcfce7', borderRadius: '50%', padding: '2px', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} title="Verified Freelancer" />
+              )}
+            </div>
             <p className="profile-title">{title}</p>
-            
+
             <div className="profile-stats">
               <div className="stat-item">
                 <span className="stat-value"><Star size={16} color="var(--warning)" fill="var(--warning)" /> 4.9</span>
@@ -64,16 +70,23 @@ export default function FreelancerProfile() {
                 <span className="stat-label">Match</span>
               </div>
             </div>
-            
+
             <div className="profile-actions">
               <button className="btn btn-primary btn-hire" onClick={() => navigate('/client/dashboard/create-project')}>Hire Me</button>
-              <button className="btn btn-outline" onClick={() => navigate('/client/dashboard/chat')} style={{width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+              <button className="btn btn-outline" onClick={() => navigate('/client/dashboard/chat', {
+                state: {
+                  partnerId: freelancer?._id || id,
+                  name: name,
+                  avatar: freelancer?.avatar || freelancer?.profilePhoto,
+                  title: title
+                }
+              })} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 <MessageSquare size={18} />
                 Message
               </button>
             </div>
           </div>
-          
+
           <div className="profile-info-section">
             <h3 className="info-title">About Info</h3>
             <div className="info-list">
@@ -98,7 +111,7 @@ export default function FreelancerProfile() {
 
           <div className="profile-info-section">
             <h3 className="info-title">Rates</h3>
-            <div style={{fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)'}}>₹{hourlyRate} <span style={{fontSize: '1rem', fontWeight: '400', color: 'var(--text-secondary)'}}>/ hr</span></div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>₹{hourlyRate} <span style={{ fontSize: '1rem', fontWeight: '400', color: 'var(--text-secondary)' }}>/ hr</span></div>
           </div>
         </aside>
 
@@ -107,7 +120,7 @@ export default function FreelancerProfile() {
           <div className="content-card">
             <h2 className="content-title">Biography</h2>
             <div className="content-text">
-              <p style={{marginBottom: '16px'}}>
+              <p style={{ marginBottom: '16px' }}>
                 {bio}
               </p>
             </div>
@@ -124,14 +137,14 @@ export default function FreelancerProfile() {
 
           <div className="content-card">
             <h2 className="content-title">Recent Reviews</h2>
-            
+
             <div className="review-item">
               <div className="review-header">
                 <img src="https://logo.clearbit.com/stripe.com" alt="Client" className="reviewer-avatar" />
                 <div className="reviewer-info">
                   <span className="reviewer-name">Stripe Inc.</span>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <div style={{display: 'flex', color: 'var(--warning)'}}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', color: 'var(--warning)' }}>
                       <Star size={12} fill="currentColor" />
                       <Star size={12} fill="currentColor" />
                       <Star size={12} fill="currentColor" />
@@ -152,8 +165,8 @@ export default function FreelancerProfile() {
                 <img src="https://logo.clearbit.com/airbnb.com" alt="Client" className="reviewer-avatar" />
                 <div className="reviewer-info">
                   <span className="reviewer-name">Airbnb</span>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <div style={{display: 'flex', color: 'var(--warning)'}}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', color: 'var(--warning)' }}>
                       <Star size={12} fill="currentColor" />
                       <Star size={12} fill="currentColor" />
                       <Star size={12} fill="currentColor" />
@@ -170,7 +183,7 @@ export default function FreelancerProfile() {
             </div>
           </div>
         </main>
-        
+
       </div>
     </div>
   );

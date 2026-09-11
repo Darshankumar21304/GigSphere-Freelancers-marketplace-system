@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Filter, 
+import axios from 'axios';
+import {
+  Filter,
   Search,
   MapPin,
   Star,
@@ -25,6 +26,7 @@ import './BrowseProjects.css';
 
 const MOCK_CATEGORIES = [
   'All Projects',
+  'Saved & Favorites',
   'Web Development',
   'Mobile Development',
   'UI/UX Design',
@@ -98,75 +100,148 @@ const DEFAULT_PROJECTS = [
 ];
 
 export default function Explore() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const role = getUserRole();
+  const isAuth = isAuthenticated();
+
+  useEffect(() => {
+    if (isAuth && role && location.pathname === '/explore') {
+      navigate(`/${role}/dashboard/browse-projects`, { replace: true });
+    }
+  }, [isAuth, role, location.pathname, navigate]);
+
   const [projects, setProjects] = useState([]);
   const [activeCategory, setActiveCategory] = useState('All Projects');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [sortBy, setSortBy] = useState('Best Match');
+
+  // URL query check for ?saved=true
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('saved') === 'true') {
+      setActiveCategory('Saved & Favorites');
+    }
+  }, [location.search]);
+
   const [filters, setFilters] = useState({
     skill: '',
     budgetRange: 'Any Budget',
     projectType: 'Any Type',
     experienceLevels: [],
     durations: [],
-    clientRating: 'Any Rating'
+    clientRating: 'Any Rating',
+    postedDate: 'Any Time'
   });
 
   const [proposalProject, setProposalProject] = useState(null);
   const [proposalForm, setProposalForm] = useState({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
 
+  const [recommendations, setRecommendations] = useState([]);
+  const [isRecsLoading, setIsRecsLoading] = useState(false);
+  const [isAiDrafting, setIsAiDrafting] = useState(false);
+  const [aiDraftTone, setAiDraftTone] = useState('professional');
+
+  // Fetch projects and recommendations from backend
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const data = await apiFetch('/projects');
+        const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
+        const updated = (Array.isArray(data) ? data : []).map(p => ({
+          ...p,
+          saved: savedList.includes(p._id)
+        }));
+        setProjects(updated);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const fetchRecommendations = async () => {
+      if (role === 'freelancer' && isAuth) {
+        setIsRecsLoading(true);
+        try {
+          const res = await apiFetch('/freelancer/ai/recommendations?limit=6');
+          if (res && Array.isArray(res.recommendations)) {
+            setRecommendations(res.recommendations);
+          }
+        } catch (err) {
+          console.error('Error loading AI recommendations in Explore:', err);
+        } finally {
+          setIsRecsLoading(false);
+        }
+      }
+    };
+
+    fetchProjects();
+    fetchRecommendations();
+  }, [role, isAuth]);
+
+  // Track AI interaction events
+  const trackAiEvent = async (eventType, project, score = 0) => {
+    if (!isAuth || role !== 'freelancer' || !project) return;
+    try {
+      await apiFetch('/freelancer/ai/events', {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: project._id || project.id,
+          eventType,
+          score: score || project.matchScore || project.matchPercentage || 0
+        })
+      });
+    } catch (e) {
+      // non-blocking
+    }
+  };
+
+  // AI Proposal Assistant handler
+  const handleAiProposalAssist = async (action = 'generate') => {
+    if (!proposalProject) return;
+    setIsAiDrafting(true);
+    try {
+      const res = await apiFetch('/freelancer/ai/proposal', {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: proposalProject._id || proposalProject.id,
+          projectTitle: proposalProject.title,
+          projectDescription: proposalProject.description,
+          requiredSkills: proposalProject.skills || proposalProject.requiredSkills || [],
+          action,
+          tone: aiDraftTone,
+          currentDraft: proposalForm.coverLetter
+        })
+      });
+
+      if (res && res.proposalText) {
+        setProposalForm(prev => ({
+          ...prev,
+          coverLetter: res.proposalText,
+          bidAmount: prev.bidAmount || proposalProject.budget || ''
+        }));
+      }
+    } catch (err) {
+      console.error('AI proposal generation failed:', err);
+      alert('AI Proposal Assistant: ' + err.message);
+    } finally {
+      setIsAiDrafting(false);
+    }
+  };
+
   const handleProposalSubmit = async (e) => {
     e.preventDefault();
     if (!proposalProject) return;
     setIsSubmittingProposal(true);
     try {
-      try {
-        await apiFetch(`/projects/${proposalProject._id || proposalProject.id}/proposals`, {
-          method: 'POST',
-          body: JSON.stringify(proposalForm)
-        });
-      } catch (err) {
-        console.warn('Backend API proposal submission fell back to local sync:', err);
-      }
-
-      // Save proposal locally to proposalUtils so it instantly displays in My Proposals & Received Proposals
-      const storedProposals = getStoredProposals();
-      const userProfile = getUserProfile();
-      const freelancerName = userProfile?.name || userProfile?.fullName || 'Darshan Kumar';
-      const freelancerTitle = userProfile?.title || 'Senior Full Stack Developer';
-      const freelancerAvatar = userProfile?.avatar || userProfile?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(freelancerName)}`;
-
-      const newProp = {
-        id: `PROP-${Date.now().toString().slice(-4)}`,
-        projectId: proposalProject._id || proposalProject.id || 'prj-1',
-        projectTitle: proposalProject.title,
-        clientName: proposalProject.client_id ? proposalProject.client_id.name : (proposalProject.clientName || 'TechNova Solutions'),
-        clientVerified: true,
-        submittedDate: 'Just now',
-        status: 'New',
-        bidAmount: Number(proposalForm.bidAmount) || 25000,
-        deliveryTime: proposalForm.deliveryTime || '2 Weeks',
-        coverLetter: proposalForm.coverLetter,
-        skills: proposalProject.skills || ['React', 'Node.js'],
-        projectBudget: `₹${proposalForm.bidAmount}`,
-        lastActivity: 'Just now',
-        freelancer: {
-          name: freelancerName,
-          title: freelancerTitle,
-          avatar: freelancerAvatar,
-          verified: true,
-          rating: 5.0,
-          reviews: 16,
-          location: userProfile?.location || 'Mumbai, India',
-          completedProjects: 12
-        }
-      };
-      
-      saveStoredProposals([newProp, ...storedProposals]);
-      alert('Proposal submitted successfully! It will now appear on the client dashboard.');
+      await axios.post(`http://localhost:5001/api/projects/${proposalProject._id}/proposals`, proposalForm);
+      alert('Proposal submitted successfully!');
       setProposalProject(null);
       setProposalForm({ bidAmount: '', coverLetter: '', deliveryTime: '1 to 2 weeks' });
     } catch (err) {
@@ -177,19 +252,14 @@ export default function Explore() {
     }
   };
 
-  // Fetch projects from backend DB or fallback to default projects feed
+  // Fetch projects from backend
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const data = await apiFetch('/projects');
-        if (Array.isArray(data) && data.length > 0) {
-          setProjects(data);
-        } else {
-          setProjects(DEFAULT_PROJECTS);
-        }
+        const response = await axios.get('http://localhost:5001/api/projects');
+        setProjects(response.data);
       } catch (error) {
-        console.warn('Error fetching projects from backend API, using default projects list:', error);
-        setProjects(DEFAULT_PROJECTS);
+        console.error('Error fetching projects:', error);
       } finally {
         setIsLoading(false);
       }
@@ -199,7 +269,37 @@ export default function Explore() {
 
   const toggleSave = (e, id) => {
     e.preventDefault();
-    setProjects(projects.map(p => p.id === id ? { ...p, saved: !p.saved } : p));
+    if (!isAuth) {
+      setShowAuthModal(true);
+      return;
+    }
+    const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
+    let updated;
+    const targetProject = projects.find(p => p._id === id);
+    if (savedList.includes(id)) {
+      updated = savedList.filter(item => item !== id);
+    } else {
+      updated = [...savedList, id];
+      // Track bookmark event for adaptive learning
+      if (targetProject) {
+        trackAiEvent('project_bookmark', targetProject, targetProject.matchScore || 80);
+      }
+    }
+    localStorage.setItem('saved_projects', JSON.stringify(updated));
+    setProjects(projects.map(p => p._id === id ? { ...p, saved: updated.includes(p._id) } : p));
+  };
+
+  const handleProposeClick = (project) => {
+    if (!isAuth) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (role === 'client') {
+      alert('Clients cannot submit proposals. Please log in as a freelancer.');
+      return;
+    }
+    setProposalProject(project);
+    trackAiEvent('project_view', project, project.matchScore || 75);
   };
 
   const handleFilterChange = (key, value) => {
@@ -226,13 +326,19 @@ export default function Explore() {
       projectType: 'Any Type',
       experienceLevels: [],
       durations: [],
-      clientRating: 'Any Rating'
+      clientRating: 'Any Rating',
+      postedDate: 'Any Time'
     });
   };
 
   const filteredProjects = projects.filter(p => {
-    if (activeCategory !== 'All Projects' && p.category !== activeCategory) return false;
-    
+    if (activeCategory === 'Saved & Favorites') {
+      const savedList = JSON.parse(localStorage.getItem('saved_projects') || '[]');
+      if (!p.saved && !savedList.includes(p._id)) return false;
+    } else if (activeCategory !== 'All Projects' && p.category !== activeCategory) {
+      return false;
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const titleMatch = p.title && p.title.toLowerCase().includes(q);
@@ -247,19 +353,43 @@ export default function Explore() {
     if (filters.projectType !== 'Any Type' && p.budgetType !== filters.projectType) return false;
     if (filters.experienceLevels.length > 0 && p.experienceLevel && !filters.experienceLevels.includes(p.experienceLevel)) return false;
     if (filters.durations.length > 0 && p.duration && !filters.durations.includes(p.duration)) return false;
-    
+
     // Default client rating to handle missing data gracefully
-    const rating = (p.client_id && p.client_id.rating) || 5.0; 
+    const rating = (p.client_id && p.client_id.rating) || 5.0;
     if (filters.clientRating === '4.5 & up' && rating < 4.5) return false;
     if (filters.clientRating === '4.0 & up' && rating < 4.0) return false;
 
+    if (filters.budgetRange !== 'Any Budget') {
+      const budgetNum = parseInt(p.budget, 10) || 0;
+      if (filters.budgetRange === '₹10k - ₹50k' && (budgetNum < 10000 || budgetNum > 50000)) return false;
+      if (filters.budgetRange === '₹50k - ₹1L' && (budgetNum < 50000 || budgetNum > 100000)) return false;
+      if (filters.budgetRange === '₹1L+' && budgetNum <= 100000) return false;
+    }
+
+    if (filters.postedDate !== 'Any Time') {
+      const now = new Date();
+      const projectDate = new Date(p.createdAt);
+      const diffTime = Math.abs(now - projectDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (filters.postedDate === 'Last 24 Hours' && diffDays > 1) return false;
+      if (filters.postedDate === 'Last 7 Days' && diffDays > 7) return false;
+      if (filters.postedDate === 'Last 14 Days' && diffDays > 14) return false;
+    }
+
     return true;
+  });
+
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    if (sortBy === 'Newest') return new Date(b.createdAt) - new Date(a.createdAt);
+    if (sortBy === 'Highest Budget') return (parseInt(b.budget) || 0) - (parseInt(a.budget) || 0);
+    return 0;
   });
 
   const SidebarContent = () => (
     <>
       <div className="drawer-header lg:hidden">
-        <h2 className="filter-title" style={{marginBottom: 0}}>Filters</h2>
+        <h2 className="filter-title" style={{ marginBottom: 0 }}>Filters</h2>
         <button className="close-drawer-btn" onClick={() => setIsFilterOpen(false)}>
           <X size={24} />
         </button>
@@ -275,7 +405,7 @@ export default function Explore() {
           </select>
         </div>
       </div>
-      
+
       <div className="filter-section">
         <h3 className="filter-title">Skills</h3>
         <div className="custom-select-wrapper">
@@ -329,13 +459,13 @@ export default function Explore() {
           </label>
         ))}
       </div>
-      
+
       <div className="filter-section">
         <h3 className="filter-title">Client Rating</h3>
         {['4.5 & up', '4.0 & up', 'Any Rating'].map((rating, i) => (
           <label key={rating} className="custom-radio">
             <input type="radio" name="clientRating" checked={filters.clientRating === rating} onChange={() => handleFilterChange('clientRating', rating)} />
-            <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               {i < 2 ? <Star size={14} fill="#eab308" color="#eab308" /> : null}
               {rating}
             </div>
@@ -347,7 +477,7 @@ export default function Explore() {
         <h3 className="filter-title">Posted Date</h3>
         {['Any Time', 'Last 24 Hours', 'Last 7 Days', 'Last 14 Days'].map(time => (
           <label key={time} className="custom-radio">
-            <input type="radio" name="postedDate" defaultChecked={time === 'Any Time'} />
+            <input type="radio" name="postedDate" checked={filters.postedDate === time} onChange={() => handleFilterChange('postedDate', time)} />
             {time}
           </label>
         ))}
@@ -361,19 +491,30 @@ export default function Explore() {
   );
 
   return (
-    <div className="gigsphere-freelancer-browse-projects">
-      <div className="browse-container">
-        
+    <div className="gigsphere-freelancer-browse-projects" style={{ position: 'relative', overflow: 'hidden' }}>
+      <AntigravityCanvas />
+
+      <div className="browse-container" style={{ position: 'relative', zIndex: 1 }}>
+
         {/* Header */}
         <div className="page-header">
           <div>
-            <div className="breadcrumb">Dashboard / Browse Projects</div>
             <h1 className="page-title">Browse Projects</h1>
             <p className="page-description">Discover projects that match your skills and experience.</p>
           </div>
-          <button className="saved-projects-btn">
-            <Bookmark size={18} />
-            Saved Projects
+          <button
+            className={`saved-projects-btn ${activeCategory === 'Saved & Favorites' ? 'active' : ''}`}
+            onClick={() => {
+              if (!isAuth) {
+                setShowAuthModal(true);
+              } else {
+                setActiveCategory(prev => prev === 'Saved & Favorites' ? 'All Projects' : 'Saved & Favorites');
+              }
+            }}
+            style={activeCategory === 'Saved & Favorites' ? { background: 'linear-gradient(135deg, #1a73e8, #1557b0)', color: '#ffffff' } : {}}
+          >
+            <Bookmark size={18} fill={activeCategory === 'Saved & Favorites' ? '#fff' : 'none'} />
+            {activeCategory === 'Saved & Favorites' ? 'Viewing Saved Favorites' : 'Saved Projects'}
           </button>
         </div>
 
@@ -382,9 +523,9 @@ export default function Explore() {
           <div className="search-input-group">
             <div className="search-wrapper">
               <Search className="search-icon" size={20} />
-              <input 
-                type="text" 
-                className="search-input" 
+              <input
+                type="text"
+                className="search-input"
                 placeholder="Search by project title, skill, or keyword..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -396,12 +537,12 @@ export default function Explore() {
               Filters
             </button>
           </div>
-          
+
           {/* Category Chips */}
           <div className="category-chips">
             {MOCK_CATEGORIES.map(cat => (
-              <button 
-                key={cat} 
+              <button
+                key={cat}
                 className={`chip ${activeCategory === cat ? 'active' : ''}`}
                 onClick={() => setActiveCategory(cat)}
               >
@@ -412,7 +553,7 @@ export default function Explore() {
         </div>
 
         <div className="content-layout">
-          
+
           {/* Desktop Sidebar Filter */}
           <aside className="filter-sidebar">
             <SidebarContent />
@@ -427,33 +568,133 @@ export default function Explore() {
 
           {/* Main Results */}
           <main className="results-area">
-            
+
+            {/* AI RECOMMENDED FOR YOU SECTION (PRIMARY RECOMMENDATION SURFACE) */}
+            {role === 'freelancer' && isAuth && (
+              <div className="ai-recomms-section" style={{ marginBottom: '28px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, border: '1px solid #a7f3d0' }}>
+                      ✨ AI Smart Match
+                    </span>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: 0 }}>
+                      Recommended For You
+                    </h2>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Personalized to your profile skills & experience
+                  </span>
+                </div>
+
+                {isRecsLoading ? (
+                  <div style={{ padding: '24px', background: '#fff', borderRadius: '12px', textAlign: 'center', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                    Scanning marketplace briefs for best matches...
+                  </div>
+                ) : recommendations.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                    {recommendations.slice(0, 4).map(rec => (
+                      <div key={rec._id || rec.id} className="project-card" style={{ border: '1.5px solid #10b981', background: 'linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                          <span style={{ background: '#10b981', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800, padding: '3px 9px', borderRadius: '14px' }}>
+                            {rec.matchPercentage || rec.matchScore}% Match
+                          </span>
+                          <button
+                            className="bookmark-icon-btn"
+                            onClick={(e) => toggleSave(e, rec._id)}
+                            style={{ padding: '4px' }}
+                          >
+                            <Bookmark size={18} fill={rec.saved ? 'currentColor' : 'none'} />
+                          </button>
+                        </div>
+
+                        <Link to={`/gig/${rec._id}`} style={{ textDecoration: 'none' }}>
+                          <h3 className="project-title" style={{ fontSize: '1.05rem', margin: '0 0 6px', color: '#0f172a' }}>{rec.title}</h3>
+                        </Link>
+
+                        <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700, margin: '4px 0 10px' }}>
+                          Budget: {formatINR(rec.budget || rec.budgetMax || 0)}
+                        </div>
+
+                        {/* Matching Skills */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                          {(rec.matchingSkills || []).map((sk, sIdx) => (
+                            <span key={sIdx} style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px' }}>
+                              ✓ {sk}
+                            </span>
+                          ))}
+                          {(rec.missingSkills || []).slice(0, 2).map((sk, sIdx) => (
+                            <span key={sIdx} style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '6px' }}>
+                              + {sk}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Why this project explainability */}
+                        <div style={{ background: 'rgba(255,255,255,0.7)', padding: '10px', borderRadius: '8px', fontSize: '0.76rem', color: '#334155', marginBottom: '14px', border: '1px solid #bbf7d0' }}>
+                          <strong style={{ display: 'block', marginBottom: '4px', color: '#065f46' }}>Why this project?</strong>
+                          <ul style={{ margin: 0, paddingLeft: '16px', lineHeight: 1.4 }}>
+                            {(rec.reasons || rec.whyRecommended || []).map((r, rIdx) => (
+                              <li key={rIdx}>{r}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
+                          <button
+                            className="btn-secondary"
+                            style={{ flex: 1, padding: '8px', fontSize: '0.8rem' }}
+                            onClick={() => {
+                              trackAiEvent('project_view', rec, rec.matchPercentage);
+                              navigate(`/gig/${rec._id}`);
+                            }}
+                          >
+                            View Details
+                          </button>
+                          <button
+                            className="btn-primary"
+                            style={{ flex: 1, padding: '8px', fontSize: '0.8rem', background: '#059669' }}
+                            onClick={() => handleProposeClick(rec)}
+                          >
+                            Submit Proposal
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '16px 20px', background: '#f8fafc', borderRadius: '10px', fontSize: '0.82rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
+                    💡 <strong>Smart Matching Active:</strong> As new client briefs matching your technical stack are posted, personalized high-confidence recommendations will automatically appear here.
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="results-toolbar">
               <div className="results-count">
                 Showing <strong>{filteredProjects.length}</strong> projects found
               </div>
-              
+
               <div className="toolbar-actions">
                 <div className="sort-dropdown">
-                  Sort By: 
-                  <div className="custom-select-wrapper" style={{display: 'inline-block', width: '160px'}}>
-                    <select className="custom-select" style={{padding: '8px 12px'}}>
+                  Sort By:
+                  <div className="custom-select-wrapper" style={{ display: 'inline-block', width: '160px' }}>
+                    <select className="custom-select" style={{ padding: '8px 12px' }} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                       <option>Best Match</option>
                       <option>Newest</option>
                       <option>Highest Budget</option>
                     </select>
                   </div>
                 </div>
-                
+
                 <div className="view-toggle">
-                  <button 
-                    className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`} 
+                  <button
+                    className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
                     onClick={() => setViewMode('grid')}
                   >
                     <LayoutGrid size={18} />
                   </button>
-                  <button 
-                    className={`view-btn ${viewMode === 'list' ? 'active' : ''}`} 
+                  <button
+                    className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
                     onClick={() => setViewMode('list')}
                   >
                     <List size={18} />
@@ -465,40 +706,59 @@ export default function Explore() {
             {isLoading ? (
               <div className={`projects-grid ${viewMode === 'list' ? 'list-view' : ''}`}>
                 {[1, 2, 3, 4].map(n => (
-                  <div key={n} className="project-card" style={{height: '350px'}}>
-                    <div className="skeleton" style={{width: '60%', height: '24px', marginBottom: '16px'}}></div>
-                    <div className="skeleton" style={{width: '40%', height: '16px', marginBottom: '24px'}}></div>
-                    <div className="skeleton" style={{width: '100%', height: '80px', marginBottom: '24px'}}></div>
-                    <div className="skeleton" style={{width: '100%', height: '100%', flex: 1}}></div>
+                  <div key={n} className="project-card" style={{ height: '350px' }}>
+                    <div className="skeleton" style={{ width: '60%', height: '24px', marginBottom: '16px' }}></div>
+                    <div className="skeleton" style={{ width: '40%', height: '16px', marginBottom: '24px' }}></div>
+                    <div className="skeleton" style={{ width: '100%', height: '80px', marginBottom: '24px' }}></div>
+                    <div className="skeleton" style={{ width: '100%', height: '100%', flex: 1 }}></div>
                   </div>
                 ))}
               </div>
-            ) : filteredProjects.length > 0 ? (
+            ) : sortedProjects.length > 0 ? (
               <>
                 <div className={`projects-grid ${viewMode === 'list' ? 'list-view' : ''}`}>
-                  {filteredProjects.map(project => (
-                    <div key={project.id} className="project-card">
-                      
+                  {sortedProjects.map(project => (
+                    <div key={project.id || project._id} className="project-card">
+
                       <div className="card-header">
-                        <div>
-                          <Link to={`/gig/${project._id}`} style={{textDecoration: 'none'}}>
+                        <div style={{ flex: 1 }}>
+                          <Link to={`/gig/${project._id}`} style={{ textDecoration: 'none' }}>
                             <h3 className="project-title">{project.title}</h3>
                           </Link>
-                          
-                          <div className="client-info">
-                            <span style={{fontWeight: 500, color: 'var(--text-main)'}}>{project.client_id ? project.client_id.name : 'Unknown Client'}</span>
-                            <span className="verified-badge">
-                              <CheckCircle size={14} /> Verified Client
-                            </span>
-                            <span className="client-rating">
-                              <Star size={14} fill="currentColor" /> {(project.client_id && project.client_id.rating) || '5.0'}
-                            </span>
-                            <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                              <MapPin size={14} /> Remote
-                            </span>
+
+                          <div className="client-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                            {(() => {
+                              const client = typeof project.client_id === 'object' ? (project.client_id || {}) : {};
+                              const rawName = client.name || client.companyName || '';
+                              const clientName = (rawName && !['Client User', 'Client Pro', 'Demo Client', 'Client', 'Unknown Client'].includes(rawName)) ? rawName : 'Heartware';
+                              const rawPic = client.avatar || client.profilePhoto;
+                              let clientAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(clientName)}&background=1a73e8&color=fff`;
+                              if (rawPic && typeof rawPic === 'string' && rawPic.trim() !== '') {
+                                if (rawPic.startsWith('http://') || rawPic.startsWith('https://')) clientAvatar = rawPic;
+                                else if (rawPic.startsWith('/uploads')) clientAvatar = `http://localhost:5001${rawPic}`;
+                                else clientAvatar = rawPic;
+                              }
+                              return (
+                                <>
+                                  <img
+                                    src={clientAvatar}
+                                    alt={clientName}
+                                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary, #1a73e8)', flexShrink: 0 }}
+                                  />
+                                  <div>
+                                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', display: 'block', lineHeight: 1.2 }}>
+                                      {clientName}
+                                    </span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 600, fontSize: '0.75rem', marginTop: '2px' }}>
+                                      <CheckCircle size={12} /> Verified Client
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
-                        <button 
+                        <button
                           className={`bookmark-icon-btn ${project.saved ? 'saved' : ''}`}
                           onClick={(e) => toggleSave(e, project._id)}
                         >
@@ -506,10 +766,12 @@ export default function Explore() {
                         </button>
                       </div>
 
-                      <div className="project-meta-grid">
+                      <div className="project-meta-grid" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', margin: '16px 0' }}>
                         <div className="meta-item">
                           <span className="meta-label">{project.budgetType || 'Fixed Price'}</span>
-                          <span className="meta-value">{project.budget || 'N/A'}</span>
+                          <span className="meta-value" style={{ color: '#10b981', fontSize: '16px' }}>
+                            {project.budget ? formatINR(project.budget) : 'Open Budget'}
+                          </span>
                         </div>
                         <div className="meta-item">
                           <span className="meta-label">Experience</span>
@@ -525,28 +787,40 @@ export default function Explore() {
                         </div>
                       </div>
 
-                      <p className="project-desc">{project.description}</p>
-                      
+                      <p className="project-desc" style={{ color: '#475569', fontSize: '15px' }}>{project.description}</p>
+
                       <div className="skills-container">
                         {project.skills && project.skills.map(skill => (
                           <span key={skill} className="skill-chip">{skill}</span>
                         ))}
                       </div>
 
-                      <div className="card-footer">
+                      <div className="card-footer" style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                         <div className="footer-stats">
-                          <div className="stat-item">
-                            <Users size={16} /> 0 Proposals
+                          <div className="stat-item" style={{ fontSize: '14px', color: '#64748b' }}>
+                            <Users size={16} /> {project.proposals ? project.proposals.length : 0} Proposals
                           </div>
                         </div>
                         <div className="card-actions">
-                          <Link to={`/gig/${project._id}`} style={{textDecoration: 'none'}}>
-                            <button className="btn-secondary">View Project</button>
-                          </Link>
-                          <button className="btn-primary" onClick={() => setProposalProject(project)}>Submit Proposal</button>
+                          <button
+                            className="btn-secondary"
+                            onClick={(e) => {
+                              if (!isAuth) {
+                                e.preventDefault();
+                                setShowAuthModal(true);
+                              } else {
+                                navigate(`/gig/${project._id}`);
+                              }
+                            }}
+                          >
+                            View Project
+                          </button>
+                          {role !== 'client' && (
+                            <button className="btn-primary" onClick={() => handleProposeClick(project)}>Submit Proposal</button>
+                          )}
                         </div>
                       </div>
-                      
+
                     </div>
                   ))}
                 </div>
@@ -556,20 +830,31 @@ export default function Explore() {
                   <button className="page-btn active">1</button>
                   <button className="page-btn">2</button>
                   <button className="page-btn">3</button>
-                  <span style={{color: 'var(--text-muted)'}}>...</span>
+                  <span style={{ color: 'var(--text-muted)' }}>...</span>
                   <button className="page-btn">8</button>
                   <button className="page-btn"><ChevronRight size={18} /></button>
                 </div>
               </>
             ) : (
               <div className="empty-state">
-                <Briefcase className="empty-icon" />
-                <h3 className="empty-title">No projects found</h3>
-                <p className="empty-desc">We couldn't find any projects matching your current filters and search query. Try adjusting your criteria.</p>
-                <button className="btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+                {activeCategory === 'Saved & Favorites' ? (
+                  <>
+                    <Bookmark className="empty-icon" style={{ color: '#ef4444' }} />
+                    <h3 className="empty-title">No Saved Projects Yet</h3>
+                    <p className="empty-desc">Click the heart or bookmark icon on any project listing to save it to your favorites for quick access.</p>
+                    <button className="btn-primary" onClick={() => setActiveCategory('All Projects')}>Browse All Projects</button>
+                  </>
+                ) : (
+                  <>
+                    <Briefcase className="empty-icon" />
+                    <h3 className="empty-title">No projects found</h3>
+                    <p className="empty-desc">We couldn't find any projects matching your current filters and search query. Try adjusting your criteria.</p>
+                    <button className="btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+                  </>
+                )}
               </div>
             )}
-            
+
           </main>
         </div>
       </div>
@@ -582,7 +867,7 @@ export default function Explore() {
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>Submit Proposal</h2>
               <button onClick={() => setProposalProject(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            
+
             <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '16px' }}>
               Submitting for: <strong>{proposalProject.title}</strong>
             </p>
@@ -590,8 +875,8 @@ export default function Explore() {
             <form onSubmit={handleProposalSubmit}>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Bid Amount (₹)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   required
                   placeholder="e.g. 25000"
                   value={proposalForm.bidAmount}
@@ -602,7 +887,7 @@ export default function Explore() {
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Estimated Delivery Time</label>
-                <select 
+                <select
                   value={proposalForm.deliveryTime}
                   onChange={(e) => setProposalForm({ ...proposalForm, deliveryTime: e.target.value })}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db' }}
@@ -615,27 +900,55 @@ export default function Explore() {
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Cover Letter / Pitch</label>
-                <textarea 
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', margin: 0 }}>Cover Letter / Pitch</label>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      disabled={isAiDrafting}
+                      onClick={() => handleAiProposalAssist('generate')}
+                      style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {isAiDrafting ? '✨ Generating...' : '✨ AI Generate'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAiDrafting || !proposalForm.coverLetter}
+                      onClick={() => handleAiProposalAssist('shorten')}
+                      style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Shorten
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAiDrafting || !proposalForm.coverLetter}
+                      onClick={() => handleAiProposalAssist('professional')}
+                      style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Professional Tone
+                    </button>
+                  </div>
+                </div>
+                <textarea
                   required
-                  rows="4"
+                  rows="5"
                   placeholder="Describe your relevant experience and why you are the best fit for this project..."
                   value={proposalForm.coverLetter}
                   onChange={(e) => setProposalForm({ ...proposalForm, coverLetter: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db', resize: 'vertical' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #d1d5db', resize: 'vertical', fontSize: '0.88rem', lineHeight: 1.5 }}
                 />
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setProposalProject(null)}
                   style={{ padding: '10px 16px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f9fafb', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmittingProposal}
                   style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', background: 'var(--primary, #2563eb)', color: '#fff', fontWeight: '600', cursor: 'pointer' }}
                 >
@@ -646,6 +959,11 @@ export default function Explore() {
           </div>
         </div>
       )}
+      {/* Login Popup Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 }

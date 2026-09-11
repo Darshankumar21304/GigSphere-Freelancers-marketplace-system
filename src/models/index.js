@@ -10,6 +10,11 @@ const Project = require('./Project');
 const Contract = require('./Contract');
 const Transaction = require('./Transaction');
 const Notification = require('./Notification');
+const Dispute = require('./Dispute');
+const Pitch = require('./Pitch');
+const RecommendationEvent = require('./RecommendationEvent');
+const TrustReview = require('./TrustReview');
+const TrustEvent = require('./TrustEvent');
 
 module.exports = {
   User,
@@ -23,5 +28,11 @@ module.exports = {
   Project,
   Contract,
   Transaction,
-  Notification
+  Notification,
+  Dispute,
+  Pitch,
+  RecommendationEvent,
+  TrustReview,
+  TrustEvent
 };
+

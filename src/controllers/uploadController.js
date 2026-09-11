@@ -15,20 +15,24 @@ const getCloudinaryOptions = (file, customFolder = null) => {
   let folder = customFolder || 'gigsphere/uploads';
   let resource_type = 'auto';
 
+  const nameWithoutExt = file.originalname ? file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, '_') : 'deliverable';
+  const originalExt = file.originalname && file.originalname.includes('.') ? file.originalname.split('.').pop().toLowerCase() : 'pdf';
+  const isArchive = mime.includes('zip') || mime.includes('compressed') || mime.includes('tar') || ['zip', 'rar', '7z', 'tar', 'gz'].includes(originalExt);
+
   if (mime.startsWith('image/')) {
     folder = customFolder || 'gigsphere/images';
     resource_type = 'image';
   } else if (mime.startsWith('video/') || mime.startsWith('audio/')) {
     folder = customFolder || 'gigsphere/videos';
     resource_type = 'video';
+  } else if (isArchive) {
+    folder = customFolder || 'gigsphere/archives';
+    resource_type = 'raw';
   } else {
     folder = customFolder || 'gigsphere/documents';
     resource_type = 'raw';
   }
 
-  const nameWithoutExt = file.originalname ? file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, '_') : 'deliverable';
-  const originalExt = file.originalname && file.originalname.includes('.') ? file.originalname.split('.').pop().toLowerCase() : 'pdf';
-  
   // PDF Workaround: Upload as .dat to bypass Cloudinary account-level PDF delivery restrictions
   const ext = originalExt === 'pdf' ? 'dat' : originalExt;
   const public_id = `${Date.now()}_${nameWithoutExt}.${ext}`;

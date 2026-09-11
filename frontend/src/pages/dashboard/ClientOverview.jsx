@@ -1,6 +1,7 @@
-import React from 'react';
-import { CreditCard, Clock, Briefcase, CheckCircle, ArrowUpRight, DollarSign, Calendar, ShieldCheck } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Clock, Briefcase, CheckCircle, ShieldCheck, Plus, Sparkles, TrendingUp, FolderPlus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
 import { getUserProfile } from '../../utils/authUtils';
 import { apiFetch } from '../../utils/api';
@@ -8,18 +9,47 @@ import './Dashboard.css';
 import './ClientDashboard.css';
 
 export default function ClientOverview() {
-  const [profileData, setProfileData] = useState({
-    walletBalance: 0,
-    escrowBalance: 0,
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState('');
+
+  const [activeProjects, setActiveProjects] = useState([]);
+  const [recentProposals, setRecentProposals] = useState([]);
+  const [hiredFreelancers, setHiredFreelancers] = useState([]);
+  const [recommendedFreelancers, setRecommendedFreelancers] = useState([]);
+  const [selectedExplainability, setSelectedExplainability] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [counts, setCounts] = useState({
     activeProjectsCount: 0,
-    completedProjectsCount: 0,
-    payments: [],
-    chartData: []
+    newProposalsCount: 0,
+    hiredFreelancersCount: 0,
+    completedProjectsCount: 0
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  const userProfile = getUserProfile();
-  const userName = userProfile?.name || 'Valued Client';
+  // Track recommendation interaction events for adaptive learning
+  const trackEvent = async (freelancerId, eventType, skills = []) => {
+    try {
+      await apiFetch('/recommendations/events', {
+        method: 'POST',
+        body: JSON.stringify({
+          freelancerId,
+          eventType,
+          matchedSkills: skills
+        })
+      });
+    } catch (e) {
+      // ignore
+    }
+  };
+
+
+  // Time-aware greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -73,166 +103,350 @@ export default function ClientOverview() {
       }
     };
 
-    fetchDashboardData();
-  }, []);
+    const handleAcceptProposal = async (propId, name) => {
+      try {
+        await apiFetch(`/proposals/${propId}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'Accepted' })
+        });
+        alert(`Proposal from ${name} accepted! Contract created.`);
+        fetchDashboardData();
+      } catch (e) {
+        alert(e.message || 'Failed to accept proposal');
+      }
+    };
 
-  const kpiCards = [
-    {
-      title: 'Total Wallet Balance',
-      value: formatINR(profileData.walletBalance),
-      desc: 'Available for instant escrow funding.',
-      icon: CreditCard,
-      color: '#1a73e8',
-      bg: '#e8f0fe'
-    },
-    {
-      title: 'Escrow Vault Locked',
-      value: formatINR(profileData.escrowBalance),
-      desc: 'Secured funds locked for active milestones.',
-      icon: ShieldCheck,
-      color: '#10b981',
-      bg: '#dcfce7'
-    },
-    {
-      title: 'Active Projects',
-      value: String(profileData.activeProjectsCount),
-      desc: 'Projects currently accepting freelancer bids.',
-      icon: Briefcase,
-      color: '#a142f4',
-      bg: '#f3e8fd'
-    },
-    {
-      title: 'Completed Hirings',
-      value: String(profileData.completedProjectsCount),
-      desc: 'Successfully delivered client projects.',
-      icon: CheckCircle,
-      color: '#f59e0b',
-      bg: '#fef3c7'
+    const handleRejectProposal = async (propId) => {
+      try {
+        await apiFetch(`/proposals/${propId}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'Rejected' })
+        });
+      } catch (e) { }
+      setRecentProposals(prev => prev.filter(p => p.id !== propId));
+      setCounts(prev => ({ ...prev, newProposalsCount: Math.max(0, prev.newProposalsCount - 1) }));
+    };
+
+    if (isLoading) {
+      return (
+        <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
+          <RefreshCw size={32} className="spin-icon" color="#1a73e8" style={{ marginBottom: '12px', display: 'inline-block' }} />
+          <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>Loading your real-time client workspace...</p>
+        </div>
+      );
     }
-  ];
 
-  return (
-    <div className="client-dashboard-container">
-      {/* Header */}
-      <div className="overview-header">
-        <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.85rem', background: '#e8f0fe', color: '#1a73e8', borderRadius: '30px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-            <Sparkles size={13} /> Verified Client Account
+    return (
+      <div className="client-dashboard-container" style={{ minHeight: '100vh' }}>
+
+        {/* 1. WELCOME MESSAGE */}
+        <div className="overview-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '24px 28px', borderRadius: '16px', border: '1px solid #cbd5e1', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          <div>
+            <h1 className="overview-title" style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>
+              {getGreeting()}, {userName} 👋
+            </h1>
+            <p className="overview-subtitle" style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
+              Here’s an overview of your projects and hiring activity.
+            </p>
           </div>
-          <h1 className="overview-title">Welcome, {userName}!</h1>
-          <p className="overview-subtitle">Manage your project budgets, milestone payments, and freelancer hiring.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link to="/client/dashboard/post-project" className="pill-btn pill-dark" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.25rem', borderRadius: '40px', background: '#0f172a', color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '0.875rem' }}>
-            <Plus size={16} /> Post a Project
-          </Link>
-          <Link to="/client/dashboard/wallet" className="pill-btn pill-light" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.25rem', borderRadius: '40px', background: '#e8f0fe', color: '#1a73e8', textDecoration: 'none', fontWeight: 700, fontSize: '0.875rem', border: '1px solid #bfdbfe' }}>
-            <CreditCard size={16} /> Deposit Funds
-          </Link>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="client-kpi-grid">
-        {kpiCards.map((card, idx) => (
-          <div key={idx} className="client-kpi-card">
-            <div className="client-kpi-header">
-              <span className="client-kpi-title">{card.title}</span>
-              <div className="client-kpi-icon-wrapper" style={{ backgroundColor: card.bg }}>
-                <card.icon size={20} color={card.color} />
-              </div>
-            </div>
-            <p className="client-kpi-value">{card.value}</p>
-            <p className="client-kpi-desc">{card.desc}</p>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <Link to="/client/dashboard/post-project" style={{ padding: '10px 22px', background: '#0f172a', color: '#ffffff', borderRadius: '30px', fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Plus size={18} /> Post a Project
+            </Link>
+            <Link to="/client/dashboard/wallet" style={{ padding: '10px 22px', background: '#e8f0fe', color: '#1a73e8', border: '1px solid #bfdbfe', borderRadius: '30px', fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <CreditCard size={18} /> Deposit Funds
+            </Link>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="dashboard-grid">
-        {/* Spending Analytics Chart */}
-        <div className="dashboard-panel" style={{ gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        {/* 2. QUICK SUMMARY (4 NUMBERS) */}
+        <div className="grid-responsive-4" style={{ gap: '16px', marginBottom: '28px' }}>
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 className="panel-title" style={{ margin: 0 }}>Monthly Escrow Analytics</h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0' }}>
-                Track project spending and secured milestone payments over time.
-              </p>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Active Projects</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a' }}>{counts.activeProjectsCount}</span>
             </div>
-            <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#1a73e8', fontWeight: '700' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#1a73e8', display: 'inline-block' }}></span>
-                Project Spending
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: '700' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
-                Milestone Payments
-              </span>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#f3e8fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Briefcase size={22} color="#a142f4" />
             </div>
           </div>
 
-          <div style={{ width: '100%', height: '280px', minWidth: 0, minHeight: '280px' }}>
-            {profileData.chartData.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc', color: '#64748b' }}>
-                <TrendingUp size={36} color="#1a73e8" style={{ marginBottom: '8px' }} />
-                <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontWeight: 800 }}>No Analytics Data Recorded</h4>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>Analytics will generate automatically once you post a project and fund milestone escrow.</p>
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>New Proposals</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1a73e8' }}>{counts.newProposalsCount}</span>
+            </div>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#e8f0fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileText size={22} color="#1a73e8" />
+            </div>
+          </div>
+
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Hired Freelancers</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#10b981' }}>{counts.hiredFreelancersCount}</span>
+            </div>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={22} color="#10b981" />
+            </div>
+          </div>
+
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Completed Projects</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#d97706' }}>{counts.completedProjectsCount}</span>
+            </div>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle size={22} color="#d97706" />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. ACTIVE PROJECTS (MAIN SECTION) */}
+        <div style={{ background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '16px', padding: '24px', marginBottom: '28px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Briefcase size={20} color="#1a73e8" /> Active Projects
+              </h2>
+              <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Currently active contracts and milestone progress.</p>
+            </div>
+            <Link to="/client/dashboard/my-projects" style={{ color: '#1a73e8', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              View All Projects <ChevronRight size={16} />
+            </Link>
+          </div>
+
+          {activeProjects.length === 0 ? (
+            <div style={{ padding: '36px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+              <Briefcase size={36} color="#94a3b8" style={{ marginBottom: '10px' }} />
+              <h4 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>No Active Projects Currently</h4>
+              <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#64748b' }}>Post a project to start receiving proposals and hiring top freelancer talent.</p>
+              <Link to="/client/dashboard/post-project" style={{ padding: '8px 20px', background: '#0f172a', color: '#fff', borderRadius: '30px', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} /> Post Your First Project
+              </Link>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {activeProjects.map(proj => (
+                <div key={proj.id} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div style={{ flex: '1 1 240px' }}>
+                    <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{proj.title}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <img
+                        src={proj.freelancerAvatar}
+                        alt={proj.freelancerName}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://res.cloudinary.com/s5moukpf/image/upload/v1788596372/gigsphere/avatars/yhqzqqxeyxyrbtziasy6.jpg';
+                        }}
+                        style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #cbd5e1' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>Freelancer: <strong style={{ color: '#0f172a' }}>{proj.freelancerName}</strong></span>
+                    </div>
+                  </div>
+
+                  <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                      <span>Progress</span>
+                      <span style={{ color: '#1a73e8' }}>{proj.progress}%</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${proj.progress}%`, height: '100%', background: '#1a73e8', borderRadius: '4px', transition: 'width 0.3s ease' }}></div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Budget</span>
+                      <strong style={{ fontSize: '0.95rem', color: '#10b981', fontWeight: 800 }}>{formatINR(proj.budget)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Due Date</span>
+                      <strong style={{ fontSize: '0.875rem', color: '#0f172a', fontWeight: 700 }}>{proj.dueDate}</strong>
+                    </div>
+                    <Link to="/client/dashboard/my-projects" style={{ padding: '8px 18px', background: '#1a73e8', color: '#ffffff', borderRadius: '30px', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      View Project
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* TWO COLUMN GRID FOR RECENT PROPOSALS & HIRED FREELANCERS */}
+        <div className="grid-responsive-2" style={{ gap: '24px', marginBottom: '28px' }}>
+
+          {/* 4. RECENT PROPOSALS */}
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '22px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileText size={18} color="#1a73e8" /> Recent Proposals
+              </h3>
+              <Link to="/client/dashboard/proposals" style={{ color: '#1a73e8', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none' }}>
+                View All
+              </Link>
+            </div>
+
+            {recentProposals.length === 0 ? (
+              <div style={{ padding: '28px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                <FileText size={28} color="#94a3b8" style={{ marginBottom: '6px' }} />
+                <h4 style={{ margin: '0 0 4px', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>No Proposals Received Yet</h4>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Proposals submitted by freelancers for your projects will appear here.</span>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
-                <AreaChart data={profileData.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorSpending" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#1a73e8" stopOpacity={0.7} />
-                      <stop offset="95%" stopColor="#1a73e8" stopOpacity={0.05} />
-                    </linearGradient>
-                    <linearGradient id="colorMilestones" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.7} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatINR(val)} />
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      formatINR(value),
-                      name === 'projectSpending' ? 'Monthly Project Spending' : 'Milestone Payments'
-                    ]}
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}
-                  />
-                  <Area type="monotone" dataKey="projectSpending" stroke="#1a73e8" strokeWidth={2} fillOpacity={1} fill="url(#colorSpending)" />
-                  <Area type="monotone" dataKey="milestonePayments" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorMilestones)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {recentProposals.map(prop => (
+                  <div key={prop.id} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <img src={prop.freelancerAvatar} alt={prop.freelancerName} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{prop.freelancerName}</h4>
+                          <span style={{ fontSize: '0.75rem', color: '#eab308', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            ★ {prop.rating}
+                          </span>
+                        </div>
+                      </div>
+                      <strong style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 800 }}>Proposed: {formatINR(prop.proposedPrice)}</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                      {prop.skills.map((skill, idx) => (
+                        <span key={idx} style={{ padding: '2px 8px', background: '#e8f0fe', color: '#1a73e8', borderRadius: '12px', fontSize: '11px', fontWeight: 700 }}>
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
+                      <Link to="/client/dashboard/proposals" style={{ padding: '5px 12px', background: '#f1f5f9', color: '#475569', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none' }}>
+                        View Proposal
+                      </Link>
+                      <button onClick={() => handleAcceptProposal(prop.id, prop.freelancerName)} style={{ padding: '5px 14px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                        Accept
+                      </button>
+                      <button onClick={() => handleRejectProposal(prop.id)} style={{ padding: '5px 10px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Recent Transactions Section */}
-        <div className="recent-payments-section" style={{ gridColumn: '1 / -1' }}>
-          <div className="recent-payments-header">
-            <div>
-              <h2 className="recent-payments-title">Recent Transactions & Milestones</h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0' }}>
-                Latest transactions and milestone approvals across your active contracts.
-              </p>
+          {/* 5. HIRED FREELANCERS */}
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '22px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={18} color="#10b981" /> Hired Freelancers
+              </h3>
+              <Link to="/client/dashboard/hired" style={{ color: '#1a73e8', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none' }}>
+                View Hired Hub
+              </Link>
             </div>
-            <a href="/client/dashboard/wallet" className="btn btn-outline" style={{ fontSize: '0.875rem', padding: '8px 16px', textDecoration: 'none' }}>
-              View All Payments
-            </a>
+
+            <div style={{ width: '100%', height: '280px', minWidth: 0, minHeight: '280px' }}>
+              {profileData.chartData.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc', color: '#64748b' }}>
+                  <TrendingUp size={36} color="#1a73e8" style={{ marginBottom: '8px' }} />
+                  <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontWeight: 800 }}>No Analytics Data Recorded</h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>Analytics will generate automatically once you post a project and fund milestone escrow.</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
+                  <AreaChart data={profileData.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorSpending" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1a73e8" stopOpacity={0.7} />
+                        <stop offset="95%" stopColor="#1a73e8" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="colorMilestones" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.7} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => formatINR(val)} />
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <Tooltip
+                      formatter={(value, name) => [
+                        formatINR(value),
+                        name === 'projectSpending' ? 'Monthly Project Spending' : 'Milestone Payments'
+                      ]}
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}
+                    />
+                    <Area type="monotone" dataKey="projectSpending" stroke="#1a73e8" strokeWidth={2} fillOpacity={1} fill="url(#colorSpending)" />
+                    <Area type="monotone" dataKey="milestonePayments" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorMilestones)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
 
-          <div className="payments-table-container">
-            {profileData.payments.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc' }}>
-                <FolderPlus size={38} color="#1a73e8" style={{ marginBottom: '10px' }} />
-                <h4 style={{ margin: '0 0 6px', color: '#0f172a', fontWeight: 800, fontSize: '1.05rem' }}>No Transactions Yet</h4>
-                <p style={{ margin: '0 0 16px', fontSize: '0.875rem' }}>Post your first project or deposit funds into your Escrow Vault to get started.</p>
-                <Link to="/client/dashboard/post-project" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.2rem', borderRadius: '30px', background: '#0f172a', color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '0.85rem' }}>
-                  <Plus size={15} /> Create Your First Project
-                </Link>
+        </div>
+
+        {/* 6. RECOMMENDED FREELANCERS (AI FEATURE - 8-FACTOR EXPLAINABLE SYSTEM) */}
+        <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '24px', marginBottom: '28px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 10px', background: '#f3e8fd', color: '#7c3aed', borderRadius: '20px', fontSize: '11px', fontWeight: 800, marginBottom: '4px' }}>
+                <Zap size={12} color="#7c3aed" /> AI Recommended for your projects
               </div>
-            ) : (
+              <Link to="/client/dashboard/wallet" className="pill-btn" style={{ fontSize: '0.85rem', padding: '6px 16px', textDecoration: 'none', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '30px', fontWeight: 700 }}>
+                View Wallet Vault
+              </Link>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Link
+                to={`/freelancer/${rf.id}`}
+                onClick={() => trackEvent(rf.id, 'profileViewed', rf.skills)}
+                style={{ flex: 1, padding: '7px', textAlign: 'center', background: '#ffffff', border: '1px solid #cbd5e1', color: '#334155', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none' }}
+              >
+                View Profile
+              </Link>
+              <Link
+                to="/client/dashboard/post-project"
+                onClick={() => trackEvent(rf.id, 'contacted', rf.skills)}
+                style={{ flex: 1, padding: '7px', textAlign: 'center', background: '#1a73e8', color: '#ffffff', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none' }}
+              >
+                Hire
+              </Link>
+            </div>
+          </div>
+            ))}
+        </div>
+        )}
+      </div>
+
+      {/* EXPLAINABILITY MODAL (PDF Section 14) */ }
+    {
+      selectedExplainability && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#ffffff', borderRadius: '18px', maxWidth: '540px', width: '100%', padding: '26px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button
+              onClick={() => setSelectedExplainability(null)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <img src={selectedExplainability.avatar} alt={selectedExplainability.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>{selectedExplainability.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, padding: '2px 8px', background: '#f3e8fd', color: '#7c3aed', borderRadius: '12px' }}>
+                    ⚡ {selectedExplainability.matchPercent}% Match
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>
+                    Match Confidence: {selectedExplainability.confidence || 'High'}
+                  </span>
+                </div>
+              </div>
+              ) : (
               <table className="payments-table">
                 <thead>
                   <tr>
@@ -297,9 +511,38 @@ export default function ClientOverview() {
                 </tbody>
               </table>
             )}
+            </div>
           </div>
+      )}
+
+
+          {/* 7. RECENT ACTIVITY */}
+          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '22px' }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={18} color="#64748b" /> Recent Activity Log
+            </h3>
+
+            {recentActivities.length === 0 ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+                <Clock size={24} color="#94a3b8" style={{ marginBottom: '4px' }} />
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>No recent activity recorded yet.</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {recentActivities.map(act => (
+                  <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: act.type === 'proposal' ? '#1a73e8' : act.type === 'update' ? '#10b981' : act.type === 'payment' ? '#7c3aed' : '#f59e0b' }}></div>
+                      <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>{act.text}</span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>{act.time}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
-      </div>
-    </div>
-  );
-}
+      );
+    }
+

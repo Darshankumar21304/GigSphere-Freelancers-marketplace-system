@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   Filter,
   Search,
@@ -17,8 +18,7 @@ import {
   Send,
   DollarSign
 } from 'lucide-react';
-import { apiFetch } from '../utils/api';
-import './BrowseProjects.css';
+import './BrowseProjects.css'; // Reusing the same CSS for consistent layout
 
 const MOCK_SKILLS = [
   'All Skills',
@@ -160,21 +160,12 @@ export default function Freelancers() {
   const [sortOption, setSortOption] = useState('Best Match');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Hire Modal State
-  const [hireModalFreelancer, setHireModalFreelancer] = useState(null);
-  const [inviteMessage, setInviteMessage] = useState('');
-  const [offerBudget, setOfferBudget] = useState('');
-
-  // Fetch freelancers from backend API with fallback
+  // Fetch freelancers from backend
   useEffect(() => {
     const fetchFreelancers = async () => {
       try {
-        const data = await apiFetch('/users/freelancers');
-        if (Array.isArray(data) && data.length > 0) {
-          setFreelancers(data);
-        } else {
-          setFreelancers(DEFAULT_FREELANCERS);
-        }
+        const response = await axios.get('http://localhost:5001/api/users/freelancers');
+        setFreelancers(response.data);
       } catch (error) {
         console.warn('Backend API fetch for freelancers fell back to default feed:', error);
         setFreelancers(DEFAULT_FREELANCERS);
@@ -184,6 +175,8 @@ export default function Freelancers() {
     };
     fetchFreelancers();
   }, []);
+
+
 
   const toggleSave = (e, id) => {
     e.preventDefault();
@@ -439,23 +432,26 @@ export default function Freelancers() {
                 <div className={`projects-grid ${viewMode === 'list' ? 'list-view' : ''}`}>
                   {freelancers.map(freelancer => (
                     <div key={freelancer._id} className="project-card">
-                      
-                      <div className="card-header" style={{alignItems: 'center'}}>
-                        <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
-                          <img src={freelancer.avatar || 'https://via.placeholder.com/150'} alt={freelancer.name} style={{width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover'}} />
+
+                      <div className="card-header" style={{ alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                          <img src={freelancer.avatar || 'https://i.pravatar.cc/150'} alt={freelancer.name} style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }} />
                           <div>
-                            <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none'}}>
-                              <h3 className="project-title" style={{marginBottom: '4px'}}>{freelancer.name}</h3>
-                            </Link>
-                            <p style={{margin: 0, fontSize: '14px', color: 'var(--text-main)', fontWeight: 500}}>{(freelancer.profile && freelancer.profile.title) || 'Freelancer'}</p>
-                            <div className="client-info" style={{marginTop: '4px'}}>
-                              <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                            <div style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <h3 className="project-title" style={{ marginBottom: 0 }}>{freelancer.name}</h3>
+                              {freelancer.kycStatus === 'Verified' && (
+                                <CheckCircle size={14} color="#10b981" fill="#dcfce7" title="Verified Freelancer" />
+                              )}
+                            </div>
+                            <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-main)', fontWeight: 500, marginTop: '4px' }}>{(freelancer.profile && freelancer.profile.title) || 'Freelancer'}</p>
+                            <div className="client-info" style={{ marginTop: '4px' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <MapPin size={14} /> Remote
                               </span>
                             </div>
                           </div>
                         </div>
-                        <button 
+                        <button
                           className={`bookmark-icon-btn ${freelancer.saved ? 'saved' : ''}`}
                           onClick={(e) => toggleSave(e, freelancer._id)}
                         >
@@ -463,148 +459,69 @@ export default function Freelancers() {
                         </button>
                       </div>
 
-                          <div className="project-meta-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', padding: '10px 12px', marginTop: '12px'}}>
-                            <div className="meta-item">
-                              <span className="meta-label">Hourly Rate</span>
-                              <span className="meta-value" style={{fontWeight: 700, color: 'var(--text-main)'}}>{rateDisplay}</span>
-                            </div>
-                            <div className="meta-item">
-                              <span className="meta-label">Success Rate</span>
-                              <span className="meta-value" style={{color: '#16a34a', fontWeight: 600}}>{profile.jobSuccess || '99%'}</span>
-                            </div>
-                            <div className="meta-item">
-                              <span className="meta-label">Total Earned</span>
-                              <span className="meta-value">{profile.totalEarned || '₹5L+'}</span>
-                            </div>
-                            <div className="meta-item">
-                              <span className="meta-label">Rating</span>
-                              <span className="meta-value" style={{display: 'flex', alignItems: 'center', gap: '3px', color: '#eab308', fontWeight: 700}}>
-                                <Star size={13} fill="#eab308" color="#eab308" /> {profile.rating || '5.0'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <p className="project-desc" style={{ marginTop: '12px', fontSize: '13px', lineHeight: '1.5' }}>
-                            {profile.bio || 'Experienced software professional dedicated to delivering high quality code and clean UX design.'}
-                          </p>
-                          
-                          <div className="skills-container" style={{ marginTop: '12px' }}>
-                            {profile.skills 
-                              ? profile.skills.split(',').map(skill => (
-                                  <span key={skill} className="skill-chip">{skill.trim()}</span>
-                                ))
-                              : <span className="skill-chip">React</span>
-                            }
-                          </div>
+                      <div className="project-meta-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', padding: '10px 12px', marginTop: '12px' }}>
+                        <div className="meta-item">
+                          <span className="meta-label">Hourly Rate</span>
+                          <span className="meta-value" style={{ fontWeight: 700, color: 'var(--text-main)' }}>{rateDisplay}</span>
                         </div>
-
-                        <div className="card-footer" style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-                          <div className="card-actions" style={{width: '100%', justifyContent: 'space-between', alignItems: 'center'}}>
-                            <Link to={`/freelancer/${freelancer._id}`} style={{textDecoration: 'none'}}>
-                              <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }}>View Profile</button>
-                            </Link>
-                            <button 
-                              className="btn-primary" 
-                              onClick={() => setHireModalFreelancer(freelancer)}
-                              style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
-                              <Send size={14} /> Hire / Invite
-                            </button>
-                          </div>
+                        <div className="meta-item">
+                          <span className="meta-label">Success Rate</span>
+                          <span className="meta-value" style={{ color: '#16a34a', fontWeight: 600 }}>{profile.jobSuccess || '99%'}</span>
                         </div>
-                        
+                        <div className="meta-item">
+                          <span className="meta-label">Total Earned</span>
+                          <span className="meta-value">{profile.totalEarned || '₹5L+'}</span>
+                        </div>
+                        <div className="meta-item">
+                          <span className="meta-label">Rating</span>
+                          <span className="meta-value" style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#eab308', fontWeight: 700 }}>
+                            <Star size={13} fill="#eab308" color="#eab308" /> {profile.rating || '5.0'}
+                          </span>
+                        </div>
                       </div>
-                );
-                  })}
-              </div>
 
-            {/* Pagination */}
-            <div className="pagination">
+                      <p className="project-desc">{(freelancer.profile && freelancer.profile.bio) || 'Ready to work on amazing projects.'}</p>
+
+                      <div className="skills-container">
+                        {(freelancer.profile && freelancer.profile.skills && freelancer.profile.skills.split(','))?.map(skill => (
+                          <span key={skill} className="skill-chip">{skill.trim()}</span>
+                        )) || <span className="skill-chip">General</span>}
+                      </div>
+
+                      <div className="card-footer">
+                        <div className="card-actions" style={{ width: '100%', justifyContent: 'flex-end' }}>
+                          <Link to={`/freelancer/${freelancer._id}`} style={{ textDecoration: 'none' }}>
+                            <button className="btn-secondary">View Profile</button>
+                          </Link>
+                          <button className="btn-primary" onClick={() => navigate('/client/dashboard/create-project')}>Hire Talent</button>
+                        </div>
+
+                      </div>
+                      );
+                  })}
+                    </div>
+
+            {/* Pagination */ }
+                    < div className = "pagination" >
               <button className="page-btn" disabled><ChevronLeft size={18} /></button>
               <button className="page-btn active">1</button>
               <button className="page-btn">2</button>
               <button className="page-btn"><ChevronRight size={18} /></button>
             </div>
-          </>
-          ) : (
-          <div className="empty-state">
-            <Users className="empty-icon" size={48} />
-            <h3 className="empty-title">No freelancers found</h3>
-            <p className="empty-desc">We couldn't find any talent matching your current search or filter criteria. Try adjusting your keywords.</p>
-            <button className="btn-secondary" onClick={clearFilters}>Clear All Filters</button>
-          </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <Users className="empty-icon" size={48} />
+                <h3 className="empty-title">No freelancers found</h3>
+                <p className="empty-desc">We couldn't find any talent matching your current search or filter criteria. Try adjusting your keywords.</p>
+                <button className="btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+              </div>
             )}
 
-        </main>
-      </div>
-    </div>
-
-      {/* Hire / Send Offer Modal */ }
-  {
-    hireModalFreelancer && (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-        <div style={{ backgroundColor: 'var(--bg-surface, #fff)', borderRadius: '16px', width: '100%', maxWidth: '520px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color, #e5e7eb)', paddingBottom: '12px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: 'var(--text-main, #111)' }}>
-              Invite / Hire {hireModalFreelancer.name}
-            </h2>
-            <button onClick={() => setHireModalFreelancer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', background: 'var(--bg-body, #f8fafc)', padding: '12px', borderRadius: '10px' }}>
-            <img src={hireModalFreelancer.avatar} alt={hireModalFreelancer.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
-            <div>
-              <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-main)' }}>{hireModalFreelancer.name}</h4>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--primary)', fontWeight: 500 }}>{hireModalFreelancer.profile?.title}</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSendInvite}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-main)' }}>Offered Budget / Project Value (₹)</label>
-              <input
-                type="number"
-                required
-                placeholder="e.g. 50000"
-                value={offerBudget}
-                onChange={(e) => setOfferBudget(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #d1d5db)', background: 'var(--bg-surface)' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-main)' }}>Message to Freelancer</label>
-              <textarea
-                required
-                rows="4"
-                placeholder="Describe your project, timeline, and why you would like to hire them..."
-                value={inviteMessage}
-                onChange={(e) => setInviteMessage(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #d1d5db)', background: 'var(--bg-surface)', resize: 'vertical' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setHireModalFreelancer(null)}
-                style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', fontWeight: '500' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'var(--primary, #2563eb)', color: '#fff', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Send size={16} /> Send Invitation & Offer
-              </button>
-            </div>
-          </form>
+          </main>
         </div>
       </div>
-    )
-  }
-    </div >
+    </div>
   );
 }
 

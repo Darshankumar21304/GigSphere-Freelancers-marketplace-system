@@ -185,3 +185,18 @@
 .history-amount.negative {
   color: var(--text-primary);
 }
+
+@media (max-width: 768px) {
+  .wallet-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .wallet-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .balance-card {
+    padding: 20px;
+  }
+}

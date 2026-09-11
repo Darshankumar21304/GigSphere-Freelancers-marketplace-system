@@ -1,5 +1,3 @@
-/* Executive Google Antigravity Admin Layout & Dashboard Styles */
-
 .admin-wrapper {
   display: flex;
   min-height: 100vh;
@@ -8,6 +6,88 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   padding: 0.75rem;
   gap: 1rem;
+  box-sizing: border-box;
+}
+
+/* Mobile Sidebar Overlay */
+.admin-sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 999;
+  backdrop-filter: blur(4px);
+}
+
+.admin-mobile-header {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-toggle-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.admin-mobile-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.admin-mobile-close {
+  display: none;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+}
+
+@media (max-width: 992px) {
+  .admin-wrapper {
+    flex-direction: column;
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  .admin-mobile-header {
+    display: flex;
+  }
+  .admin-mobile-close {
+    display: block;
+  }
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 260px;
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    border-radius: 0;
+  }
+  .admin-sidebar.open {
+    left: 0;
+  }
+  .admin-content {
+    padding: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 /* Executive Sidebar */
@@ -285,3 +365,27 @@
   border-color: #1a73e8;
   box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
 }
+
+.action-card-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: #93c5fd !important;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.08);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+

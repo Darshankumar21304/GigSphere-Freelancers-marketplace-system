@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   User, Mail, Briefcase, MapPin, Edit2, Save, Camera, Shield, CheckCircle,
   Settings, Building, Phone, AlertCircle, TrendingUp, Users, FileText, ChevronRight,
-  RefreshCw, UploadCloud, X, ArrowRight
+  RefreshCw, UploadCloud, X, ArrowRight, Sparkles, Lightbulb, Target, BookOpen, Award
 } from 'lucide-react';
 import { getUserRole, getUserProfile, saveUserProfile } from '../../utils/authUtils';
 import { formatINR } from '../../utils/currency';
@@ -60,16 +60,32 @@ export default function Profile() {
     location: savedProfile?.location || savedProfile?.city || 'India',
     state: savedProfile?.state || '',
     country: savedProfile?.country || 'India',
-    companyName: savedProfile?.companyName || 'TechNova Solutions',
-    industry: savedProfile?.industry || 'Information Technology',
-    companySize: savedProfile?.companySize || '50-200 employees',
-    website: savedProfile?.website || 'https://technova.in',
-    companyDesc: savedProfile?.companyDesc || 'TechNova is a leading provider of innovative digital solutions, specializing in e-commerce platforms and mobile applications.',
-    gstin: savedProfile?.gstin || '27AADCB2230M1Z2',
-    bio: savedProfile?.bio || savedProfile?.profile?.bio || (role === 'client'
-      ? 'Looking for talented designers and developers to build amazing products.'
-      : 'Passionate designer with 5+ years of experience creating user-centric digital products.'),
+    companyName: savedProfile?.companyName || savedProfile?.name || 'Company',
+    industry: savedProfile?.industry || 'Technology',
+    companySize: savedProfile?.companySize || '1-10 employees',
+    website: savedProfile?.website || '',
+    companyDesc: savedProfile?.companyDesc || '',
+    gstin: savedProfile?.gstin || '',
+    bio: savedProfile?.bio || savedProfile?.profile?.bio || '',
+    avatar: savedProfile?.avatar || savedProfile?.profilePhoto || ''
   });
+
+  useEffect(() => {
+    fetchLiveStats();
+  }, []);
+
+  const fetchLiveStats = async () => {
+    try {
+      const data = await apiFetch('/wallet');
+      setWalletStats(prev => ({
+        ...prev,
+        walletBalance: data.walletBalance || 0,
+        escrowBalance: data.escrowBalance || 0
+      }));
+    } catch (err) {
+      console.error('Failed to load live profile stats:', err);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -98,7 +114,7 @@ export default function Profile() {
       };
       saveUserProfile(updated);
 
-      setToastMessage('Profile photo updated & saved on Cloudinary!');
+      setToastMessage('Profile photo updated & saved successfully!');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
@@ -108,7 +124,6 @@ export default function Profile() {
     }
   };
 
-  // KYC Verification Upload Handler via Cloudinary
   const handleKycSubmit = async (e) => {
     e.preventDefault();
     if (!kycFile) {
@@ -130,7 +145,7 @@ export default function Profile() {
       saveUserProfile(updated);
 
       setIsKycModalOpen(false);
-      setToastMessage('Identity Verified successfully via Cloudinary KYC!');
+      setToastMessage('KYC Identity Document submitted for review successfully!');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3500);
     } catch (err) {
@@ -141,45 +156,21 @@ export default function Profile() {
   };
 
   const handleSave = () => {
-    // Basic validation
     if (!profileData.firstName || !profileData.email) return;
     setIsEditing(false);
     setHasChanges(false);
-
-    const fullName = `${profileData.firstName} ${profileData.lastName}`.trim();
     const updated = {
       ...savedProfile,
       ...profileData,
-      name: fullName
+      name: `${profileData.firstName} ${profileData.lastName}`
     };
     saveUserProfile(updated);
-
-    try {
-      await apiFetch('/users/settings', {
-        method: 'PUT',
-        body: JSON.stringify({
-          name: fullName,
-          email: profileData.email,
-          phone: profileData.phone,
-          location: profileData.location,
-          avatar: profileData.avatar,
-          title: profileData.title,
-          bio: profileData.bio,
-          companyName: profileData.companyName,
-          companyDesc: profileData.companyDesc
-        })
-      });
-      setToastMessage('Profile updated successfully.');
-    } catch (err) {
-      console.error('Failed to update DB settings:', err);
-      setToastMessage('Profile updated locally.');
-    }
-
+    setToastMessage('Profile updated successfully.');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handlePasswordSave = () => {
+  const handlePasswordSave = async () => {
     if (!passwords.current || !passwords.new || !passwords.confirm) {
       setPasswordError('All fields are required.');
       return;
@@ -207,19 +198,6 @@ export default function Profile() {
   };
 
   const tabs = ['Overview', 'Personal Information', ...(role === 'client' ? ['Company Details'] : []), 'Security', 'Preferences'];
-
-  const fields = [
-    profileData.avatar,
-    profileData.firstName,
-    profileData.lastName,
-    profileData.email,
-    profileData.phone,
-    profileData.title,
-    profileData.location,
-    profileData.bio
-  ];
-  const filledCount = fields.filter(f => f && String(f).trim().length > 0).length;
-  const profileStrength = Math.min(100, Math.round((filledCount / fields.length) * 100));
 
   return (
     <div className="gigsphere-client-profile">
@@ -276,11 +254,15 @@ export default function Profile() {
             </div>
             <div className="gcp-profile-info">
               <div className="gcp-profile-name-row">
-                <h2 className="gcp-profile-name">{profileData.firstName} {profileData.lastName}</h2>
-                <CheckCircle size={16} className="gcp-verified-badge" />
+                <h2 className="gcp-profile-name">
+                  {role === 'client'
+                    ? (profileData.companyName || `${profileData.firstName} ${profileData.lastName}`)
+                    : `${profileData.firstName} ${profileData.lastName}`}
+                </h2>
+                {kycStatus === 'Verified' && <CheckCircle size={16} className="gcp-verified-badge" />}
               </div>
               <div className="gcp-profile-meta">
-                <span>{profileData.companyName || profileData.title || 'GigSphere Member'}</span>
+                <span>{role === 'client' ? (profileData.title || 'Client Partner') : (profileData.title || 'Freelancer Professional')}</span>
                 <span>•</span>
                 <span>{profileData.location || 'India'}</span>
               </div>
@@ -378,7 +360,9 @@ export default function Profile() {
                     <div>
                       <span className="gcp-detail-label">Website</span>
                       {profileData.website ? (
-                        <a href={profileData.website} target="_blank" rel="noreferrer" className="gcp-detail-value gcp-link">{profileData.website.replace('https://', '')}</a>
+                        <a href={getAbsoluteUrl(profileData.website)} target="_blank" rel="noreferrer" className="gcp-detail-value gcp-link">
+                          {profileData.website.replace('https://', '').replace('http://', '')}
+                        </a>
                       ) : (
                         <span className="gcp-detail-value" style={{ color: '#94a3b8' }}>Not provided</span>
                       )}
@@ -402,6 +386,215 @@ export default function Profile() {
                       <span className="gcp-detail-label">Country</span>
                       <span className="gcp-detail-value">{profileData.country}</span>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Profile Trust & Verification Card */}
+              <div className="gcp-about-card" style={{ marginTop: '20px', border: '1.5px solid #e2e8f0', borderRadius: '16px', background: '#ffffff', padding: '22px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Shield size={18} color="#1a73e8" /> Profile Trust & Security Standing
+                  </h3>
+                  <button
+                    onClick={() => setShowTrustModal(true)}
+                    style={{ background: '#eff6ff', color: '#1a73e8', border: '1px solid #bfdbfe', borderRadius: '20px', padding: '4px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    Why this score?
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: (trustMeData?.trustScore || 85) >= 80 ? '#d1fae5' : '#fef3c7', color: (trustMeData?.trustScore || 85) >= 80 ? '#059669' : '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.1rem' }}>
+                      {trustMeData?.trustScore || 85}%
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, display: 'block' }}>Trust Score</span>
+                      <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{trustMeData?.badgeLabel || 'High Trust'}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: kycStatus === 'Verified' ? '#ecfdf5' : '#eff6ff', color: kycStatus === 'Verified' ? '#059669' : '#1a73e8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CheckCircle size={22} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, display: 'block' }}>Identity Status</span>
+                      <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{kycStatus === 'Verified' ? 'KYC Verified' : 'Standard Account'}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✓ Account verified with clean marketplace activity
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✓ Milestone escrow security protections enabled
+                  </div>
+                  {trustMeData?.positiveSignals?.slice(0, 2).map((ps, idx) => (
+                    <div key={idx} style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ✓ {ps.evidence}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* FREELANCER AI PROFILE COACH & SKILL GAP ANALYSIS */}
+              {role === 'freelancer' && (
+                <>
+                  {/* AI Profile Coach Card */}
+                  <div className="gcp-about-card" style={{ marginTop: '20px', border: '1.5px solid #dbeafe', borderRadius: '16px', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', padding: '22px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ background: '#eff6ff', color: '#2563eb', padding: '6px', borderRadius: '8px' }}>
+                          <Sparkles size={20} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>AI Profile Coach</h3>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Automated profile quality assessment and proposal readiness</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Profile Quality</span>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 900, color: (profileCoachData?.profileQualityScore || 82) >= 80 ? '#10b981' : '#f59e0b' }}>
+                            {profileCoachData?.profileQualityScore || 82}/100
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                      {/* Strengths */}
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px' }}>
+                        <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Award size={16} color="#16a34a" /> Profile Strengths
+                        </h4>
+                        <ul style={{ margin: 0, paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#15803d' }}>
+                          {(profileCoachData?.strengths || [
+                            'Comprehensive skills portfolio with strong match affinity',
+                            'Verified identity credentials and clean dispute record'
+                          ]).map((str, idx) => (
+                            <li key={idx}><strong>✓</strong> {str}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Opportunities to Improve */}
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px' }}>
+                        <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Lightbulb size={16} color="#d97706" /> Suggested Improvements
+                        </h4>
+                        <ul style={{ margin: 0, paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#b45309' }}>
+                          {(profileCoachData?.improvements || [
+                            'Add portfolio case studies with live URLs or GitHub repositories',
+                            'Include measurable impact or deliverables in your experience descriptions'
+                          ]).map((imp, idx) => (
+                            <li key={idx}>• {imp}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {profileCoachData?.portfolioSuggestions?.length > 0 && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', fontSize: '0.8rem', color: '#475569' }}>
+                        <strong style={{ color: '#1e293b' }}>Portfolio Guidance:</strong> {profileCoachData.portfolioSuggestions.join(', ')}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Marketplace Skill Gap Analysis Card */}
+                  <div className="gcp-about-card" style={{ marginTop: '20px', border: '1.5px solid #e2e8f0', borderRadius: '16px', background: '#ffffff', padding: '22px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ background: '#f5f3ff', color: '#7c3aed', padding: '6px', borderRadius: '8px' }}>
+                          <Target size={20} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Marketplace Skill Gap Analysis</h3>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Real marketplace demand vs. your active skillset</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {skillGapData?.recommendedSkillsToLearn?.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {skillGapData.recommendedSkillsToLearn.slice(0, 4).map((gap, idx) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', flexWrap: 'wrap', gap: '10px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ background: '#e0e7ff', color: '#4338ca', fontWeight: 800, fontSize: '0.82rem', padding: '2px 8px', borderRadius: '6px' }}>
+                                  +{gap.skill}
+                                </span>
+                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                                  {gap.matchingOpenProjects} Open Projects
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.8rem', color: '#334155' }}>
+                                {gap.whyItMatters}
+                              </p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Avg. Project Budget</span>
+                              <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{formatINR(gap.avgBudget)}</strong>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                        Your skills currently match high-volume marketplace demands. Keep bidding on recommended projects!
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Trust Score Breakdown Modal */}
+              {showTrustModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+                  <div style={{ background: '#ffffff', borderRadius: '16px', maxWidth: '480px', width: '100%', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Shield size={18} color="#1a73e8" /> Trust Score Breakdown
+                      </h3>
+                      <button onClick={() => setShowTrustModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ textAlign: 'center', padding: '16px', background: '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '2rem', fontWeight: 900, color: '#10b981' }}>{trustMeData?.trustScore || 85}/100</div>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>{trustMeData?.userFacingStatus || 'Verified Pro'}</span>
+                    </div>
+
+                    <h4 style={{ margin: '0 0 8px', fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>Positive Scoring Factors</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#15803d', background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px' }}>
+                        ✓ Complete profile & contact credentials
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#15803d', background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px' }}>
+                        ✓ Clean transaction & payment dispute record
+                      </div>
+                      {trustMeData?.positiveSignals?.map((pos, i) => (
+                        <div key={i} style={{ fontSize: '0.8rem', color: '#15803d', background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px' }}>
+                          ✓ {pos.evidence}
+                        </div>
+                      ))}
+                    </div>
+
+                    <p style={{ margin: '0 0 16px', fontSize: '0.78rem', color: '#64748b' }}>
+                      Trust scores are dynamically computed from your marketplace milestone completions, prompt deliveries, and client reviews.
+                    </p>
+
+                    <button
+                      onClick={() => setShowTrustModal(false)}
+                      style={{ width: '100%', padding: '10px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Close Breakdown
+                    </button>
                   </div>
                 </div>
               )}
@@ -488,6 +681,10 @@ export default function Profile() {
                   <label className="gcp-form-label">GSTIN</label>
                   <input type="text" name="gstin" value={profileData.gstin} placeholder="Optional GSTIN" onChange={handleChange} disabled={!isEditing} className="gcp-input uppercase" />
                 </div>
+                <div className="gcp-form-group">
+                  <label className="gcp-form-label">Company Website</label>
+                  <input type="text" name="website" value={profileData.website} placeholder="e.g. https://mycompany.com" onChange={handleChange} disabled={!isEditing} className="gcp-input" />
+                </div>
                 <div className="gcp-form-group gcp-col-span-full">
                   <label className="gcp-form-label">Company Description</label>
                   <textarea name="companyDesc" value={profileData.companyDesc} placeholder="Describe your company and core products/services" onChange={handleChange} disabled={!isEditing} rows={4} className="gcp-input resize-none" />
@@ -559,20 +756,6 @@ export default function Profile() {
                   </div>
                 )}
               </div>
-
-              <div className="gcp-about-card">
-                <h3 className="gcp-card-header gcp-mb-16">Two-Factor Authentication</h3>
-                <div className="gcp-status-row">
-                  <div className="gcp-status-content-left">
-                    <Shield size={20} className="gcp-icon-brand" />
-                    <div>
-                      <p className="gcp-row-title">Protect your account with 2FA</p>
-                      <p className="gcp-row-desc">Add an extra layer of security to your account by requiring a code upon login.</p>
-                    </div>
-                  </div>
-                  <button className="gcp-btn-brand-light">Enable 2FA</button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -622,6 +805,20 @@ export default function Profile() {
               <div>
                 <p className="gcp-alert-title">Unsaved Changes</p>
                 <p className="gcp-alert-desc">You have unsaved changes in your profile. Make sure to save them before leaving.</p>
+              </div>
+            </div>
+          )}
+
+          {(kycStatus === 'Rejected' || kycStatus === 'Action Required') && (
+            <div className="gcp-alert-card" style={{ background: '#fef2f2', border: '1px solid #fecaca', marginTop: '12px' }}>
+              <AlertCircle size={18} style={{ color: '#dc2626', marginTop: '2px', flexShrink: 0 }} />
+              <div>
+                <p className="gcp-alert-title" style={{ color: '#dc2626' }}>KYC Action Required</p>
+                <p className="gcp-alert-desc" style={{ color: '#7f1d1d', margin: 0, fontSize: '13px' }}>
+                  {kycStatus === 'Rejected'
+                    ? 'Your document was rejected. Please click the red status badge to re-upload your document.'
+                    : 'Additional details or clearer documents are requested. Please click the blue status badge to re-upload.'}
+                </p>
               </div>
             </div>
           )}

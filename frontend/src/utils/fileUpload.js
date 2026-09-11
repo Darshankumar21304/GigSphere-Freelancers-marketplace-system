@@ -2,7 +2,8 @@ import { getToken } from './authUtils';
 
 const SIZE_LIMITS = {
   IMAGE: 10 * 1024 * 1024,     // 10 MB
-  DOCUMENT: 15 * 1024 * 1024,  // 15 MB
+  DOCUMENT: 25 * 1024 * 1024,  // 25 MB
+  ARCHIVE: 50 * 1024 * 1024,   // 50 MB for ZIP/RAR/Code bundles
   VIDEO: 50 * 1024 * 1024     // 50 MB
 };
 
@@ -14,6 +15,15 @@ const SIZE_LIMITS = {
  */
 export async function uploadFileToCloudinary(file, endpoint = '/api/upload/single') {
   if (!file) throw new Error('No file selected');
+
+  let apiEndpoint = endpoint;
+  if (!apiEndpoint || typeof apiEndpoint !== 'string' || !apiEndpoint.startsWith('/')) {
+    if (typeof apiEndpoint === 'string' && apiEndpoint.includes('avatar')) {
+      apiEndpoint = '/api/upload/avatar';
+    } else {
+      apiEndpoint = '/api/upload/single';
+    }
+  }
 
   const mime = file.type;
   const isImage = mime.startsWith('image/');
@@ -34,7 +44,7 @@ export async function uploadFileToCloudinary(file, endpoint = '/api/upload/singl
   }
 
   const formData = new FormData();
-  const fieldName = endpoint.includes('avatar') ? 'avatar' : 'file';
+  const fieldName = apiEndpoint.includes('avatar') ? 'avatar' : 'file';
   formData.append(fieldName, file);
 
   const token = getToken();
@@ -43,7 +53,7 @@ export async function uploadFileToCloudinary(file, endpoint = '/api/upload/singl
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`http://localhost:5001${endpoint}`, {
+  const response = await fetch(`http://localhost:5001${apiEndpoint}`, {
     method: 'POST',
     headers,
     body: formData

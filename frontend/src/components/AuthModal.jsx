@@ -49,6 +49,23 @@ export default function AuthModal({ isOpen, onClose }) {
     }
   };
 
+  // Parse JWT token from Google Identity Services
+  const parseJwt = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window.atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
   // Google SSO Handler
   const handleGoogleAuth = async () => {
     setErrorMsg(null);
@@ -61,11 +78,19 @@ export default function AuthModal({ isOpen, onClose }) {
         client_id: googleClientId,
         callback: async (response) => {
           try {
+            const decoded = parseJwt(response.credential);
+            const userEmail = decoded?.email;
+            const userName = decoded?.name || 'Google User';
+
+            if (!userEmail) {
+              throw new Error('Unable to retrieve email from Google Account.');
+            }
+
             const res = await apiFetch('/auth/google', {
               method: 'POST',
               body: JSON.stringify({
-                email: 'google.user@gigsphere.com',
-                name: 'Google Authenticated User',
+                email: userEmail,
+                name: userName,
                 role: 'client'
               })
             });
@@ -74,35 +99,17 @@ export default function AuthModal({ isOpen, onClose }) {
             onClose();
             navigate(`/${res.user.role}/dashboard`);
           } catch (err) {
-            loginUser('client', 'google_jwt_sso_token', { name: 'Google User', email: 'user@google.com', role: 'client' });
-            onClose();
-            navigate('/client/dashboard');
+            setErrorMsg(err.message || 'Google authentication failed. Please sign in with email & password.');
+          } finally {
+            setLoading(false);
           }
         }
       });
 
       window.google.accounts.id.prompt();
     } else {
-      try {
-        const res = await apiFetch('/auth/google', {
-          method: 'POST',
-          body: JSON.stringify({
-            email: 'google.user@gigsphere.com',
-            name: 'Google Authenticated User',
-            role: 'client'
-          })
-        });
-
-        loginUser(res.user.role, res.token, res.user);
-        onClose();
-        navigate(`/${res.user.role}/dashboard`);
-      } catch (err) {
-        loginUser('client', 'google_sso_token', { name: 'Google SSO User', email: 'user@google.com', role: 'client' });
-        onClose();
-        navigate('/client/dashboard');
-      } finally {
-        setLoading(false);
-      }
+      setErrorMsg('Google Sign-In is not initialized or blocked by browser settings. Please sign in using your email & password.');
+      setLoading(false);
     }
   };
 

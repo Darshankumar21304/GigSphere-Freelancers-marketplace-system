@@ -33,99 +33,99 @@ export default function AccountInfoStep({ formData, updateFormData, nextStep }) 
       <form onSubmit={handleNext} className="join-form">
         <div className="form-row">
           <div className="form-group">
-            <div className="input-with-icon join-input">
+            <label className="standard-label">Full Name</label>
+            <div className="input-with-icon join-input no-float">
               <User className="input-icon" size={20} />
               <input 
                 type="text" 
                 id="fullName" 
                 name="fullName"
-                placeholder=" "
+                placeholder="e.g. John Doe"
                 value={formData.fullName || ''}
                 onChange={handleChange}
                 required 
               />
-              <label htmlFor="fullName">Full Name</label>
             </div>
           </div>
           <div className="form-group">
-            <div className="input-with-icon join-input">
+            <label className="standard-label">Username</label>
+            <div className="input-with-icon join-input no-float">
               <User className="input-icon" size={20} />
               <input 
                 type="text" 
                 id="username" 
                 name="username"
-                placeholder=" "
+                placeholder="e.g. john_doe"
                 value={formData.username || ''}
                 onChange={handleChange}
                 required 
               />
-              <label htmlFor="username">Username</label>
             </div>
           </div>
         </div>
 
         <div className="form-group">
-          <div className="input-with-icon join-input">
+          <label className="standard-label">Email Address</label>
+          <div className="input-with-icon join-input no-float">
             <Mail className="input-icon" size={20} />
             <input 
               type="email" 
               id="email" 
               name="email"
-              placeholder=" "
+              placeholder="e.g. john@example.com"
               value={formData.email || ''}
               onChange={handleChange}
               required 
             />
-            <label htmlFor="email">Email Address</label>
           </div>
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <div className="input-with-icon join-input">
+            <label className="standard-label">Country</label>
+            <div className="input-with-icon join-input no-float">
               <Globe2 className="input-icon" size={20} />
               <input 
                 type="text" 
                 id="country" 
                 name="country"
-                placeholder=" "
+                placeholder="e.g. India"
                 value={formData.country || ''}
                 onChange={handleChange}
                 required 
               />
-              <label htmlFor="country">Country</label>
             </div>
           </div>
           <div className="form-group">
-            <div className="input-with-icon join-input">
+            <label className="standard-label">City / Location</label>
+            <div className="input-with-icon join-input no-float">
               <Globe2 className="input-icon" size={20} />
               <input 
                 type="text" 
                 id="location" 
                 name="location"
-                placeholder=" "
+                placeholder="e.g. Mumbai"
                 value={formData.location || ''}
                 onChange={handleChange}
                 required 
               />
-              <label htmlFor="location">City / Location</label>
             </div>
           </div>
         </div>
 
         <div className="form-group">
-          <div className="input-with-icon join-input">
+          <label className="standard-label">Password</label>
+          <div className="input-with-icon join-input no-float">
             <Lock className="input-icon" size={20} />
             <input 
               type={showPassword ? "text" : "password"} 
               id="password" 
               name="password"
-              placeholder=" "
+              placeholder="••••••••"
               value={formData.password || ''}
               onChange={handleChange}
               required 
             />
-            <label htmlFor="password">Password</label>
             <button 
               type="button" 
               className="password-toggle"
@@ -135,7 +135,7 @@ export default function AccountInfoStep({ formData, updateFormData, nextStep }) 
             </button>
           </div>
           
-          <div className="password-strength-container">
+          <div className="password-strength-container mt-2">
             <div className={`strength-bar ${strength >= 1 ? 'weak' : ''}`}></div>
             <div className={`strength-bar ${strength >= 2 ? 'medium' : ''}`}></div>
             <div className={`strength-bar ${strength >= 3 ? 'strong' : ''}`}></div>

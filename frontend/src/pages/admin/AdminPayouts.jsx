@@ -143,8 +143,11 @@ export default function AdminPayouts() {
                       <td style={{ fontWeight: 800, color: '#dc2626' }}>
                         {formatINR(Math.abs(w.amount))}
                       </td>
-                      <td style={{ fontSize: '0.8rem', color: '#334155' }}>
-                        {w.reference || (userObj.bankDetails?.upiId ? `UPI: ${userObj.bankDetails.upiId}` : 'Bank Transfer')}
+                      <td style={{ fontSize: '0.8rem', color: '#334155', maxWidth: '320px' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{w.paymentMethod}</span> <br/>
+                        <code style={{ fontSize: '0.725rem', color: '#475569', display: 'block', marginTop: '0.25rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', wordBreak: 'break-all' }}>
+                          {w.reference || 'Manual Payout Destination Pending'}
+                        </code>
                       </td>
                       <td style={{ fontSize: '0.75rem', color: '#64748b' }}>
                         {new Date(w.createdAt).toLocaleString()}

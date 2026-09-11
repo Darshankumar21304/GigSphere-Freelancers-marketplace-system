@@ -3,7 +3,7 @@ import {
   Download, 
   ArrowUpRight, 
   ArrowDownLeft, 
-  DollarSign, 
+  IndianRupee, 
   Briefcase, 
   Clock, 
   PlusCircle, 
@@ -40,6 +40,11 @@ export default function Wallet() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState('UPI');
   const [withdrawing, setWithdrawing] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [bankName, setBankName] = useState('');
 
   // Bank Details Form State
   const [bankForm, setBankForm] = useState({
@@ -62,6 +67,11 @@ export default function Wallet() {
       setWalletBalance(data.walletBalance || 0);
       setEscrowBalance(data.escrowBalance || 0);
       setBankDetails(data.bankDetails || {});
+      setUpiId(data.bankDetails?.upiId || '');
+      setAccountHolder(data.bankDetails?.accountHolder || '');
+      setAccountNumber(data.bankDetails?.accountNumber || '');
+      setIfscCode(data.bankDetails?.ifscCode || '');
+      setBankName(data.bankDetails?.bankName || '');
       setBankForm({
         accountHolder: data.bankDetails?.accountHolder || '',
         accountNumber: data.bankDetails?.accountNumber || '',
@@ -95,6 +105,7 @@ export default function Wallet() {
         currency: 'INR',
         name: 'GigSphere Marketplace',
         description: `Wallet Balance Deposit ₹${orderRes.amount}`,
+        order_id: orderRes.orderId,
         handler: async function (response) {
           try {
             const verifyRes = await apiFetch('/wallet/deposit/verify', {
@@ -102,7 +113,9 @@ export default function Wallet() {
               body: JSON.stringify({
                 transactionId: orderRes.transactionId,
                 razorpayPaymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-                razorpayOrderId: response.razorpay_order_id || orderRes.orderId
+                razorpayOrderId: response.razorpay_order_id || orderRes.orderId,
+                razorpaySignature: response.razorpay_signature,
+                amount: orderRes.amount
               })
             });
             setMsg(verifyRes.message);
@@ -115,18 +128,27 @@ export default function Wallet() {
             setDepositing(false);
           }
         },
+        modal: {
+          ondismiss: function () {
+            setDepositing(false);
+          }
+        },
         prefill: {
           name: bankForm.accountHolder || 'Client Account',
           email: 'user@gigsphere.com',
           contact: '9876543210'
         },
         theme: {
-          color: '#4f46e5'
+          color: '#1a73e8'
         }
       };
 
       if (window.Razorpay) {
         const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          alert('Payment Failed: ' + (response.error?.description || 'Transaction cancelled'));
+          setDepositing(false);
+        });
         rzp.open();
       } else {
         // Direct sandbox fallback
@@ -135,7 +157,8 @@ export default function Wallet() {
           body: JSON.stringify({
             transactionId: orderRes.transactionId,
             razorpayPaymentId: `pay_${Date.now()}`,
-            razorpayOrderId: orderRes.orderId
+            razorpayOrderId: orderRes.orderId,
+            amount: orderRes.amount
           })
         });
         setMsg(verifyRes.message);
@@ -162,7 +185,15 @@ export default function Wallet() {
     try {
       const res = await apiFetch('/wallet/withdraw', {
         method: 'POST',
-        body: JSON.stringify({ amount, payoutMethod: withdrawMethod })
+        body: JSON.stringify({ 
+          amount, 
+          payoutMethod: withdrawMethod,
+          upiId,
+          accountHolder,
+          accountNumber,
+          ifscCode,
+          bankName
+        })
       });
 
       setMsg(res.message);
@@ -224,12 +255,19 @@ export default function Wallet() {
       {/* Balances Grid */}
       <div className="wallet-balances">
         <div className="balance-card hover-lift" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#ffffff' }}>
-          <div className="balance-label" style={{ color: '#94a3b8' }}><DollarSign size={16} /> Available Wallet Balance</div>
+          <div className="balance-label" style={{ color: '#94a3b8' }}><IndianRupee size={16} /> Available Wallet Balance</div>
           <div className="balance-amount" style={{ color: '#ffffff' }}>{isLoading ? '...' : formatINR(walletBalance)}</div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button 
               className="btn" 
-              onClick={() => setShowWithdrawModal(true)}
+              onClick={() => {
+                setUpiId(bankDetails?.upiId || '');
+                setAccountHolder(bankDetails?.accountHolder || '');
+                setAccountNumber(bankDetails?.accountNumber || '');
+                setIfscCode(bankDetails?.ifscCode || '');
+                setBankName(bankDetails?.bankName || '');
+                setShowWithdrawModal(true);
+              }}
               disabled={walletBalance <= 0}
               style={{ backgroundColor: '#4f46e5', color: 'white', flexGrow: 1, border: 'none' }}
             >
@@ -411,10 +449,73 @@ export default function Wallet() {
                   onChange={(e) => setWithdrawMethod(e.target.value)}
                   style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.875rem', color: '#0f172a', outline: 'none', boxSizing: 'border-box', background: '#ffffff', cursor: 'pointer' }}
                 >
-                  <option value="UPI">UPI Instant Payout ({bankDetails.upiId || 'Not Setup'})</option>
-                  <option value="Bank Transfer">Direct Bank Transfer ({bankDetails.bankName || 'Bank'} A/C)</option>
+                  <option value="UPI">UPI Instant Payout</option>
+                  <option value="Bank Transfer">Direct Bank Transfer</option>
                 </select>
               </div>
+
+              {withdrawMethod === 'UPI' ? (
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>UPI ID for Payout <span style={{ color: '#dc2626' }}>*</span></label>
+                  <input 
+                    type="text" 
+                    value={upiId} 
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="e.g. name@upi"
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                    required 
+                  />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Holder Name <span style={{ color: '#dc2626' }}>*</span></label>
+                    <input 
+                      type="text" 
+                      value={accountHolder} 
+                      onChange={(e) => setAccountHolder(e.target.value)}
+                      placeholder="e.g. John Doe"
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Bank Name <span style={{ color: '#dc2626' }}>*</span></label>
+                    <input 
+                      type="text" 
+                      value={bankName} 
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="e.g. HDFC Bank"
+                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                      required 
+                    />
+                  </div>
+                  <div className="grid-responsive-2" style={{ gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Number <span style={{ color: '#dc2626' }}>*</span></label>
+                      <input 
+                        type="text" 
+                        value={accountNumber} 
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder="e.g. 1234567890"
+                        style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>IFSC Code <span style={{ color: '#dc2626' }}>*</span></label>
+                      <input 
+                        type="text" 
+                        value={ifscCode} 
+                        onChange={(e) => setIfscCode(e.target.value)}
+                        placeholder="e.g. HDFC0000123"
+                        style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                        required 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowWithdrawModal(false)} style={{ padding: '0.65rem 1.25rem', borderRadius: '40px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Cancel</button>
@@ -472,7 +573,7 @@ export default function Wallet() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', textAlign: 'left' }}>
+              <div className="grid-responsive-2" style={{ gap: '0.75rem', textAlign: 'left' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>Bank Name</label>
                   <input 

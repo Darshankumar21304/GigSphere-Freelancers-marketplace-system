@@ -79,7 +79,7 @@ export default function FreelancerJoin() {
       case 5:
         return <IdentityVerificationStep formData={formData} updateFormData={updateFormData} nextStep={nextStep} prevStep={prevStep} />;
       case 6:
-        return <ReviewSubmitStep formData={formData} prevStep={prevStep} />;
+        return <ReviewSubmitStep formData={formData} prevStep={prevStep} goToStep={setCurrentStep} />;
       default:
         return <WelcomeStep nextStep={nextStep} />;
     }

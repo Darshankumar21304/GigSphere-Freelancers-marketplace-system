@@ -4,6 +4,7 @@ import { MessageSquare, Search, User, Bell, LogOut, Menu, X, ChevronDown, Rocket
 import { getUserRole, isAuthenticated, logoutUser, getUserProfile } from '../utils/authUtils';
 import { apiFetch } from '../utils/api';
 import AuthModal from './AuthModal';
+import HowItWorksModal from './HowItWorksModal';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -46,6 +47,7 @@ const Navbar = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authTab, setAuthTab] = useState('login');
   const [authRole, setAuthRole] = useState('client');
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const openLoginModal = () => {
     setAuthTab('login');
@@ -92,7 +94,7 @@ const Navbar = () => {
         <div className="navbar-left">
           <Link to="/" className="antigravity-brand" onClick={closeMobileMenu}>
             <div className="antigravity-logo-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="6" fill="url(#gigsphere_grad)" />
                 <ellipse cx="12" cy="12" rx="10" ry="4" stroke="url(#gigsphere_grad_ring)" strokeWidth="2.2" strokeLinecap="round" transform="rotate(-30 12 12)" />
                 <defs>
@@ -113,21 +115,20 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* Center: Google Antigravity Style Navigation Links */}
-        <div className="navbar-center landing-nav-center">
-          <Link to="/explore" className="antigravity-nav-link">
-            Explore Marketplace <ChevronDown size={14} className="chevron-icon" />
-          </Link>
-          <Link to="/freelancers" className="antigravity-nav-link">
-            Find Freelancers <ChevronDown size={14} className="chevron-icon" />
-          </Link>
-          <a href="#how-it-works" className="antigravity-nav-link">
-            How It Works
-          </a>
-          <a href="#categories" className="antigravity-nav-link">
-            Categories <ChevronDown size={14} className="chevron-icon" />
-          </a>
-        </div>
+        {/* Center: Google Antigravity Style Navigation Links (Only shown when logged out) */}
+        {!isAuth && (
+          <div className="navbar-center landing-nav-center">
+            <Link to="/explore" className="antigravity-nav-link">
+              Explore Marketplace <ChevronDown size={14} className="chevron-icon" />
+            </Link>
+            <Link to="/freelancers" className="antigravity-nav-link">
+              Find Freelancers <ChevronDown size={14} className="chevron-icon" />
+            </Link>
+            <a href="#how-it-works" className="antigravity-nav-link" onClick={(e) => { e.preventDefault(); setShowHowItWorks(true); }}>
+              How It Works
+            </a>
+          </div>
+        )}
 
         {/* Right: Pill Buttons & Authenticated Actions */}
         <div className="navbar-right">
@@ -186,10 +187,13 @@ const Navbar = () => {
       {isMobileMenuOpen && (
         <div className="mobile-menu animate-fade-in-up">
           <div className="mobile-nav-links">
-            <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore Marketplace</Link>
-            <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Find Freelancers</Link>
-            <a href="#how-it-works" className="nav-link" onClick={closeMobileMenu}>How It Works</a>
-            <a href="#categories" className="nav-link" onClick={closeMobileMenu}>Categories</a>
+            {!isAuth && (
+              <>
+                <Link to="/explore" className="nav-link" onClick={closeMobileMenu}>Explore Marketplace</Link>
+                <Link to="/freelancers" className="nav-link" onClick={closeMobileMenu}>Find Freelancers</Link>
+                <a href="#how-it-works" className="nav-link" onClick={(e) => { e.preventDefault(); closeMobileMenu(); setShowHowItWorks(true); }}>How It Works</a>
+              </>
+            )}
             {isAuth && <Link to={dashboardPath} className="nav-link" onClick={closeMobileMenu}>Dashboard</Link>}
             
             <div className="mobile-auth-buttons">
@@ -240,6 +244,9 @@ const Navbar = () => {
           </div>
         </div>
       )}
+
+      {/* How It Works Modal */}
+      <HowItWorksModal isOpen={showHowItWorks} onClose={() => setShowHowItWorks(false)} />
     </nav>
   );
 };
