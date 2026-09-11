@@ -1,4 +1,11 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+
+const envPath = fs.existsSync(path.resolve(__dirname, '../.env'))
+  ? path.resolve(__dirname, '../.env')
+  : (fs.existsSync(path.resolve(__dirname, '../env')) ? path.resolve(__dirname, '../env') : undefined);
+
+require('dotenv').config(envPath ? { path: envPath } : undefined);
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
@@ -119,6 +126,15 @@ io.on('connection', (socket) => {
 const startServer = async () => {
   try {
     await connectDB();
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+        console.error(`Check if another terminal is already running the backend server, or terminate the process on port ${PORT}.\n`);
+        process.exit(1);
+      } else {
+        console.error('Server error:', error);
+      }
+    });
     server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });

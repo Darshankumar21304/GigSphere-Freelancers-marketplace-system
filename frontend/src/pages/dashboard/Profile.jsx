@@ -107,21 +107,18 @@ export default function Profile() {
           }
         }).finally(() => setIsLoadingCoach(false));
       }
-      const [walletData, myProjectsRes, allProjectsRes, hiredRes, activeContractsRes] = await Promise.all([
+      const [walletData, myProjectsRes, hiredRes, activeContractsRes] = await Promise.all([
         apiFetch('/wallet').catch(() => ({ walletBalance: 0, escrowBalance: 0 })),
-        apiFetch('/projects/my').catch(() => null),
-        apiFetch('/projects').catch(() => []),
+        apiFetch('/projects/my').catch(() => []),
         apiFetch('/contracts/hired').catch(() => []),
         apiFetch('/contracts/active').catch(() => [])
       ]);
 
       let userProjects = [];
-      if (Array.isArray(myProjectsRes) && myProjectsRes.length > 0) {
+      if (Array.isArray(myProjectsRes)) {
         userProjects = myProjectsRes;
-      } else if (Array.isArray(allProjectsRes) && allProjectsRes.length > 0) {
-        userProjects = allProjectsRes;
-      } else if (allProjectsRes?.projects) {
-        userProjects = allProjectsRes.projects;
+      } else if (myProjectsRes?.projects && Array.isArray(myProjectsRes.projects)) {
+        userProjects = myProjectsRes.projects;
       }
 
       const totalProjects = userProjects.length;

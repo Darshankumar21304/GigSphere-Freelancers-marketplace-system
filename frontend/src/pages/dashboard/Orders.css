@@ -728,15 +728,27 @@
 }
 
 /* Responsive */
+.workspace-overview-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
 @media (max-width: 1100px) {
   .client-projects-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
+@media (max-width: 900px) {
+  .workspace-overview-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 @media (max-width: 768px) {
   .client-projects-page {
-    padding: 20px;
+    padding: 18px 14px;
   }
   
   .client-projects-header-content {
@@ -746,7 +758,7 @@
   }
   
   .client-projects-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 
   .client-projects-toolbar-bottom {
@@ -765,7 +777,13 @@
 }
 
 @media (max-width: 480px) {
+  .client-projects-page {
+    padding: 14px 10px;
+  }
   .client-projects-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .client-projects-meta-grid {
     grid-template-columns: 1fr;
   }
 }

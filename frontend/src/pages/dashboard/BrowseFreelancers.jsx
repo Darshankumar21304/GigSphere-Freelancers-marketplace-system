@@ -61,7 +61,7 @@ export default function BrowseFreelancers() {
       setFreelancers(Array.isArray(flData) ? flData : []);
 
       // 2. Fetch Client's Projects
-      const projData = await apiFetch('/projects').catch(() => []);
+      const projData = await apiFetch('/projects/my').catch(() => []);
       setClientProjects(Array.isArray(projData) ? projData : []);
 
       // 3. Fetch Contracts to know who is already hired

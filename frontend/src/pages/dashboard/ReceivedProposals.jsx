@@ -36,7 +36,7 @@ export default function ReceivedProposals() {
     setIsLoading(true);
     try {
       // Fetch client projects & proposals safely
-      const fetchedProjects = await apiFetch('/projects').catch(() => []);
+      const fetchedProjects = await apiFetch('/projects/my').catch(() => []);
       if (Array.isArray(fetchedProjects) && fetchedProjects.length > 0) {
         setProjectsList([
           { id: 'all', title: 'All Projects' },
@@ -130,7 +130,7 @@ export default function ReceivedProposals() {
       </div>
 
       {/* KPI Cards */}
-      <div className="rp-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div className="grid-responsive-4" style={{ gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Total Proposals</span>

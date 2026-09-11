@@ -361,18 +361,20 @@ const submitKyc = async (req, res) => {
 
 const getUserDisputes = async (req, res) => {
   try {
-    const { Dispute } = require('../models');
-    const userId = req.user.id;
-    const userEmail = req.user.email;
+    const { Dispute, User } = require('../models');
+    const userId = req.user?.id || req.user?._id;
+    const currentUser = await User.findById(userId).select('email name role');
+    const userEmail = currentUser?.email || req.user?.email;
 
-    const myDisputes = await Dispute.find({
-      $or: [
-        { client_id: userId },
-        { freelancer_id: userId },
-        { clientEmail: userEmail },
-        { freelancerEmail: userEmail }
-      ]
-    }).sort({ createdAt: -1 });
+    const orClauses = [
+      { client_id: userId },
+      { freelancer_id: userId }
+    ];
+    if (userEmail) {
+      orClauses.push({ clientEmail: userEmail }, { freelancerEmail: userEmail });
+    }
+
+    const myDisputes = await Dispute.find({ $or: orClauses }).sort({ createdAt: -1 });
 
     res.json({ success: true, disputes: myDisputes });
   } catch (error) {
@@ -383,18 +385,20 @@ const getUserDisputes = async (req, res) => {
 
 const addUserDisputeMessage = async (req, res) => {
   try {
-    const { Dispute } = require('../models');
+    const { Dispute, User } = require('../models');
     const { createNotification } = require('./notificationController');
     const { id } = req.params;
     const { text } = req.body;
-    const userId = req.user.id;
-    const userEmail = req.user.email;
-    const userRole = req.user.role;
-    const userName = req.user.name || 'User';
+    const userId = String(req.user?.id || req.user?._id || '');
 
     if (!text || !text.trim()) {
       return res.status(400).json({ message: 'Message text is required.' });
     }
+
+    const currentUser = await User.findById(userId).select('name email role');
+    const userEmail = currentUser?.email || req.user?.email || '';
+    const userRole = currentUser?.role || req.user?.role || 'client';
+    const userName = currentUser?.name || req.user?.name || (userRole === 'freelancer' ? 'Freelancer' : 'Client');
 
     const isMongoId = id && id.match(/^[0-9a-fA-F]{24}$/);
     const dispute = await Dispute.findOne({
@@ -406,8 +410,8 @@ const addUserDisputeMessage = async (req, res) => {
 
     if (!dispute) return res.status(404).json({ message: 'Dispute not found.' });
 
-    const isClient = dispute.client_id?.toString() === userId || dispute.clientEmail === userEmail;
-    const isFreelancer = dispute.freelancer_id?.toString() === userId || dispute.freelancerEmail === userEmail;
+    const isClient = dispute.client_id?.toString() === userId || (userEmail && dispute.clientEmail === userEmail);
+    const isFreelancer = dispute.freelancer_id?.toString() === userId || (userEmail && dispute.freelancerEmail === userEmail);
 
     if (!isClient && !isFreelancer && userRole !== 'admin') {
       return res.status(403).json({ message: 'Access denied to this dispute thread.' });
@@ -418,7 +422,7 @@ const addUserDisputeMessage = async (req, res) => {
     const newMessage = {
       id: `msg-${Date.now()}`,
       senderRole,
-      senderName: `${userName} (${userEmail})`,
+      senderName: `${userName} (${userEmail || senderRole})`,
       text: text.trim(),
       timestamp: new Date()
     };
@@ -434,7 +438,7 @@ const addUserDisputeMessage = async (req, res) => {
         'system',
         'New Evidence in Dispute Thread',
         `${userName} posted a response regarding dispute #${dispute.id} (${dispute.projectTitle}).`
-      );
+      ).catch(() => null);
     }
 
     res.json({ success: true, message: 'Message added successfully.', dispute });
@@ -446,32 +450,126 @@ const addUserDisputeMessage = async (req, res) => {
 
 const fileNewDispute = async (req, res) => {
   try {
-    const { Dispute, User, Project } = require('../models');
+    const { Dispute, User, Project, Contract } = require('../models');
     const { createNotification } = require('./notificationController');
-    const { projectId, projectTitle, freelancerEmail, amount, issue } = req.body;
-    const userId = req.user.id;
-    const userEmail = req.user.email;
-    const userName = req.user.name || 'Client';
+    const { projectId, projectTitle, freelancerEmail, clientEmail, amount, issue } = req.body;
+    const userId = req.user?.id || req.user?._id;
 
-    if (!projectTitle || !issue) {
-      return res.status(400).json({ message: 'Project title and issue details are required.' });
+    if (!issue || !issue.trim()) {
+      return res.status(400).json({ message: 'Issue description is required.' });
     }
 
-    // Try finding freelancer User record if email provided
-    let freelancerUser = null;
-    if (freelancerEmail) {
-      freelancerUser = await User.findOne({ email: freelancerEmail.trim() });
-    }
+    // Retrieve active authenticated user from DB
+    const currentUser = await User.findById(userId).select('name email role');
+    const isFreelancerFiler = currentUser?.role === 'freelancer';
+    const userEmail = currentUser?.email || req.user?.email || (isFreelancerFiler ? 'freelancer@gigsphere.com' : 'client@gigsphere.com');
+    const userName = currentUser?.name || req.user?.name || (isFreelancerFiler ? 'Freelancer' : 'Client');
 
-    // Try finding project if ID provided
+    // Resolve project
     let projectObj = null;
-    if (projectId && projectId.match(/^[0-9a-fA-F]{24}$/)) {
-      projectObj = await Project.findById(projectId);
-      if (projectObj && projectObj.proposals?.length > 0 && !freelancerUser) {
-        const acceptedProp = projectObj.proposals.find(p => p.status === 'Accepted');
-        if (acceptedProp?.freelancer_email) {
-          freelancerUser = await User.findOne({ email: acceptedProp.freelancer_email });
+    if (projectId) {
+      projectObj = await Project.findById(projectId).catch(() => null);
+    }
+
+    let finalClientId = null;
+    let finalClientName = 'Client';
+    let finalClientEmail = 'client@gigsphere.com';
+
+    let finalFreelancerId = null;
+    let finalFreelancerName = 'Freelancer';
+    let finalFreelancerEmail = 'freelancer@gigsphere.com';
+
+    if (isFreelancerFiler) {
+      // Authenticated user is the freelancer
+      finalFreelancerId = currentUser ? currentUser._id : userId;
+      finalFreelancerName = userName;
+      finalFreelancerEmail = userEmail;
+
+      // Resolve client from input, project, or contract
+      let clientUser = null;
+      if (clientEmail && clientEmail.trim()) {
+        const cleanClientEmail = clientEmail.trim();
+        clientUser = await User.findOne({
+          $or: [
+            { email: cleanClientEmail },
+            { name: cleanClientEmail }
+          ]
+        }).catch(() => null);
+      }
+
+      if (!clientUser && projectObj?.client_id) {
+        clientUser = await User.findById(projectObj.client_id).catch(() => null);
+      }
+
+      if (!clientUser && projectObj) {
+        const contract = await Contract.findOne({ project_id: projectObj._id }).catch(() => null);
+        if (contract?.client_id) {
+          clientUser = await User.findById(contract.client_id).catch(() => null);
         }
+      }
+
+      if (clientUser) {
+        finalClientId = clientUser._id;
+        finalClientName = clientUser.name || 'Client';
+        finalClientEmail = clientUser.email || 'client@gigsphere.com';
+      } else {
+        finalClientEmail = (clientEmail && clientEmail.includes('@')) 
+          ? clientEmail.trim() 
+          : 'client@gigsphere.com';
+        finalClientName = clientEmail 
+          ? (clientEmail.includes('@') ? clientEmail.split('@')[0] : clientEmail) 
+          : 'Client';
+      }
+    } else {
+      // Authenticated user is the client (or admin/other)
+      finalClientId = currentUser ? currentUser._id : userId;
+      finalClientName = userName;
+      finalClientEmail = userEmail;
+
+      // Resolve freelancer from input, project proposals, or contract
+      let freelancerUser = null;
+      if (freelancerEmail && freelancerEmail.trim()) {
+        const cleanEmail = freelancerEmail.trim();
+        freelancerUser = await User.findOne({
+          $or: [
+            { email: cleanEmail },
+            { name: cleanEmail }
+          ]
+        }).catch(() => null);
+      }
+
+      if (!freelancerUser && projectObj) {
+        const hiredProp = (projectObj.proposals || []).find(p => p.status === 'Hired' || p.status === 'Accepted')
+                       || (projectObj.proposals || [])[0];
+        if (hiredProp?.freelancer_id) {
+          freelancerUser = await User.findById(hiredProp.freelancer_id).catch(() => null);
+        }
+        if (!freelancerUser && hiredProp?.freelancer_email) {
+          freelancerUser = await User.findOne({ email: hiredProp.freelancer_email }).catch(() => null);
+        }
+        if (!freelancerUser && hiredProp?.freelancer_name) {
+          freelancerUser = await User.findOne({ name: hiredProp.freelancer_name }).catch(() => null);
+        }
+      }
+
+      if (!freelancerUser && projectObj) {
+        const contract = await Contract.findOne({ project_id: projectObj._id }).catch(() => null);
+        if (contract?.freelancer_id) {
+          freelancerUser = await User.findById(contract.freelancer_id).catch(() => null);
+        }
+      }
+
+      if (freelancerUser) {
+        finalFreelancerId = freelancerUser._id;
+        finalFreelancerName = freelancerUser.name || 'Freelancer Partner';
+        finalFreelancerEmail = freelancerUser.email || 'freelancer@gigsphere.com';
+      } else {
+        finalFreelancerEmail = (freelancerEmail && freelancerEmail.includes('@')) 
+          ? freelancerEmail.trim() 
+          : 'freelancer@gigsphere.com';
+        finalFreelancerName = freelancerEmail 
+          ? (freelancerEmail.includes('@') ? freelancerEmail.split('@')[0] : freelancerEmail) 
+          : 'Freelancer Partner';
       }
     }
 
@@ -480,20 +578,20 @@ const fileNewDispute = async (req, res) => {
     const newDisp = new Dispute({
       id: disputeId,
       project_id: projectObj ? projectObj._id : undefined,
-      projectTitle,
-      client_id: userId,
-      clientName: userName,
-      clientEmail: userEmail,
-      freelancer_id: freelancerUser ? freelancerUser._id : undefined,
-      freelancerName: freelancerUser ? freelancerUser.name : (freelancerEmail ? freelancerEmail.split('@')[0] : 'Freelancer'),
-      freelancerEmail: freelancerEmail || (freelancerUser ? freelancerUser.email : 'pending@gigsphere.com'),
-      amount: Number(amount || projectObj?.budget || 0),
+      projectTitle: projectTitle || projectObj?.title || 'Marketplace Project',
+      client_id: finalClientId,
+      clientName: finalClientName,
+      clientEmail: finalClientEmail,
+      freelancer_id: finalFreelancerId,
+      freelancerName: finalFreelancerName,
+      freelancerEmail: finalFreelancerEmail,
+      amount: Math.max(1, Number(amount) || Number(projectObj?.budget) || 1000),
       issue: issue.trim(),
-      freelancerDefense: 'Awaiting freelancer response in discussion thread.',
+      freelancerDefense: isFreelancerFiler ? issue.trim() : 'Awaiting response in discussion thread.',
       status: 'Open',
       messages: [{
         id: `msg-${Date.now()}`,
-        senderRole: req.user.role === 'freelancer' ? 'Freelancer' : 'Client',
+        senderRole: isFreelancerFiler ? 'Freelancer' : 'Client',
         senderName: `${userName} (${userEmail})`,
         text: `Dispute opened: ${issue.trim()}`,
         timestamp: new Date()
@@ -502,20 +600,21 @@ const fileNewDispute = async (req, res) => {
 
     await newDisp.save();
 
-    // Notify freelancer if found
-    if (freelancerUser) {
+    // Trigger notification to the counterparty
+    const targetUserId = isFreelancerFiler ? finalClientId : finalFreelancerId;
+    if (targetUserId) {
       await createNotification(
-        freelancerUser._id,
+        targetUserId,
         'system',
         'Dispute Filed On Project',
-        `A dispute (#${disputeId}) was filed by ${userName} for project "${projectTitle}". Please respond in the evidence thread.`
-      );
+        `A dispute (#${disputeId}) was filed by ${userName} for project "${newDisp.projectTitle}". Please review and respond in the evidence thread.`
+      ).catch(() => null);
     }
 
     res.status(201).json({ success: true, message: 'Dispute filed successfully!', dispute: newDisp });
   } catch (error) {
     console.error('Error filing dispute:', error);
-    res.status(500).json({ message: 'Error filing dispute' });
+    res.status(500).json({ message: error.message || 'Error filing dispute' });
   }
 };
 

@@ -98,7 +98,10 @@ function calculateRecommendationScore(freelancer, project, options = {}) {
   }
 
   // 4. Past Success / Completed Projects (0 - 100)
-  const completedProjects = Number(profile.completedProjects || historicalData.completedContracts || 0);
+  const historicalData = (options && (options.historicalData || (options.completedContracts !== undefined ? options : null))) 
+    || freelancer.historicalData 
+    || {};
+  const completedProjects = Number(profile.completedProjects || user.completedProjects || historicalData.completedContracts || 0);
   const pastSuccessScore = completedProjects > 0 
     ? Math.min(100, 60 + (completedProjects * 10))
     : (profile.portfolioItems?.length > 0 ? 70 : 40);

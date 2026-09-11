@@ -4,7 +4,16 @@ const milestoneSchema = new mongoose.Schema({
   title: { type: String, required: true },
   amount: { type: Number, required: true },
   deadline: { type: Date, required: true },
-  status: { type: String, enum: ['Pending', 'In Progress', 'Under Review', 'Completed'], default: 'Pending' }
+  status: { type: String, enum: ['Pending', 'In Progress', 'Under Review', 'Completed'], default: 'Pending' },
+  submissionMessage: { type: String, default: '' },
+  submissionFiles: [{
+    name: { type: String },
+    url: { type: String },
+    size: { type: String },
+    type: { type: String },
+    uploadedAt: { type: Date, default: Date.now }
+  }],
+  submittedAt: { type: Date }
 });
 
 const contractSchema = new mongoose.Schema({

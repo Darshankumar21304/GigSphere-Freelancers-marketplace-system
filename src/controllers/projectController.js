@@ -163,12 +163,11 @@ const getMyProjects = async (req, res) => {
 
     const NEELANJAN_AVATAR = 'https://res.cloudinary.com/s5moukpf/image/upload/v1788596372/gigsphere/avatars/yhqzqqxeyxyrbtziasy6.jpg';
 
+    const orClauses = [{ client_id: userId }];
+    if (userObjectId) orClauses.push({ client_id: userObjectId });
+
     const projects = await Project.find({
-      $or: [
-        ...(userObjectId ? [{ client_id: userObjectId }] : []),
-        { client_id: userId },
-        { client_id: null }
-      ]
+      $or: orClauses
     }).sort({ createdAt: -1 }).lean();
 
     for (let p of projects) {

@@ -64,9 +64,50 @@
 /* WIZARD LAYOUT */
 .gcpj-wizard-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 24px;
   align-items: start;
+}
+
+.gcpj-form-column {
+  min-width: 0;
+  width: 100%;
+}
+
+.gcpj-summary-column {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.gcpj-summary-stack {
+  position: static;
+  display: contents;
+}
+
+.gcpj-preview-card, .gcpj-tips-card {
+  height: fit-content;
+}
+
+/* 3-Column Layout only on Ultra-Wide Monitors where available width >= 1480px */
+@media (min-width: 1480px) {
+  .gcpj-wizard-layout {
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
+  }
+  .gcpj-summary-column {
+    grid-column: auto;
+    display: block;
+    margin-top: 0;
+  }
+  .gcpj-summary-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    position: sticky;
+    top: 100px;
+  }
 }
 
 /* LEFT STEPPER */
@@ -377,7 +418,7 @@
 /* Budget & Option Cards */
 .gcpj-budget-type-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 16px;
 }
 
@@ -731,57 +772,124 @@
 }
 
 /* RESPONSIVE LAYOUT */
-@media (max-width: 1199px) {
-  .gcpj-wizard-layout {
-    grid-template-columns: 240px minmax(0, 1fr);
-  }
-  .gcpj-summary-column {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-  }
-  .gcpj-summary-stack {
-    position: static;
-    flex-direction: row;
-    display: contents;
-  }
-  .gcpj-preview-card, .gcpj-tips-card {
-    height: fit-content;
-  }
-}
-
-@media (max-width: 899px) {
+@media (max-width: 992px) {
   .gcpj-wizard-layout {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
   .gcpj-stepper-column {
+    display: block;
+    width: 100%;
+    position: static;
+  }
+  .gcpj-stepper-card {
+    position: static;
+    padding: 16px 20px;
+    border-radius: 14px;
+  }
+  .gcpj-stepper-heading {
+    margin-bottom: 12px;
+    font-size: 11px;
+  }
+  .gcpj-step-list {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 14px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .gcpj-step-list::-webkit-scrollbar {
+    display: none;
+  }
+  .gcpj-step-item {
+    flex-shrink: 0;
+    gap: 8px;
+    align-items: center;
+  }
+  .gcpj-step-connector {
+    display: none;
+  }
+  .gcpj-step-indicator {
+    width: 36px;
+    height: 36px;
+  }
+  .gcpj-step-number {
+    font-size: 13px;
+  }
+  .gcpj-step-content {
+    padding-top: 0;
+  }
+  .gcpj-step-title {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .gcpj-step-description {
     display: none;
   }
   .gcpj-summary-column {
     grid-template-columns: 1fr;
+    margin-top: 16px;
   }
 }
 
 @media (max-width: 639px) {
   .gigsphere-create-project {
-    padding: 16px;
-  }
-  .gcpj-form-header, .gcpj-form-body {
-    padding: 20px;
-  }
-  .gcpj-form-footer {
-    flex-direction: column;
-    padding: 20px;
-  }
-  .gcpj-back-button, .gcpj-next-button, .gcpj-publish-button {
-    width: 100%;
-  }
-  .gcpj-field-row {
-    grid-template-columns: 1fr;
+    padding: 14px 10px;
   }
   .gcpj-page-header {
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .gcpj-save-draft-button {
+    width: 100%;
+  }
+  .gcpj-stepper-card {
+    padding: 12px 14px;
+  }
+  .gcpj-step-list {
+    gap: 10px;
+  }
+  .gcpj-step-indicator {
+    width: 32px;
+    height: 32px;
+  }
+  .gcpj-step-number {
+    font-size: 12px;
+  }
+  .gcpj-form-header, .gcpj-form-body {
+    padding: 18px 14px;
+  }
+  .gcpj-form-footer {
+    flex-direction: column-reverse;
+    gap: 10px;
+    padding: 18px 14px;
+  }
+  .gcpj-back-button, .gcpj-next-button, .gcpj-publish-button {
+    width: 100%;
+    justify-content: center;
+  }
+  .gcpj-field-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .gcpj-input, .gcpj-select {
+    font-size: 14px;
+    min-height: 44px;
+  }
+}
+
+.gcpj-milestone-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .gcpj-milestone-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 }

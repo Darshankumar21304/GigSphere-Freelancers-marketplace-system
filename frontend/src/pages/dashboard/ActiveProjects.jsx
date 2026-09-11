@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Briefcase, Clock, Calendar, CheckCircle, 
@@ -29,8 +29,11 @@ export default function ActiveProjects() {
   // Workspace State
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [workspaceTab, setWorkspaceTab] = useState('Overview');
-  const [submitModal, setSubmitModal] = useState({ show: false, milestone: null });
+  const [submitModal, setSubmitModal] = useState({ show: false, milestone: null, project: null });
   const [submitText, setSubmitText] = useState('');
+  const [submitFiles, setSubmitFiles] = useState([]);
+  const [isUploadingSubmitFile, setIsUploadingSubmitFile] = useState(false);
+  const submitFileInputRef = useRef(null);
   
   // Shared Materials & Upload State
   const [uploadedDeliverables, setUploadedDeliverables] = useState([]);
@@ -354,24 +357,38 @@ export default function ActiveProjects() {
     if (!submitModal.milestone) return;
 
     try {
-      const contractId = selectedProject._id || selectedProject.id;
+      const targetProj = submitModal.project 
+        || selectedProject 
+        || projects.find(p => p.id === selectedProjectId || p._id === selectedProjectId)
+        || projects[0];
+
+      if (!targetProj) {
+        throw new Error('Project reference could not be resolved');
+      }
+
+      const contractId = targetProj._id || targetProj.id;
       const milestoneId = submitModal.milestone._id || submitModal.milestone.id;
 
       await apiFetch(`/contracts/${contractId}/milestones/${milestoneId}/submit`, {
         method: 'PUT',
-        body: JSON.stringify({ message: submitText })
+        body: JSON.stringify({ 
+          message: submitText,
+          files: submitFiles 
+        })
       });
 
       alert('Work submitted for review successfully!');
-      setSubmitModal({ show: false, milestone: null });
+      setSubmitModal({ show: false, milestone: null, project: null });
       setSubmitText('');
-      fetchActiveContracts();
+      setSubmitFiles([]);
+      await fetchActiveContracts();
     } catch (error) {
+      console.error('Submit work error:', error);
       alert(error.message || 'Failed to submit work');
     }
   };
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const selectedProject = projects.find(p => p.id === selectedProjectId || p._id === selectedProjectId);
 
   // Compute KPIs
   const activeCount = projects.filter(p => p.status !== 'Completed').length;
@@ -495,8 +512,8 @@ export default function ActiveProjects() {
                           </div>
                         </div>
                         <div className="milestone-actions">
-                          {milestone.status === 'In Progress' && (
-                            <button className="btn btn-primary" onClick={() => setSubmitModal({ show: true, milestone })}>
+                          {(milestone.status === 'In Progress' || milestone.status === 'Pending' || milestone.status === 'Revision Requested') && (
+                            <button className="btn btn-primary" onClick={() => setSubmitModal({ show: true, milestone, project: selectedProject })}>
                               <Send size={16} /> Submit Work
                             </button>
                           )}
@@ -809,37 +826,126 @@ export default function ActiveProjects() {
             </div>
 
             {/* Submit Work Modal */}
-            {submitModal.show && (
+            {submitModal.show && submitModal.milestone && (
               <div className="modal-overlay" style={{zIndex: 1100}}>
-                <div className="modal-content">
-                  <h3 className="modal-title">Submit Work for Milestone</h3>
-                  <p className="modal-desc" style={{marginBottom: '16px'}}>
-                    Submitting work for: <strong>{submitModal.milestone.title}</strong>
-                  </p>
-                  
-                  <div className="form-group" style={{marginBottom: '16px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500}}>Upload Files</label>
-                    <div className="upload-box">
-                      <Paperclip size={24} color="var(--text-muted)"/>
-                      <span>Click to upload or drag & drop files here</span>
-                    </div>
+                <div className="modal-content" style={{maxWidth: '540px', width: '90%'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px'}}>
+                    <h3 className="modal-title" style={{margin: 0}}>Submit Work for Milestone</h3>
+                    <button 
+                      onClick={() => { setSubmitModal({ show: false, milestone: null, project: null }); setSubmitText(''); setSubmitFiles([]); }}
+                      style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)'}}
+                    >
+                      <X size={20} />
+                    </button>
                   </div>
 
-                  <div className="form-group" style={{marginBottom: '24px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500}}>Message to Client</label>
+                  <p className="modal-desc" style={{marginBottom: '16px'}}>
+                    Submitting deliverables for: <strong>{submitModal.milestone.title}</strong>
+                  </p>
+                  
+                  {/* File Upload Area */}
+                  <div className="form-group" style={{marginBottom: '16px'}}>
+                    <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500}}>
+                      Attach Deliverable Files (ZIP, PDF, images, or documents)
+                    </label>
+
+                    <input 
+                      type="file" 
+                      ref={submitFileInputRef} 
+                      style={{display: 'none'}} 
+                      multiple
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (!files.length) return;
+                        setIsUploadingSubmitFile(true);
+                        try {
+                          for (const file of files) {
+                            const res = await uploadFileToCloudinary(file, '/api/upload/single');
+                            const fileUrl = res.fileUrl || res.avatarUrl || res.url;
+                            const isZip = file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z');
+                            const newFile = {
+                              id: Date.now() + Math.random().toString(),
+                              name: file.name,
+                              url: fileUrl,
+                              size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                              type: file.type || (isZip ? 'application/zip' : 'application/octet-stream')
+                            };
+                            setSubmitFiles(prev => [...prev, newFile]);
+                          }
+                        } catch (err) {
+                          alert(err.message || 'Error uploading file');
+                        } finally {
+                          setIsUploadingSubmitFile(false);
+                          if (submitFileInputRef.current) submitFileInputRef.current.value = '';
+                        }
+                      }}
+                    />
+
+                    <div 
+                      className="upload-box" 
+                      style={{cursor: 'pointer', border: '2px dashed var(--border-color)', borderRadius: '10px', padding: '18px', textAlign: 'center'}}
+                      onClick={() => submitFileInputRef.current?.click()}
+                    >
+                      <Paperclip size={24} color="var(--primary)" style={{marginBottom: '6px'}}/>
+                      <span style={{display: 'block', fontWeight: 500}}>
+                        {isUploadingSubmitFile ? 'Uploading file to secure cloud...' : 'Click to select and upload deliverables'}
+                      </span>
+                      <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>Upload project ZIP archives, document deliverables, or assets</span>
+                    </div>
+
+                    {/* Uploaded Files List */}
+                    {submitFiles.length > 0 && (
+                      <div style={{marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                        {submitFiles.map((f, idx) => (
+                          <div key={f.id || idx} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px'}}>
+                            <span style={{display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                              <FileText size={15} color="var(--primary)" />
+                              <strong>{f.name}</strong> ({f.size})
+                            </span>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setSubmitFiles(prev => prev.filter((_, i) => i !== idx)); }}
+                              style={{background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444'}}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group" style={{marginBottom: '20px'}}>
+                    <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500}}>
+                      Message & Description for Client
+                    </label>
                     <textarea 
                       rows={4} 
                       className="search-input" 
-                      style={{width: '100%', padding: '12px', resize: 'none'}} 
-                      placeholder="Describe the work you have completed..."
+                      style={{width: '100%', padding: '12px', resize: 'none', borderRadius: '8px'}} 
+                      placeholder="Describe the completed deliverables, repository links, or instructions for the client..."
                       value={submitText}
                       onChange={(e) => setSubmitText(e.target.value)}
                     />
                   </div>
 
-                  <div className="modal-actions">
-                    <button className="btn-outline" onClick={() => {setSubmitModal({ show: false, milestone: null }); setSubmitText('');}}>Cancel</button>
-                    <button className="btn-primary" onClick={handleSubmitWork}>Submit for Review</button>
+                  <div className="modal-actions" style={{display: 'flex', justifyContent: 'flex-end', gap: '10px'}}>
+                    <button 
+                      className="btn-outline" 
+                      onClick={() => {
+                        setSubmitModal({ show: false, milestone: null, project: null }); 
+                        setSubmitText('');
+                        setSubmitFiles([]);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      className="btn-primary" 
+                      disabled={isUploadingSubmitFile}
+                      onClick={handleSubmitWork}
+                    >
+                      {isUploadingSubmitFile ? 'Uploading...' : 'Submit for Review'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -988,11 +1094,13 @@ export default function ActiveProjects() {
                         <button className="btn btn-secondary" onClick={() => handleOpenWorkspace(project.id, 'Milestones')}>
                           <Calendar size={16} /> Milestones
                         </button>
-                        {(project.status === 'In Progress' || project.status === 'Revision Requested') && (
+                        {(project.status === 'In Progress' || project.status === 'Revision Requested' || project.status === 'Active' || project.status === 'Open') && (
                           <button className="btn btn-primary" onClick={() => {
-                            const activeMilestone = project.milestones.find(m => m.status === 'In Progress') || project.milestones[0];
+                            const activeMilestone = (project.milestones || []).find(m => m.status === 'In Progress' || m.status === 'Revision Requested')
+                              || (project.milestones || []).find(m => m.status === 'Pending')
+                              || (project.milestones || [])[0];
                             handleOpenWorkspace(project.id, 'Milestones');
-                            setSubmitModal({ show: true, milestone: activeMilestone });
+                            setSubmitModal({ show: true, milestone: activeMilestone, project });
                           }}>
                             <Send size={16} /> Submit Work
                           </button>
@@ -1050,7 +1158,7 @@ export default function ActiveProjects() {
             <form onSubmit={handleAddGithubLink} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.5rem' }}>Resource Type / Platform *</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <div className="grid-responsive-4" style={{ gap: '8px' }}>
                   {[
                     { id: 'drive', label: 'Google Drive', icon: <Folder size={18} /> },
                     { id: 'figma', label: 'Figma', icon: <Layers size={18} /> },

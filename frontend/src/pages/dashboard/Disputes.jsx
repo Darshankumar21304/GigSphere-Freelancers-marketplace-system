@@ -17,10 +17,10 @@ export default function Disputes() {
   const [newMessageText, setNewMessageText] = useState('');
   const [postingMessage, setPostingMessage] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
-  const [fileForm, setFileForm] = useState({ projectId: '', projectTitle: '', freelancerEmail: '', amount: '', issue: '' });
+  const [fileForm, setFileForm] = useState({ projectId: '', projectTitle: '', freelancerEmail: '', clientEmail: '', amount: '', issue: '' });
   const [filingDispute, setFilingDispute] = useState(false);
 
-  // Projects & freelancers for dispute form
+  // Projects & counterparties for dispute form
   const [myProjects, setMyProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -64,49 +64,92 @@ export default function Disputes() {
   const openFileModal = async () => {
     setShowFileModal(true);
     setSelectedProject(null);
-    setFileForm({ projectId: '', projectTitle: '', freelancerEmail: '', amount: '', issue: '' });
-    if (myProjects.length > 0) return; // already loaded
+    setFileForm({ projectId: '', projectTitle: '', freelancerEmail: '', clientEmail: '', amount: '', issue: '' });
     setLoadingProjects(true);
     try {
-      const data = await apiFetch('/projects/my');
-      setMyProjects(Array.isArray(data) ? data : []);
+      if (role === 'freelancer') {
+        const data = await apiFetch('/projects/my-contracts');
+        const contractProjects = (data.contracts || []).map(c => ({
+          _id: c.project_id?._id || c._id,
+          contractId: c._id,
+          title: c.project_id?.title || c.title || 'Marketplace Project',
+          budget: c.totalValue || c.amountEarned || 1000,
+          client: c.client_id,
+          clientName: c.client_id?.name || 'Client',
+          clientEmail: c.client_id?.email || '',
+          proposals: []
+        }));
+        setMyProjects(contractProjects);
+      } else {
+        const data = await apiFetch('/projects/my');
+        setMyProjects(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.error('Failed to load projects:', err);
+      flash('Failed to load active projects.', 'error');
     } finally {
       setLoadingProjects(false);
     }
   };
 
   const handleProjectSelect = (projectId) => {
-    const proj = myProjects.find(p => p._id === projectId);
+    const proj = myProjects.find(p => p._id === projectId || p.contractId === projectId);
     if (!proj) {
       setSelectedProject(null);
-      setFileForm(f => ({ ...f, projectId: '', projectTitle: '', freelancerEmail: '', amount: '' }));
+      setFileForm(f => ({ ...f, projectId: '', projectTitle: '', freelancerEmail: '', clientEmail: '', amount: '' }));
       return;
     }
     setSelectedProject(proj);
-    // Auto-fill from project
-    const acceptedProposal = proj.proposals?.find(p => p.status === 'Accepted');
-    const freelancerEmail = acceptedProposal?.freelancer_email || '';
-    setFileForm(f => ({
-      ...f,
-      projectId: proj._id,
-      projectTitle: proj.title,
-      freelancerEmail,
-      amount: proj.budget ? String(proj.budget) : f.amount
-    }));
+
+    if (role === 'freelancer') {
+      const cEmail = proj.clientEmail || proj.client?.email || '';
+      setFileForm(f => ({
+        ...f,
+        projectId: proj._id,
+        projectTitle: proj.title,
+        clientEmail: cEmail,
+        freelancerEmail: '',
+        amount: proj.budget ? String(proj.budget) : (f.amount || '1000')
+      }));
+    } else {
+      // For client: find hired or accepted proposal, or fallback to first proposal
+      const candidates = (proj.proposals || []).filter(p => p.status === 'Hired' || p.status === 'Accepted');
+      const activeProp = candidates.length > 0 ? candidates[0] : (proj.proposals?.[0] || null);
+
+      const flEmail = activeProp?.freelancer_id?.email 
+                   || activeProp?.freelancer_email 
+                   || activeProp?.freelancer_name 
+                   || '';
+
+      setFileForm(f => ({
+        ...f,
+        projectId: proj._id,
+        projectTitle: proj.title,
+        freelancerEmail: flEmail,
+        clientEmail: '',
+        amount: proj.budget ? String(proj.budget) : (f.amount || '1000')
+      }));
+    }
   };
 
   const handleFileDispute = async (e) => {
     e.preventDefault();
+    if (!selectedProject) {
+      flash('Please select a project first.', 'error');
+      return;
+    }
+    if (!fileForm.issue || !fileForm.issue.trim()) {
+      flash('Please provide an issue description.', 'error');
+      return;
+    }
     setFilingDispute(true);
     try {
       const res = await apiFetch('/users/disputes', { method: 'POST', body: JSON.stringify(fileForm) });
       flash(res.message || 'Dispute filed successfully!');
       setShowFileModal(false);
-      setMyProjects([]);
-      setFileForm({ projectId: '', projectTitle: '', freelancerEmail: '', amount: '', issue: '' });
-      fetchDisputes();
+      setFileForm({ projectId: '', projectTitle: '', freelancerEmail: '', clientEmail: '', amount: '', issue: '' });
+      setSelectedProject(null);
+      await fetchDisputes();
     } catch (err) {
       flash(err.message || 'Failed to file dispute.', 'error');
     } finally { setFilingDispute(false); }
@@ -136,11 +179,9 @@ export default function Disputes() {
           <button onClick={fetchDisputes} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1.2rem', borderRadius: '40px', background: '#f8fafc', border: '1px solid #cbd5e1', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
             <RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh
           </button>
-          {role === 'client' && (
-            <button onClick={openFileModal} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.65rem 1.4rem', borderRadius: '40px', background: '#0f172a', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
-              <PlusCircle size={18} /> File New Dispute
-            </button>
-          )}
+          <button onClick={openFileModal} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.65rem 1.4rem', borderRadius: '40px', background: '#0f172a', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+            <PlusCircle size={18} /> File New Dispute
+          </button>
         </div>
       </div>
 
@@ -166,13 +207,11 @@ export default function Disputes() {
           <AlertTriangle size={40} color="#94a3b8" style={{ marginBottom: '12px' }} />
           <h4 style={{ margin: '0 0 8px', color: '#0f172a', fontWeight: 800 }}>No Disputes Found</h4>
           <p style={{ margin: '0 0 20px', fontSize: '0.875rem' }}>
-            {role === 'client' ? 'No active disputes. File one if you have an issue with a freelancer.' : 'No disputes filed against your projects.'}
+            {role === 'client' ? 'No active disputes. File one if you have an issue with a freelancer.' : 'No disputes filed on your contracts. You can file a dispute if there is an issue with a client or milestone.'}
           </p>
-          {role === 'client' && (
-            <button onClick={openFileModal} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1.4rem', borderRadius: '40px', background: '#0f172a', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
-              <PlusCircle size={16} /> File a Dispute
-            </button>
-          )}
+          <button onClick={openFileModal} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1.4rem', borderRadius: '40px', background: '#0f172a', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+            <PlusCircle size={16} /> File a Dispute
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -355,35 +394,71 @@ export default function Disputes() {
                 )}
               </div>
 
-              {/* Step 2: Select Hired Freelancer (auto-filled from project) */}
+              {/* Step 2: Select Counterparty */}
               {selectedProject && (
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
-                    Hired Freelancer *
-                  </label>
-                  {selectedProject.proposals?.filter(p => p.status === 'Accepted').length > 0 ? (
-                    <select
-                      value={fileForm.freelancerEmail}
-                      onChange={e => setFileForm(f => ({ ...f, freelancerEmail: e.target.value }))}
-                      required
-                      style={{ ...inputStyle, appearance: 'auto', cursor: 'pointer', background: '#fff' }}
-                    >
-                      <option value="">— Select freelancer —</option>
-                      {selectedProject.proposals
-                        .filter(p => p.status === 'Accepted')
-                        .map((p, i) => (
-                          <option key={i} value={p.freelancer_email || p.freelancer_name}>
-                            {p.freelancer_name || p.freelancer_email || `Freelancer ${i + 1}`}
-                          </option>
-                        ))
-                      }
-                    </select>
+                  {role === 'freelancer' ? (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                        Project Client *
+                      </label>
+                      <div style={{ padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.85rem', color: '#0f172a' }}>
+                        <strong>{selectedProject.clientName || selectedProject.client?.name || 'Client'}</strong>
+                        {selectedProject.clientEmail || selectedProject.client?.email ? (
+                          <span style={{ color: '#64748b', marginLeft: '6px' }}>({selectedProject.clientEmail || selectedProject.client?.email})</span>
+                        ) : null}
+                      </div>
+                    </div>
                   ) : (
-                    <div style={{ padding: '0.75rem 1rem', borderRadius: '10px', border: '1px dashed #fde68a', background: '#fffbeb', fontSize: '0.8rem', color: '#92400e' }}>
-                      ⚠ No accepted proposals on this project yet. You can still describe the issue and submit.
-                      <input type="email" placeholder="Enter freelancer email manually" value={fileForm.freelancerEmail}
-                        onChange={e => setFileForm(f => ({ ...f, freelancerEmail: e.target.value }))}
-                        style={{ ...inputStyle, marginTop: '8px' }} />
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                        Freelancer to Dispute *
+                      </label>
+                      {(() => {
+                        const proposalList = selectedProject.proposals || [];
+                        const candidateList = proposalList.filter(p => p.status === 'Hired' || p.status === 'Accepted');
+                        const displayList = candidateList.length > 0 ? candidateList : proposalList;
+
+                        if (displayList.length > 0) {
+                          return (
+                            <select
+                              value={fileForm.freelancerEmail}
+                              onChange={e => setFileForm(f => ({ ...f, freelancerEmail: e.target.value }))}
+                              required
+                              style={{ ...inputStyle, appearance: 'auto', cursor: 'pointer', background: '#fff' }}
+                            >
+                              <option value="">— Select freelancer —</option>
+                              {displayList.map((p, i) => {
+                                const val = p.freelancer_id?.email || p.freelancer_email || p.freelancer_name || `freelancer_${i}`;
+                                const name = p.freelancer_name || p.freelancer_id?.name || `Freelancer ${i + 1}`;
+                                const email = p.freelancer_id?.email || p.freelancer_email;
+                                const statusTag = p.status ? ` (${p.status})` : '';
+                                return (
+                                  <option key={i} value={val}>
+                                    {name}{statusTag}{email ? ` — ${email}` : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          );
+                        } else {
+                          return (
+                            <div>
+                              <div style={{ padding: '0.75rem 1rem', borderRadius: '10px', border: '1px dashed #fde68a', background: '#fffbeb', fontSize: '0.8rem', color: '#92400e', marginBottom: '8px' }}>
+                                ⚠ No proposals recorded on this project yet. Please enter the freelancer's email or username below.
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Enter freelancer email or name"
+                                value={fileForm.freelancerEmail}
+                                onChange={e => setFileForm(f => ({ ...f, freelancerEmail: e.target.value }))}
+                                required
+                                style={inputStyle}
+                              />
+                            </div>
+                          );
+                        }
+                      })()}
                     </div>
                   )}
                 </div>

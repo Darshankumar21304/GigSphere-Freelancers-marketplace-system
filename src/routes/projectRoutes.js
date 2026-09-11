@@ -17,8 +17,8 @@ router.get('/my-contracts', authenticateToken, projectController.getMyContracts)
 // Get single project by ID
 router.get('/:id', projectController.getProjectById);
 
-// Create a project (Temporarily public for demo)
-router.post('/', projectController.createProject);
+// Create a project (Uses auth token if logged in, falls back to demo client if unauthenticated)
+router.post('/', optionalAuth, projectController.createProject);
 
 // Submit a proposal to a project
 router.post('/:projectId/proposals', optionalAuth, projectController.submitProposal);

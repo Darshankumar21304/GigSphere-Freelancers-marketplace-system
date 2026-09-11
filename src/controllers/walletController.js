@@ -16,8 +16,7 @@ exports.getWalletDetails = async (req, res) => {
       const activeContracts = await Contract.find({
         $or: [
           { client_id: user._id },
-          { client_id: String(user._id) },
-          { client_id: null }
+          { client_id: String(user._id) }
         ],
         status: { $nin: ['Completed', 'Cancelled'] }
       }).lean();

@@ -512,7 +512,7 @@ export default function ClientSpending() {
                           required 
                         />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="grid-responsive-2" style={{ gap: '0.75rem' }}>
                         <div>
                           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.35rem', textAlign: 'left' }}>Account Number <span style={{ color: '#dc2626' }}>*</span></label>
                           <input 

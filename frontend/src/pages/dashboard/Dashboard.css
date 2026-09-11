@@ -22,18 +22,68 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  .dashboard-layout {
+    padding: 12px;
+    gap: 0;
+  }
   .dashboard-sidebar {
     position: fixed;
     top: 62px;
     left: -100%;
     height: calc(100vh - 62px);
-    z-index: 40;
+    z-index: 999;
     width: 280px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   }
   .dashboard-sidebar.open {
     left: 0;
+  }
+  .mobile-close-sidebar {
+    display: block;
+  }
+  .sidebar-overlay {
+    position: fixed;
+    top: 62px;
+    left: 0;
+    width: 100vw;
+    height: calc(100vh - 62px);
+    background: rgba(15, 23, 42, 0.5);
+    z-index: 998;
+    backdrop-filter: blur(4px);
+  }
+  .dashboard-mobile-header {
+    display: flex;
+  }
+  .dashboard-main {
+    padding: 20px;
+    border-radius: 16px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-layout {
+    padding: 8px 6px;
+    height: auto;
+    min-height: calc(100vh - 62px);
+    overflow: visible;
+  }
+  .dashboard-main {
+    padding: 16px 12px;
+    border-radius: 12px;
+    overflow-x: hidden;
+  }
+  .overview-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+  }
+  .overview-title {
+    font-size: 1.4rem !important;
+  }
+  .date-filter {
+    width: 100%;
   }
 }
 
@@ -45,28 +95,15 @@
   cursor: pointer;
 }
 
-@media (max-width: 768px) {
-  .mobile-close-sidebar {
-    display: block;
-  }
-}
-
 .sidebar-overlay {
-  position: fixed;
-  top: 62px;
-  left: 0;
-  width: 100vw;
-  height: calc(100vh - 62px);
-  background: rgba(15, 23, 42, 0.5);
-  z-index: 35;
-  backdrop-filter: blur(4px);
+  display: none;
 }
 
 .dashboard-mobile-header {
   display: none;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .sidebar-toggle-btn {
@@ -86,15 +123,6 @@
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
-}
-
-@media (max-width: 768px) {
-  .dashboard-mobile-header {
-    display: flex;
-  }
-  .dashboard-main {
-    padding: 16px;
-  }
 }
 
 .sidebar-header {

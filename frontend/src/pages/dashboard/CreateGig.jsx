@@ -516,7 +516,7 @@ export default function CreateGig() {
                       {formData.includeMilestones && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           {formData.milestones.map((milestone, index) => (
-                            <div key={milestone.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '12px', alignItems: 'end', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <div key={milestone.id} className="gcpj-milestone-grid" style={{ background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                               <div>
                                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>Milestone Title</label>
                                 <input type="text" value={milestone.title} onChange={(e) => {
@@ -624,7 +624,7 @@ export default function CreateGig() {
                         </div>
                         <p style={{fontSize: '14px', lineHeight: 1.6, marginBottom: '16px', color: '#4b5563'}}>{formData.description || 'No description provided.'}</p>
                         
-                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px 0', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', marginBottom: '16px'}}>
+                        <div className="grid-responsive-2" style={{padding: '16px 0', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', marginBottom: '16px'}}>
                           <div>
                             <div style={{fontSize: '12px', color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px'}}>Budget</div>
                             <div style={{fontSize: '14px', fontWeight: 'bold'}}>

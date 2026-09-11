@@ -1,6 +1,6 @@
 const { 
   User, Project, Gig, Contract, FreelancerProfile, 
-  Transaction, Dispute, TrustEvent, TrustReview, RecommendationEvent 
+  Transaction, Dispute, TrustEvent, TrustReview, RecommendationEvent, Review 
 } = require('../models');
 const { 
   calculateUserTrustScore, 

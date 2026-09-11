@@ -20,6 +20,7 @@ import {
 import './BrowseProjects.css'; // Reusing the same CSS for consistent layout
 import AuthModal from '../components/AuthModal';
 import FreelancerProfileModal from '../components/FreelancerProfileModal';
+import { getUserRole, isAuthenticated } from '../utils/authUtils';
 
 const MOCK_SKILLS = [
   'All Skills',
@@ -385,15 +386,27 @@ export default function Freelancers() {
         freelancer={selectedFreelancer}
         onHire={() => {
           setIsProfileModalOpen(false);
-          setShowAuthModal(true);
+          if (isAuthenticated() && getUserRole() === 'client') {
+            navigate('/client/dashboard/browse-freelancers');
+          } else {
+            setShowAuthModal(true);
+          }
         }}
         onMessage={() => {
           setIsProfileModalOpen(false);
-          setShowAuthModal(true);
+          if (isAuthenticated() && getUserRole() === 'client') {
+            navigate(`/client/dashboard/chat?partnerId=${selectedFreelancer?._id || selectedFreelancer?.id}`);
+          } else {
+            setShowAuthModal(true);
+          }
         }}
         onShortlist={() => {
           setIsProfileModalOpen(false);
-          setShowAuthModal(true);
+          if (isAuthenticated() && getUserRole() === 'client') {
+            navigate('/client/dashboard/browse-freelancers');
+          } else {
+            setShowAuthModal(true);
+          }
         }}
       />
 

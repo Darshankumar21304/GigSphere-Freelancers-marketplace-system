@@ -16,7 +16,6 @@ const getActiveContracts = async (req, res) => {
     if (userId) {
       orClauses.push({ client_id: userId }, { freelancer_id: userId });
     }
-    orClauses.push({ client_id: null }); // fallback for legacy/testing data
 
     let filter;
     if (req.query.projectId) {
@@ -98,7 +97,6 @@ const getActiveContracts = async (req, res) => {
       $or: [
         ...(userObjectId ? [{ client_id: userObjectId }] : []),
         { client_id: userId },
-        { client_id: null },
         ...(userObjectId ? [{ 'proposals.freelancer_id': userObjectId }] : []),
         { 'proposals.freelancer_id': userId }
       ]
@@ -185,41 +183,138 @@ const getActiveContracts = async (req, res) => {
 const submitMilestone = async (req, res) => {
   try {
     const { contractId, milestoneId } = req.params;
-    const userId = req.user.id;
+    const userId = String(req.user?.id || req.user?._id || '');
+    const { message, files } = req.body;
+    const { Project, User } = require('../models');
 
-    const contract = await Contract.findById(contractId);
-    if (!contract) return res.status(404).json({ message: 'Contract not found' });
-
-    // Verify user is the freelancer
-    if (contract.freelancer_id.toString() !== userId) {
-      return res.status(403).json({ message: 'Not authorized' });
+    // 1. Locate Contract by ID or Project ID
+    let contract = await Contract.findById(contractId).catch(() => null);
+    if (!contract) {
+      contract = await Contract.findOne({ project_id: contractId }).catch(() => null);
+    }
+    if (!contract) {
+      const project = await Project.findById(contractId).catch(() => null);
+      if (project) {
+        const deadlineDate = project.deadline ? new Date(project.deadline) : new Date(Date.now() + 30 * 86400000);
+        const totalVal = Number(project.budget || 0);
+        contract = await Contract.create({
+          client_id: project.client_id,
+          freelancer_id: userId,
+          project_id: project._id,
+          title: `Contract: ${project.title}`,
+          status: 'In Progress',
+          totalValue: totalVal,
+          deadline: deadlineDate,
+          milestones: [
+            {
+              title: 'Phase 1: Project Initiation & Architecture Setup',
+              amount: Math.round(totalVal * 0.4),
+              deadline: new Date(Date.now() + 7 * 86400000),
+              status: 'In Progress'
+            },
+            {
+              title: 'Phase 2: Core Functional Delivery & QA Review',
+              amount: Math.round(totalVal * 0.6),
+              deadline: deadlineDate,
+              status: 'Pending'
+            }
+          ]
+        });
+      }
     }
 
-    const milestone = contract.milestones.id(milestoneId);
+    if (!contract) return res.status(404).json({ message: 'Contract not found' });
+
+    // 2. Authorization check
+    const contractFreelancerId = contract.freelancer_id ? contract.freelancer_id.toString() : '';
+    const isAuthorized = !contractFreelancerId || contractFreelancerId === userId || req.user?.role === 'freelancer' || req.user?.role === 'admin';
+
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Not authorized to submit work for this contract' });
+    }
+
+    // Bind current user to contract if unassigned or demo freelancer
+    if (!contractFreelancerId && userId) {
+      contract.freelancer_id = userId;
+    }
+
+    // 3. Locate milestone
+    let milestone = null;
+    try {
+      milestone = contract.milestones.id(milestoneId);
+    } catch (e) {}
+    if (!milestone) {
+      milestone = contract.milestones.find(m => String(m._id) === String(milestoneId) || String(m.id) === String(milestoneId));
+    }
+    if (!milestone) {
+      milestone = contract.milestones.find(m => m.status === 'In Progress' || m.status === 'Revision Requested')
+               || contract.milestones.find(m => m.status === 'Pending')
+               || contract.milestones[0];
+    }
+
     if (!milestone) return res.status(404).json({ message: 'Milestone not found' });
 
+    // 4. Update milestone details
     milestone.status = 'Under Review';
-    contract.status = 'Submitted for Review';
+    if (message) milestone.submissionMessage = message;
+    milestone.submittedAt = new Date();
 
+    if (Array.isArray(files) && files.length > 0) {
+      milestone.submissionFiles = files.map(f => ({
+        name: f.name || 'Submitted Deliverable',
+        url: f.url || '',
+        size: f.size || '',
+        type: f.type || '',
+        uploadedAt: new Date()
+      }));
+    }
+
+    contract.status = 'Submitted for Review';
     await contract.save();
 
-    // Trigger Notification to Client (project owner)
+    // 5. Sync Project status and attachments if available
+    if (contract.project_id) {
+      const projUpdate = { status: 'Submitted for Review' };
+      if (Array.isArray(files) && files.length > 0) {
+        projUpdate.$push = {
+          attachments: {
+            $each: files.map(f => ({
+              name: f.name || 'Submitted Deliverable',
+              url: f.url || '',
+              size: f.size || '',
+              type: f.type || '',
+              uploadedBy: 'Freelancer',
+              uploadedAt: new Date()
+            }))
+          }
+        };
+      }
+      await Project.findByIdAndUpdate(contract.project_id, projUpdate).catch(() => null);
+    }
+
+    // 6. Trigger Notification to Client (project owner)
     const { createNotification } = require('./notificationController');
-    const { User } = require('../models');
     const freelancer = await User.findById(userId).catch(() => null);
     const freelancerName = freelancer ? freelancer.name : 'The freelancer';
 
-    await createNotification(
-      contract.client_id,
-      'project',
-      'Milestone Submitted for Review',
-      `${freelancerName} has marked "${milestone.title}" as completed and submitted it for your review.`
-    );
+    if (contract.client_id) {
+      await createNotification(
+        contract.client_id,
+        'project',
+        'Milestone Submitted for Review',
+        `${freelancerName} has marked "${milestone.title}" as completed and submitted work for your review.`
+      ).catch(() => null);
+    }
 
-    res.json(contract);
+    res.json({
+      success: true,
+      message: 'Work submitted for review successfully',
+      contract,
+      milestone
+    });
   } catch (error) {
     console.error('Error submitting milestone:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -239,7 +334,13 @@ const approveMilestone = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to release escrow' });
     }
 
-    const milestone = contract.milestones.id(milestoneId);
+    let milestone = null;
+    try {
+      milestone = contract.milestones.id(milestoneId);
+    } catch (e) {}
+    if (!milestone) {
+      milestone = contract.milestones.find(m => String(m._id) === String(milestoneId) || String(m.id) === String(milestoneId));
+    }
     if (!milestone) return res.status(404).json({ message: 'Milestone not found' });
 
     if (milestone.status === 'Completed') {
@@ -249,12 +350,16 @@ const approveMilestone = async (req, res) => {
     // Update milestone status
     milestone.status = 'Completed';
     
-    // Check progress
+    // Check progress and activate next pending milestone
     const allCompleted = contract.milestones.every(m => m.status === 'Completed');
     if (allCompleted) {
       contract.status = 'Completed';
     } else {
       contract.status = 'In Progress';
+      const nextPending = contract.milestones.find(m => m.status === 'Pending');
+      if (nextPending) {
+        nextPending.status = 'In Progress';
+      }
     }
 
     // Release escrow funds from client to freelancer with 10% platform commission
@@ -402,20 +507,20 @@ const getHiredContracts = async (req, res) => {
         ? arr.flatMap(s => typeof s === 'string' ? s.split(',').map(x => x.trim()) : [String(s)]).filter(Boolean)
         : [];
 
-    // â”€â”€ 1. Contracts where current user is client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 1. Contracts where current user is client ────────────────────────────
     const contractQuery = userObjectId
-      ? { $or: [{ client_id: userObjectId }, { client_id: userId }, { client_id: null }] }
-      : { $or: [{ client_id: userId }, { client_id: null }] };
+      ? { $or: [{ client_id: userObjectId }, { client_id: userId }] }
+      : { client_id: userId };
 
     const contracts = await Contract.find(contractQuery)
       .populate('freelancer_id', 'name email avatar profilePhoto title skills rating numReviews location bio')
       .populate('project_id', 'title budget category status skills')
       .sort({ createdAt: -1 });
 
-    // â”€â”€ 2. Projects with hired proposals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── 2. Projects with hired proposals ────────────────────────────────────
     const projectQuery = userObjectId
-      ? { $or: [{ client_id: userObjectId }, { client_id: userId }, { client_id: null }, { 'proposals.0': { $exists: true } }] }
-      : { $or: [{ client_id: userId }, { client_id: null }, { 'proposals.0': { $exists: true } }] };
+      ? { $or: [{ client_id: userObjectId }, { client_id: userId }] }
+      : { client_id: userId };
 
     const projects = await Project.find(projectQuery);
 

@@ -4,14 +4,17 @@ const { createNotification } = require('./notificationController');
 // GET /api/proposals/received
 exports.getReceivedProposals = async (req, res) => {
   try {
-    const userId = req.user.id;
-    // Find all projects owned by the client or containing submitted proposals
+    const mongoose = require('mongoose');
+    const userId = String(req.user?.id || req.user?._id || '');
+    let userObjectId;
+    try { userObjectId = new mongoose.Types.ObjectId(userId); } catch(e) { userObjectId = null; }
+
+    const orClauses = [{ client_id: userId }];
+    if (userObjectId) orClauses.push({ client_id: userObjectId });
+
+    // Find all projects owned by this client
     const projects = await Project.find({
-      $or: [
-        { client_id: userId },
-        { client_id: null },
-        { 'proposals.0': { $exists: true } }
-      ]
+      $or: orClauses
     });
     
     // Collect all freelancer IDs across proposals
@@ -153,25 +156,43 @@ exports.getMyProposals = async (req, res) => {
 exports.updateProposalStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // 'Pending', 'Shortlisted', 'Accepted', 'Rejected'
-    const userId = req.user.id;
+    const { status } = req.body; // 'Pending', 'Shortlisted', 'Accepted', 'Hired', 'Rejected'
+    const userId = req.user?.id || req.user?._id;
 
     // Find the project containing this proposal
-    const project = await Project.findOne({ 'proposals._id': id });
+    let project = await Project.findOne({ 'proposals._id': id });
+    if (!project) {
+      // Try string search across all projects if exact subdocument id lookup needed fallback
+      const allProjects = await Project.find({ 'proposals.0': { $exists: true } });
+      project = allProjects.find(p => (p.proposals || []).some(pr => String(pr._id) === String(id) || String(pr.id) === String(id)));
+    }
+
     if (!project) return res.status(404).json({ message: 'Proposal not found' });
 
-    // Ensure project is associated with the active client user
-    if (!project.client_id) {
+    // Ensure project is associated with the active client user if unassigned
+    if (!project.client_id && userId) {
       project.client_id = userId;
     }
 
-    const proposal = project.proposals.id(id);
+    let proposal = null;
+    try {
+      proposal = project.proposals.id(id);
+    } catch (e) {}
+    if (!proposal) {
+      proposal = (project.proposals || []).find(pr => String(pr._id) === String(id) || String(pr.id) === String(id));
+    }
+
     if (!proposal) return res.status(404).json({ message: 'Proposal not found' });
 
     proposal.status = status;
+
+    if (status === 'Accepted' || status === 'Hired') {
+      project.status = 'In Progress';
+    }
+
     await project.save();
 
-    // Trigger Notification for the Freelancer
+    // Trigger Notification for the Freelancer & manage contract
     if (proposal.freelancer_id) {
       let notifTitle = 'Proposal Updated';
       let notifDesc = `Your proposal status for "${project.title}" has been set to ${status}.`;
@@ -180,45 +201,69 @@ exports.updateProposalStatus = async (req, res) => {
         notifTitle = 'Proposal Accepted / Hired!';
         notifDesc = `Congratulations! You have been hired by the client for "${project.title}".`;
 
-        // Update Project Status to In Progress
-        project.status = 'In Progress';
-        await project.save();
+        try {
+          // Create or update the active Contract document automatically for workspace mapping!
+          const deadlineDate = (project.deadline && !isNaN(new Date(project.deadline).getTime())) 
+            ? new Date(project.deadline) 
+            : new Date(Date.now() + 30 * 86400000);
 
-        // Create the active Contract document automatically for workspace mapping!
-        const deadlineDate = new Date();
-        deadlineDate.setDate(deadlineDate.getDate() + 30); // 30 days default duration
+          const totalVal = Number(proposal.bidAmount) || Number(project.budget) || 1000;
 
-        await Contract.create({
-          client_id: project.client_id,
-          freelancer_id: proposal.freelancer_id,
-          project_id: project._id,
-          title: `Contract: ${project.title}`,
-          status: 'In Progress',
-          totalValue: proposal.bidAmount || Number(project.budget) || 0,
-          deadline: deadlineDate,
-          milestones: [
-            {
-              title: 'Phase 1: Project Initiation & Architecture Setup',
-              amount: Math.round((proposal.bidAmount || Number(project.budget) || 0) * 0.4),
-              deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-              status: 'In Progress'
-            },
-            {
-              title: 'Phase 2: Core Functional Delivery & QA Review',
-              amount: Math.round((proposal.bidAmount || Number(project.budget) || 0) * 0.6),
-              deadline: deadlineDate,
-              status: 'Pending'
+          let existingContract = await Contract.findOne({
+            $or: [
+              { project_id: project._id, freelancer_id: proposal.freelancer_id },
+              { project_id: project._id }
+            ]
+          });
+
+          if (existingContract) {
+            existingContract.status = 'In Progress';
+            existingContract.freelancer_id = proposal.freelancer_id;
+            if (project.client_id) existingContract.client_id = project.client_id;
+            existingContract.totalValue = totalVal;
+            if (existingContract.milestones && existingContract.milestones.length > 0) {
+              const allComp = existingContract.milestones.every(m => m.status === 'Completed');
+              if (allComp && existingContract.milestones[0]) {
+                existingContract.milestones[0].status = 'In Progress';
+              }
             }
-          ]
-        });
+            await existingContract.save();
+          } else {
+            await Contract.create({
+              client_id: project.client_id || userId,
+              freelancer_id: proposal.freelancer_id,
+              project_id: project._id,
+              title: `Contract: ${project.title}`,
+              status: 'In Progress',
+              totalValue: totalVal,
+              deadline: deadlineDate,
+              milestones: [
+                {
+                  title: 'Phase 1: Project Initiation & Architecture Setup',
+                  amount: Math.round(totalVal * 0.4),
+                  deadline: new Date(Date.now() + 7 * 86400000),
+                  status: 'In Progress'
+                },
+                {
+                  title: 'Phase 2: Core Functional Delivery & QA Review',
+                  amount: Math.round(totalVal * 0.6),
+                  deadline: deadlineDate,
+                  status: 'Pending'
+                }
+              ]
+            });
+          }
+        } catch (contractErr) {
+          console.error('Contract sync error during hiring:', contractErr);
+        }
       }
 
-      await createNotification(proposal.freelancer_id, 'project', notifTitle, notifDesc);
+      await createNotification(proposal.freelancer_id, 'project', notifTitle, notifDesc).catch(() => null);
     }
 
-    res.json({ message: 'Proposal status updated successfully', proposal });
+    res.json({ message: 'Proposal status updated successfully', proposal, projectStatus: project.status });
   } catch (error) {
     console.error('Error updating proposal status:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };

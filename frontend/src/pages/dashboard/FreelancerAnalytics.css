@@ -472,3 +472,29 @@
 .fl-btn-mini-action:hover {
   background: #1d4ed8;
 }
+
+/* Responsive Media Queries */
+@media (max-width: 1024px) {
+  .fl-analytics-container {
+    padding: 20px 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fl-analytics-container {
+    padding: 16px 12px;
+  }
+  .fl-analytics-title {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .fl-kpi-grid-analytics {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .fl-chart-card, .fl-card-panel {
+    padding: 16px 14px;
+  }
+}

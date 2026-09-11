@@ -88,7 +88,7 @@ export default function ClientAnalytics() {
   }, []);
 
   return (
-    <div className="client-dashboard-container" style={{ padding: '24px 32px' }}>
+    <div className="client-dashboard-container">
       {/* Header */}
       <div className="overview-header" style={{ marginBottom: '24px' }}>
         <div>
@@ -106,7 +106,7 @@ export default function ClientAnalytics() {
       </div>
 
       {/* Analytics KPI Cards */}
-      <div className="client-kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', marginBottom: '28px' }}>
+      <div className="grid-responsive-3" style={{ marginBottom: '28px' }}>
         <div className="client-kpi-card">
           <div className="client-kpi-header">
             <span className="client-kpi-title">Total Project Investments</span>
@@ -211,7 +211,7 @@ export default function ClientAnalytics() {
           </div>
         </div>
 
-        <div className="payments-table-container">
+        <div className="payments-table-container responsive-table-wrapper">
           {analyticsData.payments.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', border: '1px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc' }}>
               <FolderPlus size={38} color="#1a73e8" style={{ marginBottom: '10px' }} />

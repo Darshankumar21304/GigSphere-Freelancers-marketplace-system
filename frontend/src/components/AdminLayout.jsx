@@ -8,7 +8,9 @@ import {
   Building2,
   ShieldCheck, 
   LogOut,
-  FileCheck
+  FileCheck,
+  Menu,
+  X
 } from 'lucide-react';
 import { logoutUser } from '../utils/authUtils';
 import './AdminLayout.css';
@@ -16,6 +18,10 @@ import './AdminLayout.css';
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   const confirmLogout = () => {
     logoutUser();
@@ -24,8 +30,13 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-wrapper">
+      {/* Mobile Drawer Overlay */}
+      {isSidebarOpen && (
+        <div className="admin-sidebar-overlay" onClick={closeSidebar}></div>
+      )}
+
       {/* Minimalist Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="admin-brand">
           <Link to="/" style={{ textDecoration: 'none', color: '#0f172a', fontWeight: '800', fontSize: '1.2rem', letterSpacing: '-0.03em', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -46,46 +57,51 @@ export default function AdminLayout() {
             </svg>
             GigSphere
           </Link>
-          <span className="admin-brand-tag">ADMIN</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="admin-brand-tag">ADMIN</span>
+            <button className="admin-mobile-close" onClick={closeSidebar}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <nav className="admin-nav">
-          <NavLink to="/admin/dashboard" end className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard" end onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <BarChart3 size={18} />
             <span>Overview</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/users" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/users" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <Users size={18} />
             <span>Users</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/listings" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/listings" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <Layers size={18} />
             <span>Listings</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/disputes" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/disputes" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <AlertTriangle size={18} />
             <span>Disputes</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/payouts" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/payouts" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <Building2 size={18} />
             <span>Payouts</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/kyc" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/kyc" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <FileCheck size={18} />
             <span>KYC Approvals</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/trust-fraud" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/trust-fraud" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <ShieldCheck size={18} color="#1a73e8" />
             <span>Trust & Fraud AI</span>
           </NavLink>
 
-          <NavLink to="/admin/dashboard/ai-security" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/admin/dashboard/ai-security" onClick={closeSidebar} className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <ShieldCheck size={18} />
             <span>AI & Security</span>
           </NavLink>
@@ -100,6 +116,13 @@ export default function AdminLayout() {
 
       {/* Main Admin Page Content */}
       <main className="admin-content">
+        {/* Mobile Header Toggle */}
+        <div className="admin-mobile-header">
+          <button className="admin-toggle-btn" onClick={toggleSidebar}>
+            <Menu size={20} />
+          </button>
+          <span className="admin-mobile-title">Admin Console</span>
+        </div>
         <Outlet />
       </main>
 

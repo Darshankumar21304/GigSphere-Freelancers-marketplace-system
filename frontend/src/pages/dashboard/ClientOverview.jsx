@@ -78,17 +78,14 @@ export default function ClientOverview() {
     try {
       setIsLoading(true);
 
-      // 1. Fetch Real Client Projects from MongoDB (Attempt client-specific first, fallback to all projects)
-      const myProjectsRes = await apiFetch('/projects/my').catch(() => null);
-      const allProjectsRes = await apiFetch('/projects').catch(() => []);
+      // 1. Fetch Real Client Projects from MongoDB
+      const myProjectsRes = await apiFetch('/projects/my').catch(() => []);
       
       let rawProjects = [];
-      if (Array.isArray(myProjectsRes) && myProjectsRes.length > 0) {
+      if (Array.isArray(myProjectsRes)) {
         rawProjects = myProjectsRes;
-      } else if (Array.isArray(allProjectsRes)) {
-        rawProjects = allProjectsRes;
-      } else if (allProjectsRes?.projects) {
-        rawProjects = allProjectsRes.projects;
+      } else if (myProjectsRes?.projects && Array.isArray(myProjectsRes.projects)) {
+        rawProjects = myProjectsRes.projects;
       }
 
       // 2. Fetch Real Active Contracts from MongoDB
@@ -432,7 +429,7 @@ export default function ClientOverview() {
   }
 
   return (
-    <div className="client-dashboard-container" style={{ padding: '24px 32px', background: '#f8fafc', minHeight: '100vh' }}>
+    <div className="client-dashboard-container" style={{ minHeight: '100vh' }}>
       
       {/* 1. WELCOME MESSAGE */}
       <div className="overview-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '24px 28px', borderRadius: '16px', border: '1px solid #cbd5e1', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
@@ -444,7 +441,7 @@ export default function ClientOverview() {
             Here’s an overview of your projects and hiring activity.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <Link to="/client/dashboard/post-project" style={{ padding: '10px 22px', background: '#0f172a', color: '#ffffff', borderRadius: '30px', fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
             <Plus size={18} /> Post a Project
           </Link>
@@ -455,7 +452,7 @@ export default function ClientOverview() {
       </div>
 
       {/* 2. QUICK SUMMARY (4 NUMBERS) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px', marginBottom: '28px' }}>
+      <div className="grid-responsive-4" style={{ gap: '16px', marginBottom: '28px' }}>
         <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Active Projects</span>
@@ -570,7 +567,7 @@ export default function ClientOverview() {
       </div>
 
       {/* TWO COLUMN GRID FOR RECENT PROPOSALS & HIRED FREELANCERS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '24px', marginBottom: '28px' }}>
+      <div className="grid-responsive-2" style={{ gap: '24px', marginBottom: '28px' }}>
         
         {/* 4. RECENT PROPOSALS */}
         <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '22px' }}>
@@ -692,7 +689,7 @@ export default function ClientOverview() {
             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>AI recommendations will generate once freelancers register and set up their profiles.</span>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px' }}>
+          <div className="grid-responsive-3" style={{ gap: '16px' }}>
             {recommendedFreelancers.map(rf => (
               <div key={rf.id} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>

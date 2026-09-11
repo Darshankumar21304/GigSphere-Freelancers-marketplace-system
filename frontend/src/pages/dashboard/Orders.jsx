@@ -241,7 +241,7 @@ export default function Orders() {
 
   const fetchProjects = async () => {
     try {
-      const data = await apiFetch('/projects').catch(() => []);
+      const data = await apiFetch('/projects/my').catch(() => []);
       if (Array.isArray(data)) {
         setProjects(data.map(p => ({
           ...p,
@@ -672,7 +672,7 @@ export default function Orders() {
         </div>
 
         {/* 4-Stat Workspace KPI Summary Strip */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
+        <div className="grid-responsive-4" style={{ gap: '14px', marginBottom: '24px' }}>
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 18px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Project Budget</span>
             <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#10b981' }}>{formatINR(totalBudgetAmount)}</span>
@@ -702,7 +702,7 @@ export default function Orders() {
         </div>
 
         {/* Workspace Nav Pills */}
-        <div style={{ display: 'flex', gap: '10px', borderBottom: '1.5px solid #e2e8f0', paddingBottom: '10px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '10px', borderBottom: '1.5px solid #e2e8f0', paddingBottom: '10px', marginBottom: '24px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexWrap: 'wrap' }}>
           {[
             { id: 'overview', label: '📌 Project Overview' },
             { id: 'milestones', label: `🎯 Milestones & Escrow (${totalMilestonesCount})` },
@@ -731,7 +731,7 @@ export default function Orders() {
 
         {/* TAB 1: OVERVIEW */}
         {workspaceTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+          <div className="workspace-overview-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               {/* Assigned Freelancer & Milestone Spotlight Card */}
@@ -1599,7 +1599,7 @@ export default function Orders() {
            </Link>
         </div>
       ) : (
-        <div className="client-projects-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginTop: '20px' }}>
+        <div className="client-projects-grid" style={{ gap: '16px', marginTop: '20px' }}>
           {filteredProjects.map(project => (
             <div key={project.id || project._id} className="client-projects-card" style={{ padding: '18px 20px', borderRadius: '16px', border: '1px solid #cbd5e1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: '12px', background: '#ffffff', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1657,7 +1657,7 @@ export default function Orders() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+              <div className="grid-responsive-4" style={{ gap: '8px', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
                 <div>
                   <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Budget</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#10b981' }}>{formatINR(project.budget || 0)}</span>
@@ -1889,7 +1889,7 @@ export default function Orders() {
             <form onSubmit={handleAddClientExternalLink} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.5rem' }}>Resource Type / Platform *</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <div className="grid-responsive-4" style={{ gap: '8px' }}>
                   {[
                     { id: 'drive', label: 'Google Drive', icon: <Folder size={18} /> },
                     { id: 'figma', label: 'Figma', icon: <Layers size={18} /> },
